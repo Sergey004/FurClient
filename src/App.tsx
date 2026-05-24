@@ -3,6 +3,7 @@ import {View, StyleSheet, StatusBar, SafeAreaView} from 'react-native';
 import {UserSession} from './types';
 import {FAClient} from './lib/faClient';
 import {loadSession, saveSession, clearSession} from './lib/faSession';
+import {isElectron} from './lib/electronLogin';
 import LoginScreen from './screens/LoginScreen';
 import AppNavigator from './navigation/AppNavigator';
 import LoadingIndicator from './components/LoadingIndicator';
@@ -20,6 +21,9 @@ export default function App() {
       if (saved) {
         setSession(saved);
         client.setSession(saved);
+        if (isElectron() && saved.cookies) {
+          window.electronAPI?.restoreSessionCookies(saved.cookies);
+        }
       }
       setInitializing(false);
     };

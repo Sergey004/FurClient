@@ -9,7 +9,14 @@ import {
   parseSearchResults,
 } from './faParser';
 
-const USER_AGENT = 'FurClientRN/1.0';
+const CHROME_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+const BASE_HEADERS: Record<string, string> = {
+  'User-Agent': CHROME_UA,
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.5',
+};
 
 function cookieHeader(session: UserSession): string {
   if (session.cookies) {
@@ -24,14 +31,12 @@ function cookieHeader(session: UserSession): string {
 }
 
 async function fetchHtml(url: string, session?: UserSession): Promise<string> {
-  const headers: Record<string, string> = {
-    'User-Agent': USER_AGENT,
-  };
+  const headers: Record<string, string> = {...BASE_HEADERS};
   if (session?.cookies) {
     headers['Cookie'] = cookieHeader(session);
   }
 
-  const response = await fetch(url, {headers});
+  const response = await fetch(url, {headers, credentials: 'include'});
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
@@ -60,7 +65,7 @@ export async function loginToFA(username: string, password: string): Promise<Use
   const response = await fetch(`${FAUrls.login}/`, {
     method: 'POST',
     headers: {
-      'User-Agent': USER_AGENT,
+      'User-Agent': CHROME_UA,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: formData.toString(),
@@ -99,14 +104,12 @@ export class FAClient {
   }
 
   private async getHtml(url: string): Promise<string> {
-    const headers: Record<string, string> = {
-      'User-Agent': USER_AGENT,
-    };
+    const headers: Record<string, string> = {...BASE_HEADERS};
     if (this.session?.cookies) {
       headers['Cookie'] = cookieHeader(this.session);
     }
 
-    const response = await fetch(url, {headers});
+    const response = await fetch(url, {headers, credentials: 'include'});
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }

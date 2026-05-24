@@ -2,6 +2,7 @@ import {UserSession} from '../types';
 
 interface ElectronAPI {
   openLoginWindow: () => Promise<UserSession | null>;
+  restoreSessionCookies: (cookies: string) => Promise<boolean>;
 }
 
 declare global {
