@@ -1,26 +1,23 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false,
-    "module": "ESNext",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "isolatedModules": true,
-    "moduleDetection": "force",
+    "target": "esnext",
+    "module": "commonjs",
+    "lib": ["es2022", "dom"],
     "allowJs": true,
     "jsx": "react-jsx",
+    "strict": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
-    "allowImportingTsExtensions": true,
-    "noEmit": true
-  }
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*", "index.js", "index.web.tsx"],
+  "exclude": ["node_modules", "server", "FurAffinityApp", "Fur_Affinity_NOC_decomp"]
 }

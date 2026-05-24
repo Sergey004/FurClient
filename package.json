@@ -1,49 +1,94 @@
 {
-  "name": "react-example",
+  "name": "fa-nexus",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "main": "electron/main.js",
   "scripts": {
-    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
-    "server:dev": "tsx watch server/index.ts",
-    "client:dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "clean": "rimraf dist server.js",
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "windows": "react-native run-windows",
+    "macos": "react-native run-macos",
+    "start": "react-native start",
+    "web:dev": "vite",
+    "web:build": "vite build",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "electron:build:linux": "vite build && electron-builder --linux",
+    "electron:build:win": "vite build && electron-builder --win",
+    "electron:build:mac": "vite build && electron-builder --mac",
+    "electron:build:all": "vite build && electron-builder --linux --win --mac",
     "lint": "tsc --noEmit",
-    "start": "node server.js && vite preview",
     "typecheck": "tsc --noEmit"
   },
+  "build": {
+    "appId": "com.fanexus.app",
+    "productName": "FA Nexus",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "web-build/**/*",
+      "electron/**/*"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "assets/icon.png",
+      "category": "Network"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.social-networking"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
   "dependencies": {
-    "@google/genai": "^2.4.0",
-    "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4",
-    "axios": "^1.6.8",
-    "cheerio": "^1.0.0-rc.12",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^4.21.2",
-    "lucide-react": "^0.546.0",
-    "motion": "^12.23.24",
-    "node-cache": "^5.1.2",
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@react-native-async-storage/async-storage": "^2.1.2",
+    "@react-navigation/bottom-tabs": "^7.3.10",
+    "@react-navigation/native": "^7.1.6",
+    "@react-navigation/native-stack": "^7.3.10",
+    "@vitejs/plugin-react": "^4.4.1",
+    "cheerio": "^1.0.0",
+    "htmlparser2": "^10.0.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "vite": "^6.2.3"
+    "react-native": "^0.79.2",
+    "react-native-fast-image": "^8.6.3",
+    "react-native-safe-area-context": "^5.4.0",
+    "react-native-screens": "^4.10.0",
+    "react-native-vector-icons": "^10.2.0",
+    "react-native-web": "^0.20.0",
+    "react-native-webview": "^13.12.5",
+    "vite": "^6.3.2"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.8",
-    "@types/cheerio": "^0.22.31",
-    "@types/express": "^4.17.21",
-    "@types/node": "^22.14.0",
-    "@types/node-cache": "^4.1.5",
-    "adm-zip": "^0.5.17",
-    "autoprefixer": "^10.4.21",
-    "concurrently": "^8.2.2",
-    "esbuild": "^0.25.0",
-    "rimraf": "^5.0.5",
-    "tailwindcss": "^4.1.14",
-    "tsx": "^4.21.0",
+    "@types/react": "^19.1.2",
+    "@types/react-native": "^0.73.0",
+    "@types/react-native-vector-icons": "^6.4.18",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^36.1.0",
+    "electron-builder": "^26.0.12",
+    "react-native-macos": "^0.79.0",
+    "react-native-windows": "^0.79.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "wait-on": "^8.0.3"
   }
 }
