@@ -19,10 +19,15 @@ export default function App() {
     const init = async () => {
       const saved = await loadSession();
       if (saved) {
-        setSession(saved);
         client.setSession(saved);
-        if (isElectron() && saved.cookies) {
-          window.electronAPI?.restoreSessionCookies(saved.cookies);
+        const valid = await client.verifySession();
+        if (valid) {
+          setSession(saved);
+          if (isElectron() && saved.cookies) {
+            window.electronAPI?.restoreSessionCookies(saved.cookies);
+          }
+        } else {
+          await clearSession();
         }
       }
       setInitializing(false);
