@@ -21,7 +21,6 @@ function createWindow() {
     },
   });
 
-  // Allow CORS for FurAffinity.net from file:// origin
   mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
     {urls: ['https://www.furaffinity.net/*', 'https://a.furaffinity.net/*', 'https://t.furaffinity.net/*']},
     (details, callback) => {
@@ -56,6 +55,11 @@ function createWindow() {
 }
 
 ipcMain.handle('open-login-window', async () => {
+  const {loginWithBrowser} = require('./browser-login');
+  const result = await loginWithBrowser();
+
+  if (result) return result;
+
   const loginWindow = new BrowserWindow({
     width: 500,
     height: 780,

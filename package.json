@@ -66,6 +66,8 @@
     "@react-navigation/native-stack": "^7.3.10",
     "@vitejs/plugin-react": "^4.4.1",
     "cheerio": "^1.0.0",
+    "chrome-launcher": "^1.2.1",
+    "chrome-remote-interface": "^0.34.0",
     "htmlparser2": "^10.0.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
