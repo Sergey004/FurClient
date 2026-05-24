@@ -12,10 +12,12 @@
     "web:dev": "vite",
     "web:build": "vite build",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
-    "electron:build:linux": "vite build && cp web-build/bundle.js electron/bundle.js && electron-builder --linux",
-    "electron:build:win": "vite build && cp web-build/bundle.js electron/bundle.js && electron-builder --win",
-    "electron:build:mac": "vite build && cp web-build/bundle.js electron/bundle.js && electron-builder --mac",
-    "electron:build:all": "vite build && cp web-build/bundle.js electron/bundle.js && electron-builder --linux --win --mac",
+    "electron:copy-bundle": "shx cp web-build/bundle.js electron/bundle.js",
+    "verify-bundle": "node scripts/verify-bundle.js",
+    "electron:build:linux": "vite build && npm run electron:copy-bundle && npm run verify-bundle && electron-builder --linux",
+    "electron:build:win": "vite build && npm run electron:copy-bundle && npm run verify-bundle && electron-builder --win",
+    "electron:build:mac": "vite build && npm run electron:copy-bundle && npm run verify-bundle && electron-builder --mac",
+    "electron:build:all": "vite build && npm run electron:copy-bundle && npm run verify-bundle && electron-builder --linux --win --mac",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },
@@ -90,6 +92,7 @@
     "electron-builder": "^26.0.12",
     "react-native-macos": "^0.79.0",
     "react-native-windows": "^0.79.0",
+    "shx": "^0.4.0",
     "typescript": "~5.8.2",
     "wait-on": "^8.0.3"
   }
