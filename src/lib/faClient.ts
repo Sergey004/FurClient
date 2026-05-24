@@ -31,10 +31,17 @@ function cookieHeader(session: UserSession): string {
 }
 
 async function fetchHtml(url: string, session?: UserSession): Promise<string> {
-  const headers: Record<string, string> = {...BASE_HEADERS};
-  if (session?.cookies) {
-    headers['Cookie'] = cookieHeader(session);
+  const cookieString = session?.cookies ? cookieHeader(session) : '';
+  const ep = typeof window !== 'undefined' ? (window as any).electronAPI : undefined;
+
+  if (ep?.faFetch) {
+    const result = await ep.faFetch(url, cookieString);
+    if (result.error) throw new Error(result.error);
+    return result.html!;
   }
+
+  const headers: Record<string, string> = {...BASE_HEADERS};
+  if (cookieString) headers['Cookie'] = cookieString;
 
   const response = await fetch(url, {headers, credentials: 'include'});
   if (!response.ok) {
@@ -104,10 +111,17 @@ export class FAClient {
   }
 
   private async getHtml(url: string): Promise<string> {
-    const headers: Record<string, string> = {...BASE_HEADERS};
-    if (this.session?.cookies) {
-      headers['Cookie'] = cookieHeader(this.session);
+    const cookieString = this.session?.cookies ? cookieHeader(this.session) : '';
+    const ep = typeof window !== 'undefined' ? (window as any).electronAPI : undefined;
+
+    if (ep?.faFetch) {
+      const result = await ep.faFetch(url, cookieString);
+      if (result.error) throw new Error(result.error);
+      return result.html!;
     }
+
+    const headers: Record<string, string> = {...BASE_HEADERS};
+    if (cookieString) headers['Cookie'] = cookieString;
 
     const response = await fetch(url, {headers, credentials: 'include'});
     if (!response.ok) {
@@ -119,9 +133,8 @@ export class FAClient {
   async verifySession(): Promise<boolean> {
     if (!this.session?.cookies) return false;
     try {
-      const headers: Record<string, string> = {...BASE_HEADERS, 'Cookie': cookieHeader(this.session)};
-      const response = await fetch('https://www.furaffinity.net/', {headers, credentials: 'include'});
-      return response.ok;
+      await this.getHtml('https://www.furaffinity.net/');
+      return true;
     } catch { return false; }
   }
 

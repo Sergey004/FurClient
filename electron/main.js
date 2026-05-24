@@ -1,5 +1,7 @@
 const {app, BrowserWindow, session, ipcMain} = require('electron');
 const path = require('path');
+const https = require('https');
+const http = require('http');
 
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 
@@ -143,6 +145,37 @@ ipcMain.handle('open-login-window', async () => {
     });
 
     loginWindow.loadURL('https://www.furaffinity.net/login/');
+  });
+});
+
+ipcMain.handle('fa-fetch', async (event, {url, cookieString}) => {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const mod = u.protocol === 'https:' ? https : http;
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+    };
+    if (cookieString) headers['Cookie'] = cookieString;
+
+    const req = mod.get(
+      u,
+      {headers, rejectUnauthorized: false},
+      (res) => {
+        let body = '';
+        res.on('data', (c) => (body += c));
+        res.on('end', () => {
+          if (res.statusCode >= 400) {
+            resolve({error: `HTTP ${res.statusCode}: ${res.statusMessage || ''}`, statusCode: res.statusCode});
+          } else {
+            resolve({html: body, statusCode: res.statusCode});
+          }
+        });
+      },
+    );
+    req.on('error', (e) => resolve({error: e.message}));
+    req.setTimeout(15000, () => { req.destroy(); resolve({error: 'Timeout'}); });
   });
 });
 
