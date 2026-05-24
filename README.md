@@ -1,20 +1,51 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# FA Nexus — Fur Affinity Client
 
-# Run and deploy your AI Studio app
+Кроссплатформенный клиент для Fur Affinity на React Native.
 
-This contains everything you need to run your app locally.
+## Платформы
 
-View your app in AI Studio: https://ai.studio/apps/da198606-d421-42bd-a458-6b5300d9bf8e
+| Платформа | Технология | Бинарник |
+|---|---|---|
+| Windows | Electron | `npm run electron:build:win` → EXE |
+| macOS | Electron | `npm run electron:build:mac` → DMG |
+| Linux | Electron | `npm run electron:build:linux` → AppImage |
+| Android | Capacitor | `cd android && ./gradlew assembleRelease` → APK |
 
-## Run Locally
+## Команды
 
-**Prerequisites:**  Node.js
+```bash
+# Установка
+npm install
 
+# Веб-сборка (общая для всех десктоп-платформ)
+npm run web:build
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+# Linux
+npm run electron:build:linux
+
+# Android
+cd android && ./gradlew assembleDebug
+
+# Разработка
+npm run web:dev          # браузер
+npm run electron:dev     # Electron окно
+```
+
+## Структура
+
+```
+src/           — React Native код (общий)
+electron/      — Electron main process
+android/       — Capacitor Android проект
+web-build/     — собранные веб-ресурсы (gitignored)
+dist-electron/ — Electron бинарники (gitignored)
+```
+
+## Git workflow
+
+```bash
+git add .
+git commit -m "что сделано"
+git push          # залить на GitHub
+git pull          # скачать изменения
+```
