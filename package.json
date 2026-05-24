@@ -12,10 +12,10 @@
     "web:dev": "vite",
     "web:build": "vite build",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
-    "electron:build:linux": "vite build && electron-builder --linux",
-    "electron:build:win": "vite build && electron-builder --win",
-    "electron:build:mac": "vite build && electron-builder --mac",
-    "electron:build:all": "vite build && electron-builder --linux --win --mac",
+    "electron:build:linux": "vite build && cp web-build/bundle.js electron/bundle.js && electron-builder --linux",
+    "electron:build:win": "vite build && cp web-build/bundle.js electron/bundle.js && electron-builder --win",
+    "electron:build:mac": "vite build && cp web-build/bundle.js electron/bundle.js && electron-builder --mac",
+    "electron:build:all": "vite build && cp web-build/bundle.js electron/bundle.js && electron-builder --linux --win --mac",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },
@@ -26,9 +26,9 @@
       "output": "dist-electron"
     },
     "files": [
-      "web-build/**/*",
       "electron/**/*"
     ],
+    "extraResources": [],
     "linux": {
       "target": [
         "AppImage",

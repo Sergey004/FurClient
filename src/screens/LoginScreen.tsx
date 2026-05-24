@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import {colors, font, spacing} from '../utils/theme';
 import {UserSession} from '../types';
 import {fetchUserSession} from '../lib/faClient';
+import {isElectron, electronLogin} from '../lib/electronLogin';
 
 interface Props {
   onLogin: (session: UserSession) => void;
@@ -23,8 +23,9 @@ export default function LoginScreen({onLogin}: Props) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const useElectron = isElectron();
 
-  const handleLogin = async () => {
+  const handleFormLogin = async () => {
     if (!username.trim() || !password.trim()) return;
 
     setLoading(true);
@@ -44,6 +45,24 @@ export default function LoginScreen({onLogin}: Props) {
     }
   };
 
+  const handleWebViewLogin = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const session = await electronLogin();
+      if (session) {
+        onLogin(session);
+      } else {
+        setError('Login cancelled.');
+      }
+    } catch (e: any) {
+      setError(e.message || 'Login failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -58,52 +77,79 @@ export default function LoginScreen({onLogin}: Props) {
           <Text style={styles.subtitle}>Fur Affinity Client</Text>
         </View>
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Username</Text>
-          <TextInput
-            style={styles.input}
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Enter your FA username"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!loading}
-          />
+        {useElectron ? (
+          <View style={styles.form}>
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleWebViewLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.text} />
+              ) : (
+                <Text style={styles.buttonText}>Login with FA Website</Text>
+              )}
+            </TouchableOpacity>
 
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
-            placeholderTextColor={colors.textMuted}
-            secureTextEntry
-            editable={!loading}
-          />
+            <Text style={styles.hint}>
+              A browser window will open. Log in on the FA website, then close
+              it when done.
+            </Text>
 
-          {error && (
-            <View style={styles.error}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading || !username.trim() || !password.trim()}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.text} />
-            ) : (
-              <Text style={styles.buttonText}>Login</Text>
+            {error && (
+              <View style={styles.error}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
+          </View>
+        ) : (
+          <View style={styles.form}>
+            <Text style={styles.label}>Username</Text>
+            <TextInput
+              style={styles.input}
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Enter your FA username"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!loading}
+            />
 
-        <Text style={styles.hint}>
-          Your credentials are only used for this session
-        </Text>
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Enter your password"
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry
+              editable={!loading}
+            />
+
+            {error && (
+              <View style={styles.error}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleFormLogin}
+              disabled={loading || !username.trim() || !password.trim()}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.text} />
+              ) : (
+                <Text style={styles.buttonText}>Login</Text>
+              )}
+            </TouchableOpacity>
+
+            <Text style={styles.hint}>
+              Your credentials are only used for this session
+            </Text>
+          </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );

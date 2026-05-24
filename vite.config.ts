@@ -1,9 +1,8 @@
-import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig({
-  plugins: [react()],
+  base: './',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
@@ -14,12 +13,30 @@ export default defineConfig({
     },
     extensions: ['.web.tsx', '.web.ts', '.web.js', '.tsx', '.ts', '.js'],
   },
+  esbuild: {
+    jsx: 'automatic',
+    jsxImportSource: 'react',
+    jsxDev: false,
+  },
   define: {
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-    __DEV__: JSON.stringify(false),
-    global: 'globalThis',
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    '__DEV__': 'false',
+    '__REACT_DEVTOOLS_GLOBAL_HOOK__': 'false',
+    'global': 'globalThis',
   },
   build: {
     outDir: 'web-build',
+    emptyOutDir: true,
+    minify: 'esbuild',
+    modulePreload: false,
+    cssCodeSplit: false,
+    rollupOptions: {
+      input: path.resolve(__dirname, 'index.web.tsx'),
+      output: {
+        entryFileNames: 'bundle.js',
+        format: 'iife',
+        inlineDynamicImports: true,
+      },
+    },
   },
 });

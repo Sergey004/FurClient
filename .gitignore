@@ -34,7 +34,8 @@ Thumbs.db
 Fur_Affinity_NOC_decomp/
 FurAffinityApp/
 
-# Electron
+# Electron (build artifacts)
+electron/bundle.js
 electron-api.json
 electron.d.ts
 
