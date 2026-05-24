@@ -1,0 +1,6 @@
+{
+  "name": "Fur Affinity Multiplatform Client",
+  "description": "Interactive cross-platform layout mockup and stable Flutter integration blueprint with beautiful WinUI 3 style for Fur Affinity client.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

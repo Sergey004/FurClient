@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# iOS App source folder and uploads
+extracted_app/
+FurAffinityApp-main/
+*.zip
