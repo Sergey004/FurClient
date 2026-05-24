@@ -1,13 +1,34 @@
 node_modules/
 build/
 dist/
+web-build/
 coverage/
 .DS_Store
 *.log
 .env*
 !.env.example
 
+# React Native
+*.jsbundle
+*.hbc
+
+# Android
+android/app/build/
+android/.gradle/
+android/.idea/
+
+# iOS
+ios/Pods/
+ios/build/
+
+# Windows
+windows/out/
+
+# macOS
+macos/build/
+
 # iOS App source folder and uploads
 extracted_app/
 FurAffinityApp-main/
 *.zip
+Fur_Affinity_NOC_decomp/App_to_decomp.apk
