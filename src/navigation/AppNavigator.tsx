@@ -113,12 +113,14 @@ function MainTabs({client, sfwMode, onToggleSfw, session, onLogout}: Props) {
 
 export default function AppNavigator({client, session, sfwMode, onToggleSfw, onLogout}: Props) {
   return (
-    <MainTabs
-      client={client}
-      session={session}
-      sfwMode={sfwMode}
-      onToggleSfw={onToggleSfw}
-      onLogout={onLogout}
-    />
+    <NavigationContainer>
+      <MainTabs
+        client={client}
+        session={session}
+        sfwMode={sfwMode}
+        onToggleSfw={onToggleSfw}
+        onLogout={onLogout}
+      />
+    </NavigationContainer>
   );
 }
