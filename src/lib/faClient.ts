@@ -9,8 +9,8 @@ import {
   parseSearchResults,
 } from './faParser';
 
-// TEMP:借用 iOS FA app 的 UA（FA staff 向该 app 作者要求的 UA）。
-// 若 FA 批准我们自己的 UA，替换为 FurClient/1.0
+// TEMP: UA borrowed from the iOS FA app (FA staff asked the author to use this specific UA).
+// If FA approves our own UA, replace it with FurClient/1.0
 const FA_UA = 'ceylo.FurAffinityApp/1.0';
 
 const BASE_HEADERS: Record<string, string> = {
