@@ -24,7 +24,7 @@ function createWindow() {
   mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
     {urls: ['https://www.furaffinity.net/*', 'https://a.furaffinity.net/*', 'https://t.furaffinity.net/*']},
     (details, callback) => {
-      const headers = {...details.requestHeaders, 'User-Agent': ['ceylo.FurAffinityApp/1.0']};
+      const headers = {...details.requestHeaders, 'User-Agent': ['ceylo.FurAffinityApp/1.0']}; // TEMP: borrowed UA, replace with FurClient/1.0 if FA approves
       callback({requestHeaders: headers});
     },
   );
