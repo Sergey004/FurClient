@@ -73,7 +73,7 @@ export default function LoginScreen({onLogin}: Props) {
           <View style={styles.logoIcon}>
             <Text style={styles.logoText}>FA</Text>
           </View>
-          <Text style={styles.title}>FA Nexus</Text>
+          <Text style={styles.title}>FurClient</Text>
           <Text style={styles.subtitle}>Fur Affinity Client</Text>
         </View>
 

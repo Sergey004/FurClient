@@ -9,41 +9,29 @@ import {
   parseSearchResults,
 } from './faParser';
 
-const CHROME_UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const FA_UA = 'ceylo.FurAffinityApp/1.0';
 
 const BASE_HEADERS: Record<string, string> = {
-  'User-Agent': CHROME_UA,
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-  'Accept-Language': 'en-US,en;q=0.5',
+  'User-Agent': FA_UA,
 };
 
-function cookieHeader(session: UserSession): string {
-  if (session.cookies) {
-    try {
-      const pairs = JSON.parse(session.cookies);
-      if (Array.isArray(pairs)) {
-        return pairs.map(([k, v]: [string, string]) => `${k}=${v}`).join('; ');
-      }
-    } catch {}
+class CloudflareError extends Error {
+  constructor() {
+    super('FA is currently protected by Cloudflare challenge. Please try again later.');
+    this.name = 'CloudflareError';
   }
-  return '';
+}
+
+function checkCloudflare(response: Response): void {
+  if (response.headers.get('cf-mitigated') === 'challenge') {
+    throw new CloudflareError();
+  }
 }
 
 async function fetchHtml(url: string, session?: UserSession): Promise<string> {
-  const cookieString = session?.cookies ? cookieHeader(session) : '';
-  const ep = typeof window !== 'undefined' ? (window as any).electronAPI : undefined;
-
-  if (ep?.faFetch) {
-    const result = await ep.faFetch(url, cookieString);
-    if (result.error) throw new Error(result.error);
-    return result.html!;
-  }
-
   const headers: Record<string, string> = {...BASE_HEADERS};
-  if (cookieString) headers['Cookie'] = cookieString;
-
   const response = await fetch(url, {headers, credentials: 'include'});
+  checkCloudflare(response);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
@@ -72,7 +60,7 @@ export async function loginToFA(username: string, password: string): Promise<Use
   const response = await fetch(`${FAUrls.login}/`, {
     method: 'POST',
     headers: {
-      'User-Agent': CHROME_UA,
+      'User-Agent': FA_UA,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: formData.toString(),
@@ -111,19 +99,9 @@ export class FAClient {
   }
 
   private async getHtml(url: string): Promise<string> {
-    const cookieString = this.session?.cookies ? cookieHeader(this.session) : '';
-    const ep = typeof window !== 'undefined' ? (window as any).electronAPI : undefined;
-
-    if (ep?.faFetch) {
-      const result = await ep.faFetch(url, cookieString);
-      if (result.error) throw new Error(result.error);
-      return result.html!;
-    }
-
     const headers: Record<string, string> = {...BASE_HEADERS};
-    if (cookieString) headers['Cookie'] = cookieString;
-
     const response = await fetch(url, {headers, credentials: 'include'});
+    checkCloudflare(response);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }

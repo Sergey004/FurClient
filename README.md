@@ -1,4 +1,4 @@
-# FA Nexus — Fur Affinity Client
+# FurClient — Fur Affinity Client
 
 Кроссплатформенный клиент для Fur Affinity на React Native.
 

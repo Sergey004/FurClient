@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.fanexus.app',
-  appName: 'FA Nexus',
+  appName: 'FurClient',
   webDir: 'web-build'
 };
 

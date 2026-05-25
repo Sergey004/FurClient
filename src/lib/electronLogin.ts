@@ -3,7 +3,6 @@ import {UserSession} from '../types';
 interface ElectronAPI {
   openLoginWindow: () => Promise<UserSession | null>;
   restoreSessionCookies: (cookies: string) => Promise<boolean>;
-  faFetch: (url: string, cookieString: string) => Promise<{html?: string; error?: string; statusCode?: number}>;
 }
 
 declare global {

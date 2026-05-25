@@ -23,7 +23,7 @@
   },
   "build": {
     "appId": "com.fanexus.app",
-    "productName": "FA Nexus",
+    "productName": "FurClient",
     "directories": {
       "output": "dist-electron"
     },

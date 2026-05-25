@@ -73,7 +73,7 @@ export default function SearchScreen({client, sfwMode, onSubmissionPress}: Props
       ) : !searched ? (
         <View style={styles.center}>
           <Text style={styles.emptyIcon}>🔍</Text>
-          <Text style={styles.emptyTitle}>Search FA Nexus</Text>
+          <Text style={styles.emptyTitle}>Search FurClient</Text>
           <Text style={styles.emptySubtitle}>
             Find submissions by title, author, or tags
           </Text>
