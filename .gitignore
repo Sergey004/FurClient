@@ -43,3 +43,4 @@ electron.d.ts
 *.stackdump
 *.hprof
 *.pyc
+FIX_AUTH.md

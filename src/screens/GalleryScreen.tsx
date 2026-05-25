@@ -38,7 +38,7 @@ export default function GalleryScreen({client, sfwMode, onSubmissionPress}: Prop
     try {
       setError(null);
       const data = await client.getSubmissions(p, cat);
-      setSubmissions(data);
+      setSubmissions(prev => p === 1 ? data : [...prev, ...data]);
     } catch (e: any) {
       setError(e.message);
     } finally {

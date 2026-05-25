@@ -55,94 +55,88 @@ function createWindow() {
   });
 }
 
-async function setCookiesInSession(cookiePairs) {
-  const s = session.defaultSession;
-  for (const [name, value] of cookiePairs) {
-    try {
-      const existing = await s.cookies.get({name, domain: '.furaffinity.net'});
-      if (existing.length > 0 && existing[0].value === value) continue;
-      await s.cookies.set({
-        url: 'https://www.furaffinity.net',
-        name,
-        value,
-        domain: '.furaffinity.net',
-        secure: true,
-        httpOnly: true,
-      });
-    } catch (e) {
-      console.error('Cookie set error:', name, e.message);
-    }
-  }
-}
-
-ipcMain.handle('open-login-window', async () => {
-  const {loginWithBrowser} = require('./browser-login');
-  const result = await loginWithBrowser();
-
-  if (result) {
-    const pairs = JSON.parse(result.cookies || '[]');
-    await setCookiesInSession(pairs);
-    return result;
-  }
-
-  const loginWindow = new BrowserWindow({
-    width: 500,
-    height: 780,
-    title: 'FurClient - Login',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-
+ipcMain.handle('open-login-window', () => {
   return new Promise(resolve => {
-    const interval = setInterval(async () => {
-      try {
-        const cookies = await loginWindow.webContents.session.cookies.get({
-          domain: '.furaffinity.net',
-        });
-        const hasA = cookies.some(c => c.name === 'a');
-        const hasB = cookies.some(c => c.name === 'b');
+    let resolved = false;
 
-        if (hasA && hasB) {
-          clearInterval(interval);
+    const loginWindow = new BrowserWindow({
+      width: 460,
+      height: 780,
+      title: 'FurClient — Sign In',
+      backgroundColor: '#090909',
+      autoHideMenuBar: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
 
-          const allCookies = cookies.map(c => [c.name, c.value]);
+    loginWindow.webContents.setUserAgent('ceylo.FurAffinityApp/1.0');
 
-          let username = 'unknown';
-          try {
-            username =
-              (await loginWindow.webContents.executeJavaScript(`
-                (() => {
-                  for (const a of document.querySelectorAll('a[href*="/user/"]')) {
-                    const m = a.getAttribute('href').match(/\\/user\\/([^\\/]+)/);
-                    if (m && m[1] !== '' && !m[1].includes('login') && !m[1].includes('register')) return m[1];
-                  }
-                  return 'unknown';
-                })()
-              `)) || 'unknown';
-          } catch {}
+    const tryCapture = async (url) => {
+      if (resolved) return;
 
-          const avatarUrl = `https://a.furaffinity.net/${username}.gif`;
+      let parsed;
+      try { parsed = new URL(url); } catch { return; }
 
-          await setCookiesInSession(allCookies);
+      const p = parsed.pathname;
+      const isHome = /^\/?(\?.*)?$/.test(p);
+      const isUserPage = /^\/user\//.test(p);
+      if (!isHome && !isUserPage) return;
 
-          loginWindow.close();
-          resolve({
-            username,
-            avatarUrl,
-            isLoggedIn: true,
-            cookies: JSON.stringify(allCookies),
+      const cookies = await loginWindow.webContents.session.cookies.get({
+        domain: '.furaffinity.net',
+      });
+      if (!cookies.some(c => c.name === 'a')) return;
+
+      resolved = true;
+
+      for (const c of cookies) {
+        try {
+          await session.defaultSession.cookies.set({
+            url: 'https://www.furaffinity.net',
+            name: c.name,
+            value: c.value,
+            domain: '.furaffinity.net',
+            path: '/',
+            secure: true,
+            httpOnly: !!c.httpOnly,
+            sameSite: 'no_restriction',
           });
+        } catch (e) {
+          console.error('[auth] cookie copy error:', c.name, e.message);
         }
-      } catch (e) {
-        console.error('Cookie check error:', e);
       }
-    }, 1000);
+
+      let username = 'unknown';
+      try {
+        username = await loginWindow.webContents.executeJavaScript(`
+          (() => {
+            for (const a of document.querySelectorAll('a[href*="/user/"]')) {
+              const m = a.getAttribute('href').match(/\\/user\\/([^\\/]+)/);
+              if (m && m[1] && !['login','register','logout'].includes(m[1])) {
+                return m[1];
+              }
+            }
+            return 'unknown';
+          })()
+        `);
+      } catch {}
+
+      loginWindow.close();
+      resolve({
+        username,
+        avatarUrl: `https://a.furaffinity.net/${username}.gif`,
+        isLoggedIn: true,
+        cookies: JSON.stringify(cookies.map(c => [c.name, c.value])),
+      });
+    };
+
+    loginWindow.webContents.on('did-navigate', (_, url) => tryCapture(url));
+    loginWindow.webContents.on('did-navigate-in-page', (_, url) => tryCapture(url));
 
     loginWindow.on('closed', () => {
-      clearInterval(interval);
-      resolve(null);
+      if (!resolved) resolve(null);
     });
 
     loginWindow.loadURL('https://www.furaffinity.net/login/');
@@ -152,7 +146,18 @@ ipcMain.handle('open-login-window', async () => {
 ipcMain.handle('restore-session-cookies', async (_, cookiesJson) => {
   try {
     const pairs = JSON.parse(cookiesJson || '[]');
-    await setCookiesInSession(pairs);
+    for (const [name, value] of pairs) {
+      await session.defaultSession.cookies.set({
+        url: 'https://www.furaffinity.net',
+        name,
+        value,
+        domain: '.furaffinity.net',
+        path: '/',
+        secure: true,
+        httpOnly: true,
+        sameSite: 'no_restriction',
+      });
+    }
     return true;
   } catch {
     return false;

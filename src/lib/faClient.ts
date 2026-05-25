@@ -113,9 +113,16 @@ export class FAClient {
   async verifySession(): Promise<boolean> {
     if (!this.session?.cookies) return false;
     try {
-      await this.getHtml('https://www.furaffinity.net/');
+      const headers: Record<string, string> = {...BASE_HEADERS};
+      const response = await fetch('https://www.furaffinity.net/', {headers, credentials: 'include'});
+      if (response.status === 401 || response.status === 403) return false;
+      if (response.status >= 500) return true;
+      if (response.ok) return true;
+      return false;
+    } catch {
       return true;
-    } catch { return false; }
+    }
+  }
   }
 
   async getSubmissions(page: number = 1, filter: string = 'all'): Promise<Submission[]> {
