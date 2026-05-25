@@ -1,4 +1,4 @@
-package com.fanexus.app;
+package com.furclient.app;
 
 import com.getcapacitor.BridgeActivity;
 

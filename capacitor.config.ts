@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.fanexus.app',
+  appId: 'com.furclient.app',
   appName: 'FurClient',
   webDir: 'web-build'
 };

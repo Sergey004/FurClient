@@ -22,7 +22,7 @@
     "typecheck": "tsc --noEmit"
   },
   "build": {
-    "appId": "com.fanexus.app",
+    "appId": "com.furclient.app",
     "productName": "FurClient",
     "directories": {
       "output": "dist-electron"
