@@ -1,23 +1,29 @@
-node_modules/
-*.log
-.env
-.envrc
-.npmrc
-package-lock.json
-
-# Build artifacts
-web-build/
-dist/
-dist-electron/
-android/app/build/
-android/.gradle/
-android/.idea/
-android/build/
-android/local.properties
+# Flutter
+furclient/build/
+furclient/.dart_tool/
+furclient/.pub-cache/
+furclient/.pub/
+furclient/.packages
+furclient/pubspec.lock
+furclient/.flutter-plugins
+furclient/.flutter-plugins-dependencies
+furclient/linux/flutter/ephemeral/
+furclient/windows/flutter/ephemeral/
+furclient/macos/Flutter/ephemeral/
+furclient/ios/Flutter/
+furclient/android/.gradle/
+furclient/android/app/build/
+furclient/android/build/
+furclient/android/local.properties
+furclient/android/.idea/
 *.apk
 *.aab
-*.hbc
-*.jsbundle
+*.ipa
+*.dSYM
+*.framework
+
+# Dart
+*.dart_tool/
 
 # IDE
 .vscode/
@@ -34,12 +40,8 @@ Thumbs.db
 Fur_Affinity_NOC_decomp/
 FurAffinityApp/
 
-# Electron (build artifacts)
-electron/bundle.js
-electron-api.json
-electron.d.ts
-
 # Temp
+*.log
 *.stackdump
 *.hprof
 *.pyc
