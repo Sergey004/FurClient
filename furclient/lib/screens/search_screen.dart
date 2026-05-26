@@ -18,7 +18,8 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClientMixin {
+class _SearchScreenState extends State<SearchScreen>
+    with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -146,7 +147,8 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final isDesktop = MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
+    final isDesktop =
+        MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
 
     return Scaffold(
       appBar: AppBar(
@@ -162,9 +164,11 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
               style: const TextStyle(color: AppColors.text, fontSize: 14),
               onSubmitted: _search,
               decoration: InputDecoration(
-      hintText: 'Search submissions...',
-      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-      prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.materialGreen),
+                hintText: 'Search submissions...',
+                hintStyle:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 14),
+                prefixIcon: const Icon(Icons.search,
+                    size: 20, color: AppColors.materialGreen),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 20),
@@ -209,7 +213,8 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
           children: [
             const Icon(Icons.search_off, color: AppColors.textMuted, size: 48),
             const SizedBox(height: 16),
-            Text('No results for "$_query"', style: const TextStyle(color: AppColors.textDim, fontSize: 16)),
+            Text('No results for "$_query"',
+                style: const TextStyle(color: AppColors.textDim, fontSize: 16)),
           ],
         ),
       );
@@ -233,7 +238,9 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
             if (index >= _results.length) {
               return const Padding(
                 padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator(color: AppColors.materialGreen, strokeWidth: 2)),
+                child: Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.materialGreen, strokeWidth: 2)),
               );
             }
             final sub = _results[index];
@@ -258,9 +265,12 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search, color: AppColors.materialGreen.withOpacity(0.5), size: 48),
+            Icon(Icons.search,
+                color: AppColors.materialGreen.withValues(alpha: 0.5),
+                size: 48),
             const SizedBox(height: 16),
-            const Text('Search for submissions', style: TextStyle(color: AppColors.textDim, fontSize: 16)),
+            const Text('Search for submissions',
+                style: TextStyle(color: AppColors.textDim, fontSize: 16)),
           ],
         ),
       );
@@ -273,7 +283,11 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              const Text('Recent Searches', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+              const Text('Recent Searches',
+                  style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600)),
               const Spacer(),
               TextButton(
                 onPressed: () async {
@@ -294,10 +308,14 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
               final term = recent[index];
               return ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                leading: const Icon(Icons.history, color: AppColors.materialGreen, size: 20),
-                title: Text(term, style: const TextStyle(color: AppColors.textDim, fontSize: 14)),
+                leading: const Icon(Icons.history,
+                    color: AppColors.materialGreen, size: 20),
+                title: Text(term,
+                    style: const TextStyle(
+                        color: AppColors.textDim, fontSize: 14)),
                 trailing: IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.textMuted, size: 18),
+                  icon: const Icon(Icons.close,
+                      color: AppColors.textMuted, size: 18),
                   onPressed: () async {
                     await _searchHistory.remove(term);
                     setState(() {});

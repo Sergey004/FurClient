@@ -16,7 +16,8 @@ class NotificationsScreen extends StatefulWidget {
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> with AutomaticKeepAliveClientMixin {
+class _NotificationsScreenState extends State<NotificationsScreen>
+    with AutomaticKeepAliveClientMixin {
   List<FANotification> _notifications = [];
   bool _isLoading = true;
   String? _error;
@@ -125,11 +126,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.notifications_none, color: AppColors.textMuted, size: 48),
+            const Icon(Icons.notifications_none,
+                color: AppColors.textMuted, size: 48),
             const SizedBox(height: 16),
-            const Text('No notifications', style: TextStyle(color: AppColors.textDim, fontSize: 16)),
+            const Text('No notifications',
+                style: TextStyle(color: AppColors.textDim, fontSize: 16)),
             const SizedBox(height: 8),
-            TextButton(onPressed: _loadNotifications, child: const Text('Refresh')),
+            TextButton(
+                onPressed: _loadNotifications, child: const Text('Refresh')),
           ],
         ),
       );
@@ -142,7 +146,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _notifications.length,
-        separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.border, indent: 62),
+        separatorBuilder: (_, __) =>
+            const Divider(height: 1, color: AppColors.border, indent: 62),
         itemBuilder: (context, index) {
           final notif = _notifications[index];
           return _buildNotificationTile(notif);
@@ -163,8 +168,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
             Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: color.withOpacity(0.1),
-                border: Border.all(color: color.withOpacity(0.2), width: 1),
+                color: color.withValues(alpha: 0.1),
+                border:
+                    Border.all(color: color.withValues(alpha: 0.2), width: 1),
               ),
               child: CircleAvatar(
                 radius: 22,
@@ -186,11 +192,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     text: TextSpan(
-                      style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.4),
+                      style: const TextStyle(
+                          color: AppColors.textDim, fontSize: 14, height: 1.4),
                       children: [
                         TextSpan(
                           text: notif.author,
-                          style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                              color: AppColors.text,
+                              fontWeight: FontWeight.w600),
                         ),
                         if (notif.title.isNotEmpty)
                           TextSpan(text: ' ${notif.title}'),
@@ -201,9 +210,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
+                          color: color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -213,7 +223,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
                             const SizedBox(width: 4),
                             Text(
                               notif.type.toUpperCase(),
-                              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                              style: TextStyle(
+                                  color: color,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5),
                             ),
                           ],
                         ),
@@ -221,7 +235,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
                       const SizedBox(width: 8),
                       Text(
                         notif.datetime,
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                        style: const TextStyle(
+                            color: AppColors.textMuted, fontSize: 12),
                       ),
                     ],
                   ),

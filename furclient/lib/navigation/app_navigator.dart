@@ -29,11 +29,31 @@ class _AppNavigatorState extends State<AppNavigator> {
   bool _sfwMode = false;
 
   static const _navItems = [
-    _NavItem(icon: Icons.photo_library_outlined, selectedIcon: Icons.photo_library, label: 'Gallery', accent: AppColors.fluentCyan),
-    _NavItem(icon: Icons.search_outlined, selectedIcon: Icons.search, label: 'Search', accent: AppColors.materialGreen),
-    _NavItem(icon: Icons.notifications_outlined, selectedIcon: Icons.notifications, label: 'Notifications', accent: AppColors.cupertinoPurple),
-    _NavItem(icon: Icons.person_outline, selectedIcon: Icons.person, label: 'Profile', accent: AppColors.materialLavender),
-    _NavItem(icon: Icons.settings_outlined, selectedIcon: Icons.settings, label: 'Settings', accent: AppColors.textMuted),
+    _NavItem(
+        icon: Icons.photo_library_outlined,
+        selectedIcon: Icons.photo_library,
+        label: 'Gallery',
+        accent: AppColors.fluentCyan),
+    _NavItem(
+        icon: Icons.search_outlined,
+        selectedIcon: Icons.search,
+        label: 'Search',
+        accent: AppColors.materialGreen),
+    _NavItem(
+        icon: Icons.notifications_outlined,
+        selectedIcon: Icons.notifications,
+        label: 'Notifications',
+        accent: AppColors.cupertinoPurple),
+    _NavItem(
+        icon: Icons.person_outline,
+        selectedIcon: Icons.person,
+        label: 'Profile',
+        accent: AppColors.materialLavender),
+    _NavItem(
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings,
+        label: 'Settings',
+        accent: AppColors.textMuted),
   ];
 
   void _onSfwModeChanged(bool value) {
@@ -75,15 +95,16 @@ class _AppNavigatorState extends State<AppNavigator> {
       body: Row(
         children: [
           Container(
-        decoration: const BoxDecoration(
-          color: AppColors.bgCard,
-          border: Border(
-            right: BorderSide(color: AppColors.border, width: 1),
+            decoration: const BoxDecoration(
+              color: AppColors.bgCard,
+              border: Border(
+                right: BorderSide(color: AppColors.border, width: 1),
               ),
             ),
             child: NavigationRail(
               selectedIndex: _currentIndex,
-              onDestinationSelected: (index) => setState(() => _currentIndex = index),
+              onDestinationSelected: (index) =>
+                  setState(() => _currentIndex = index),
               extended: isExtended,
               leading: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -105,7 +126,7 @@ class _AppNavigatorState extends State<AppNavigator> {
                       )
                     : Icon(Icons.pets, color: currentAccent, size: 28),
               ),
-              indicatorColor: currentAccent.withOpacity(0.15),
+              indicatorColor: currentAccent.withValues(alpha: 0.15),
               destinations: _navItems.map((item) {
                 return NavigationRailDestination(
                   icon: Icon(item.icon, color: AppColors.textMuted),
@@ -128,17 +149,19 @@ class _AppNavigatorState extends State<AppNavigator> {
         children: screens,
       ),
       bottomNavigationBar: Container(
-      decoration: const BoxDecoration(
-        color: AppColors.bgCard,
-        border: Border(
-          top: BorderSide(color: AppColors.border, width: 1),
+        decoration: const BoxDecoration(
+          color: AppColors.bgCard,
+          border: Border(
+            top: BorderSide(color: AppColors.border, width: 1),
           ),
         ),
         child: NavigationBar(
           selectedIndex: _currentIndex,
-          onDestinationSelected: (index) => setState(() => _currentIndex = index),
+          onDestinationSelected: (index) =>
+              setState(() => _currentIndex = index),
           backgroundColor: AppColors.bgCard,
-          indicatorColor: _navItems[_currentIndex].accent.withOpacity(0.15),
+          indicatorColor:
+              _navItems[_currentIndex].accent.withValues(alpha: 0.15),
           height: 64,
           labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
           destinations: _navItems.map((item) {

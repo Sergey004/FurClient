@@ -96,7 +96,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.fluentCyan))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.fluentCyan))
           : _error != null
               ? Center(
                   child: Padding(
@@ -104,11 +105,17 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
+                        const Icon(Icons.error_outline,
+                            color: AppColors.danger, size: 48),
                         const SizedBox(height: 16),
-                        Text(_error!, style: const TextStyle(color: AppColors.textDim, fontSize: 14), textAlign: TextAlign.center),
+                        Text(_error!,
+                            style: const TextStyle(
+                                color: AppColors.textDim, fontSize: 14),
+                            textAlign: TextAlign.center),
                         const SizedBox(height: 16),
-                        ElevatedButton(onPressed: _loadSubmission, child: const Text('Retry')),
+                        ElevatedButton(
+                            onPressed: _loadSubmission,
+                            child: const Text('Retry')),
                       ],
                     ),
                   ),
@@ -175,24 +182,30 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               placeholder: (context, url) => Container(
                 height: 300,
                 color: AppColors.bgInput,
-                child: const Center(child: CircularProgressIndicator(color: AppColors.fluentCyan, strokeWidth: 2)),
+                child: const Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.fluentCyan, strokeWidth: 2)),
               ),
               errorWidget: (context, url, error) => Container(
                 height: 200,
                 color: AppColors.bgInput,
-                child: const Icon(Icons.broken_image, color: AppColors.textMuted, size: 48),
+                child: const Icon(Icons.broken_image,
+                    color: AppColors.textMuted, size: 48),
               ),
             )
           : Container(
               height: 200,
               color: AppColors.bgInput,
-              child: const Center(child: Icon(Icons.image, color: AppColors.textMuted, size: 48)),
+              child: const Center(
+                  child:
+                      Icon(Icons.image, color: AppColors.textMuted, size: 48)),
             ),
     );
   }
 
   Widget _buildDetailsPanel(Submission sub) {
-    final isDesktop = MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
+    final isDesktop =
+        MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(isDesktop ? 24 : 16),
@@ -210,7 +223,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           ),
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: sub.author.isNotEmpty ? () => _navigateToProfile(sub.author) : null,
+            onTap: sub.author.isNotEmpty
+                ? () => _navigateToProfile(sub.author)
+                : null,
             child: Row(
               children: [
                 CircleAvatar(
@@ -218,7 +233,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   backgroundColor: AppColors.bgInput,
                   child: Text(
                     sub.author.isNotEmpty ? sub.author[0].toUpperCase() : '?',
-                    style: const TextStyle(color: AppColors.fluentCyan, fontSize: 12, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        color: AppColors.fluentCyan,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -236,18 +254,25 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
-              _statChip(Icons.visibility, '${sub.views}', 'Views', AppColors.fluentCyan),
+              _statChip(Icons.visibility, '${sub.views}', 'Views',
+                  AppColors.fluentCyan),
               const SizedBox(width: 8),
-              _statChip(Icons.favorite, '${sub.faves}', 'Faves', AppColors.notifFave),
+              _statChip(
+                  Icons.favorite, '${sub.faves}', 'Faves', AppColors.notifFave),
               const SizedBox(width: 8),
-              _statChip(Icons.comment, '${sub.commentsCount}', 'Comments', AppColors.materialGreen),
+              _statChip(Icons.comment, '${sub.commentsCount}', 'Comments',
+                  AppColors.materialGreen),
             ],
           ),
           if (sub.description.isNotEmpty) ...[
             const SizedBox(height: 20),
             const Divider(color: AppColors.border),
             const SizedBox(height: 12),
-            const Text('Description', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+            const Text('Description',
+                style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Container(
               width: double.infinity,
@@ -259,7 +284,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               ),
               child: Text(
                 sub.description,
-                style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.6),
+                style: const TextStyle(
+                    color: AppColors.textDim, fontSize: 14, height: 1.6),
               ),
             ),
           ],
@@ -267,21 +293,29 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             const SizedBox(height: 20),
             const Divider(color: AppColors.border),
             const SizedBox(height: 12),
-            const Text('Tags', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+            const Text('Tags',
+                style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: sub.tags.map((tag) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.materialLavenderBg,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     tag,
-                    style: const TextStyle(color: AppColors.materialLavender, fontSize: 12, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                        color: AppColors.materialLavender,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500),
                   ),
                 );
               }).toList(),
@@ -292,7 +326,11 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              const Text('Comments', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+              const Text('Comments',
+                  style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600)),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -302,7 +340,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 ),
                 child: Text(
                   '${_comments.length}',
-                  style: const TextStyle(color: AppColors.materialGreen, fontSize: 11, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                      color: AppColors.materialGreen,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -312,13 +353,17 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(color: AppColors.fluentCyan, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                    color: AppColors.fluentCyan, strokeWidth: 2),
               ),
             )
           else if (_comments.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: Text('No comments yet', style: TextStyle(color: AppColors.textMuted, fontSize: 14))),
+              child: Center(
+                  child: Text('No comments yet',
+                      style:
+                          TextStyle(color: AppColors.textMuted, fontSize: 14))),
             )
           else
             ..._comments.map((comment) => _buildComment(comment)),
@@ -332,18 +377,24 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 6),
-          Text(value, style: const TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w600)),
+          Text(value,
+              style: const TextStyle(
+                  color: AppColors.text,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600)),
           const SizedBox(width: 4),
-          Text(label, style: TextStyle(color: color.withOpacity(0.7), fontSize: 12)),
+          Text(label,
+              style:
+                  TextStyle(color: color.withValues(alpha: 0.7), fontSize: 12)),
         ],
       ),
     );
@@ -374,22 +425,26 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   children: [
                     Text(
                       comment.author,
-                      style: const TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                          color: AppColors.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(width: 8),
-        Text(
-          comment.time,
-          style: const TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 11,
-          ),
-        ),
+                    Text(
+                      comment.time,
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   comment.text,
-                  style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.5),
+                  style: const TextStyle(
+                      color: AppColors.textDim, fontSize: 14, height: 1.5),
                 ),
               ],
             ),

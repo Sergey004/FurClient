@@ -17,7 +17,8 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAliveClientMixin {
+class _SettingsScreenState extends State<SettingsScreen>
+    with AutomaticKeepAliveClientMixin {
   bool _sfwMode = false;
 
   @override
@@ -95,8 +96,13 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
         _sectionHeader('ACCOUNT'),
         _card([
           ListTile(
-            leading: const Icon(Icons.logout, color: AppColors.danger, size: 22),
-            title: const Text('Logout', style: TextStyle(color: AppColors.danger, fontSize: 15, fontWeight: FontWeight.w500)),
+            leading:
+                const Icon(Icons.logout, color: AppColors.danger, size: 22),
+            title: const Text('Logout',
+                style: TextStyle(
+                    color: AppColors.danger,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500)),
             onTap: _confirmLogout,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
@@ -106,22 +112,32 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
         _card([
           const ListTile(
             leading: Icon(Icons.pets, color: AppColors.accentLight, size: 22),
-            title: Text('FurClient', style: TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w500)),
-            subtitle: Text('A FurAffinity client', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+            title: Text('FurClient',
+                style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500)),
+            subtitle: Text('A FurAffinity client',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
             contentPadding: EdgeInsets.symmetric(horizontal: 16),
           ),
-    const Divider(height: 1, indent: 56, color: AppColors.border),
-    const ListTile(
-      leading: Icon(Icons.info_outline, color: AppColors.textDim, size: 22),
-      title: Text('Version', style: TextStyle(color: AppColors.text, fontSize: 15)),
-      trailing: Text('1.0.0', style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
-      contentPadding: EdgeInsets.symmetric(horizontal: 16),
-    ),
-    const Divider(height: 1, indent: 56, color: AppColors.border),
+          const Divider(height: 1, indent: 56, color: AppColors.border),
+          const ListTile(
+            leading:
+                Icon(Icons.info_outline, color: AppColors.textDim, size: 22),
+            title: Text('Version',
+                style: TextStyle(color: AppColors.text, fontSize: 15)),
+            trailing: Text('1.0.0',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
+            contentPadding: EdgeInsets.symmetric(horizontal: 16),
+          ),
+          const Divider(height: 1, indent: 56, color: AppColors.border),
           const ListTile(
             leading: Icon(Icons.code, color: AppColors.textDim, size: 22),
-            title: Text('Built with Flutter', style: TextStyle(color: AppColors.text, fontSize: 15)),
-            trailing: Text('3.x', style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
+            title: Text('Built with Flutter',
+                style: TextStyle(color: AppColors.text, fontSize: 15)),
+            trailing: Text('3.x',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
             contentPadding: EdgeInsets.symmetric(horizontal: 16),
           ),
         ]),
@@ -139,7 +155,8 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Settings', style: Theme.of(context).textTheme.headlineMedium),
+              Text('Settings',
+                  style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 24),
               _desktopSection(
                 title: 'Content',
@@ -166,9 +183,16 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                 accent: AppColors.fluentCyan,
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.logout, color: AppColors.danger, size: 22),
-                    title: const Text('Logout', style: TextStyle(color: AppColors.danger, fontSize: 15, fontWeight: FontWeight.w500)),
-                    subtitle: const Text('Sign out and clear session', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    leading: const Icon(Icons.logout,
+                        color: AppColors.danger, size: 22),
+                    title: const Text('Logout',
+                        style: TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500)),
+                    subtitle: const Text('Sign out and clear session',
+                        style: TextStyle(
+                            color: AppColors.textMuted, fontSize: 13)),
                     onTap: _confirmLogout,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
@@ -181,23 +205,38 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                 accent: AppColors.materialLavender,
                 children: const [
                   ListTile(
-                    leading: Icon(Icons.pets, color: AppColors.accentLight, size: 22),
-                    title: Text('FurClient', style: TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w500)),
-                    subtitle: Text('A FurAffinity client', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    leading: Icon(Icons.pets,
+                        color: AppColors.accentLight, size: 22),
+                    title: Text('FurClient',
+                        style: TextStyle(
+                            color: AppColors.text,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500)),
+                    subtitle: Text('A FurAffinity client',
+                        style: TextStyle(
+                            color: AppColors.textMuted, fontSize: 13)),
                     contentPadding: EdgeInsets.symmetric(horizontal: 16),
                   ),
                   Divider(height: 1, indent: 56, color: AppColors.border),
                   ListTile(
-                    leading: Icon(Icons.info_outline, color: AppColors.textDim, size: 22),
-                    title: Text('Version', style: TextStyle(color: AppColors.text, fontSize: 15)),
-                    trailing: Text('1.0.0', style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
+                    leading: Icon(Icons.info_outline,
+                        color: AppColors.textDim, size: 22),
+                    title: Text('Version',
+                        style: TextStyle(color: AppColors.text, fontSize: 15)),
+                    trailing: Text('1.0.0',
+                        style: TextStyle(
+                            color: AppColors.textMuted, fontSize: 14)),
                     contentPadding: EdgeInsets.symmetric(horizontal: 16),
                   ),
                   Divider(height: 1, indent: 56, color: AppColors.border),
                   ListTile(
-                    leading: Icon(Icons.code, color: AppColors.textDim, size: 22),
-                    title: Text('Built with Flutter', style: TextStyle(color: AppColors.text, fontSize: 15)),
-                    trailing: Text('3.x', style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
+                    leading:
+                        Icon(Icons.code, color: AppColors.textDim, size: 22),
+                    title: Text('Built with Flutter',
+                        style: TextStyle(color: AppColors.text, fontSize: 15)),
+                    trailing: Text('3.x',
+                        style: TextStyle(
+                            color: AppColors.textMuted, fontSize: 14)),
                     contentPadding: EdgeInsets.symmetric(horizontal: 16),
                   ),
                 ],
@@ -281,14 +320,17 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
         children: [
           Icon(icon, color: iconColor, size: 20),
           const SizedBox(width: 12),
-          Expanded(child: Text(title, style: const TextStyle(color: AppColors.text, fontSize: 15))),
+          Expanded(
+              child: Text(title,
+                  style: const TextStyle(color: AppColors.text, fontSize: 15))),
         ],
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(left: 32),
-        child: Text(subtitle, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+        child: Text(subtitle,
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
       ),
-      activeColor: AppColors.fluentCyanDark,
+      activeThumbColor: AppColors.fluentCyanDark,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }

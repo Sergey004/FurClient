@@ -23,7 +23,8 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin {
+class _ProfileScreenState extends State<ProfileScreen>
+    with AutomaticKeepAliveClientMixin {
   FAUser? _profile;
   bool _isLoading = true;
   String? _error;
@@ -67,7 +68,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
   Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.targetUsername != null ? _username : 'Profile')),
+      appBar: AppBar(
+          title: Text(widget.targetUsername != null ? _username : 'Profile')),
       body: _buildBody(),
     );
   }
@@ -95,9 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
       onRefresh: _loadProfile,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        child: isDesktop
-            ? _buildDesktopLayout(p)
-            : _buildMobileLayout(p),
+        child: isDesktop ? _buildDesktopLayout(p) : _buildMobileLayout(p),
       ),
     );
   }
@@ -163,20 +163,25 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                         ? CachedNetworkImageProvider(p.avatarUrl)
                         : null,
                     child: p.avatarUrl.isEmpty
-                        ? const Icon(Icons.person, color: AppColors.textMuted, size: 56)
+                        ? const Icon(Icons.person,
+                            color: AppColors.textMuted, size: 56)
                         : null,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   p.displayName,
-                  style: const TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                      color: AppColors.text,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '@${p.username}',
-                  style: const TextStyle(color: AppColors.materialLavender, fontSize: 14),
+                  style: const TextStyle(
+                      color: AppColors.materialLavender, fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
@@ -215,10 +220,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
           ? CachedNetworkImage(
               imageUrl: p.bannerUrl,
               fit: BoxFit.cover,
-              placeholder: (context, url) => Container(color: AppColors.bgInput),
+              placeholder: (context, url) =>
+                  Container(color: AppColors.bgInput),
               errorWidget: (context, url, error) => Container(
                 color: AppColors.bgInput,
-                child: const Icon(Icons.image, color: AppColors.textMuted, size: 48),
+                child: const Icon(Icons.image,
+                    color: AppColors.textMuted, size: 48),
               ),
             )
           : Container(
@@ -227,7 +234,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    AppColors.materialLavender.withOpacity(0.2),
+                    AppColors.materialLavender.withValues(alpha: 0.2),
                     AppColors.bgInput,
                   ],
                 ),
@@ -256,7 +263,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                     ? CachedNetworkImageProvider(p.avatarUrl)
                     : null,
                 child: p.avatarUrl.isEmpty
-                    ? const Icon(Icons.person, color: AppColors.textMuted, size: 44)
+                    ? const Icon(Icons.person,
+                        color: AppColors.textMuted, size: 44)
                     : null,
               ),
             ),
@@ -267,12 +275,16 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                 children: [
                   Text(
                     p.displayName,
-                    style: const TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                        color: AppColors.text,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '@${p.username}',
-                    style: const TextStyle(color: AppColors.materialLavender, fontSize: 14),
+                    style: const TextStyle(
+                        color: AppColors.materialLavender, fontSize: 14),
                   ),
                 ],
               ),
@@ -288,9 +300,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: p.isWatching ? AppColors.bgInput : AppColors.materialLavenderDark,
+        color:
+            p.isWatching ? AppColors.bgInput : AppColors.materialLavenderDark,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: p.isWatching ? AppColors.border : AppColors.materialLavender),
+        border: Border.all(
+            color:
+                p.isWatching ? AppColors.border : AppColors.materialLavender),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -325,11 +340,16 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
         children: [
-          _statCard(Icons.visibility, '${p.stats.views}', 'Views', AppColors.fluentCyan),
-          _statCard(Icons.collections, '${p.stats.submissions}', 'Submissions', AppColors.materialGreen),
-          _statCard(Icons.favorite, '${p.stats.favorites}', 'Faves', AppColors.notifFave),
-          _statCard(Icons.comment, '${p.stats.comments}', 'Comments', AppColors.materialLavender),
-          _statCard(Icons.book, '${p.stats.journals}', 'Journals', AppColors.notifJournal),
+          _statCard(Icons.visibility, '${p.stats.views}', 'Views',
+              AppColors.fluentCyan),
+          _statCard(Icons.collections, '${p.stats.submissions}', 'Submissions',
+              AppColors.materialGreen),
+          _statCard(Icons.favorite, '${p.stats.favorites}', 'Faves',
+              AppColors.notifFave),
+          _statCard(Icons.comment, '${p.stats.comments}', 'Comments',
+              AppColors.materialLavender),
+          _statCard(Icons.book, '${p.stats.journals}', 'Journals',
+              AppColors.notifJournal),
         ],
       ),
     );
@@ -338,17 +358,23 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
   Widget _statCard(IconData icon, String value, String label, Color color) {
     return Container(
       decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
+        color: color.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.1)),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, color: color, size: 18),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w700)),
-          Text(label, style: TextStyle(color: color.withOpacity(0.7), fontSize: 11)),
+          Text(value,
+              style: const TextStyle(
+                  color: AppColors.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700)),
+          Text(label,
+              style:
+                  TextStyle(color: color.withValues(alpha: 0.7), fontSize: 11)),
         ],
       ),
     );
@@ -360,7 +386,11 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('About', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+          const Text('About',
+              style: TextStyle(
+                  color: AppColors.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Container(
             width: double.infinity,
@@ -372,7 +402,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
             ),
             child: Text(
               p.description,
-              style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.6),
+              style: const TextStyle(
+                  color: AppColors.textDim, fontSize: 14, height: 1.6),
             ),
           ),
         ],
@@ -386,11 +417,18 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Quick Links', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+          const Text('Quick Links',
+              style: TextStyle(
+                  color: AppColors.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          _linkTile(Icons.collections, 'Gallery', FAUrls.gallery(p.username), AppColors.fluentCyan),
-          _linkTile(Icons.favorite, 'Favorites', FAUrls.favorites(p.username), AppColors.materialGreen),
-          _linkTile(Icons.book, 'Journals', FAUrls.journals(p.username), AppColors.notifJournal),
+          _linkTile(Icons.collections, 'Gallery', FAUrls.gallery(p.username),
+              AppColors.fluentCyan),
+          _linkTile(Icons.favorite, 'Favorites', FAUrls.favorites(p.username),
+              AppColors.materialGreen),
+          _linkTile(Icons.book, 'Journals', FAUrls.journals(p.username),
+              AppColors.notifJournal),
         ],
       ),
     );
@@ -400,15 +438,20 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.04),
+        color: color.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.1)),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Icon(icon, color: color, size: 22),
-        title: Text(title, style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w500)),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),
+        title: Text(title,
+            style: const TextStyle(
+                color: AppColors.text,
+                fontSize: 15,
+                fontWeight: FontWeight.w500)),
+        trailing: const Icon(Icons.chevron_right,
+            color: AppColors.textMuted, size: 20),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -430,7 +473,8 @@ class _LinkPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: Center(child: Text(url, style: const TextStyle(color: AppColors.textDim))),
+      body: Center(
+          child: Text(url, style: const TextStyle(color: AppColors.textDim))),
     );
   }
 }

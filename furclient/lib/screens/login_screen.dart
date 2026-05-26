@@ -52,29 +52,27 @@ class _LoginScreenState extends State<LoginScreen>
       _loginCompleter = Completer<UserSession?>();
     });
 
-    _loginCompleter!.future
-        .then((session) {
-          if (!mounted) return;
-          setState(() {
-            _showWebView = false;
-            _isLoading = false;
-          });
-          if (session != null && session.isLoggedIn) {
-            widget.onLogin();
-          } else {
-            setState(() {
-              _errorMessage = 'Login was not completed. Please try again.';
-            });
-          }
-        })
-        .catchError((e) {
-          if (!mounted) return;
-          setState(() {
-            _showWebView = false;
-            _isLoading = false;
-            _errorMessage = 'Login failed: $e';
-          });
+    _loginCompleter!.future.then((session) {
+      if (!mounted) return;
+      setState(() {
+        _showWebView = false;
+        _isLoading = false;
+      });
+      if (session != null && session.isLoggedIn) {
+        widget.onLogin();
+      } else {
+        setState(() {
+          _errorMessage = 'Login was not completed. Please try again.';
         });
+      }
+    }).catchError((e) {
+      if (!mounted) return;
+      setState(() {
+        _showWebView = false;
+        _isLoading = false;
+        _errorMessage = 'Login failed: $e';
+      });
+    });
   }
 
   void _cancelLogin() {
@@ -241,15 +239,15 @@ class _LoginScreenState extends State<LoginScreen>
                                 color: AppColors.fluentCyanBg,
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: AppColors.fluentCyan.withOpacity(
-                                    0.3 + glow * 0.4,
+                                  color: AppColors.fluentCyan.withValues(
+                                    alpha: 0.3 + glow * 0.4,
                                   ),
                                   width: 1.5,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.fluentCyan.withOpacity(
-                                      0.08 * glow,
+                                    color: AppColors.fluentCyan.withValues(
+                                      alpha: 0.08 * glow,
                                     ),
                                     blurRadius: 24,
                                     spreadRadius: 2,
@@ -278,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen>
                         Text(
                           'FurAffinity Client',
                           style: TextStyle(
-                            color: AppColors.fluentCyan.withOpacity(0.7),
+                            color: AppColors.fluentCyan.withValues(alpha: 0.7),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                             letterSpacing: 2,
@@ -290,10 +288,10 @@ class _LoginScreenState extends State<LoginScreen>
                             width: double.infinity,
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: AppColors.danger.withOpacity(0.08),
+                              color: AppColors.danger.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: AppColors.danger.withOpacity(0.2),
+                                color: AppColors.danger.withValues(alpha: 0.2),
                               ),
                             ),
                             child: Row(
