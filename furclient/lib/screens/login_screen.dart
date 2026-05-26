@@ -1,0 +1,285 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import '../theme/app_theme.dart';
+import '../models/models.dart';
+import '../services/auth_service.dart';
+import '../services/fa_urls.dart';
+
+class LoginScreen extends StatefulWidget {
+  final AuthService authService;
+  final VoidCallback onLogin;
+
+  const LoginScreen({super.key, required this.authService, required this.onLogin});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  bool _isLoading = false;
+  bool _showWebView = false;
+  String? _errorMessage;
+  Completer<UserSession?>? _loginCompleter;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  Future<void> _startLogin() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _showWebView = true;
+      _loginCompleter = Completer<UserSession?>();
+    });
+
+    _loginCompleter!.future.then((session) {
+      if (!mounted) return;
+      setState(() {
+        _showWebView = false;
+        _isLoading = false;
+      });
+      if (session != null && session.isLoggedIn) {
+        widget.onLogin();
+      } else {
+        setState(() {
+          _errorMessage = 'Login was not completed. Please try again.';
+        });
+      }
+    }).catchError((e) {
+      if (!mounted) return;
+      setState(() {
+        _showWebView = false;
+        _isLoading = false;
+        _errorMessage = 'Login failed: $e';
+      });
+    });
+  }
+
+  void _cancelLogin() {
+    _loginCompleter?.complete(null);
+    setState(() {
+      _showWebView = false;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _handleNavigation(InAppWebViewController controller, Uri? url) async {
+    if (url == null) return;
+    final path = url.path;
+    final isRoot = path == '/' || path == '';
+    final isUserPage = path.startsWith('/user/');
+
+    if (isRoot || isUserPage) {
+      final cookieManager = CookieManager();
+      final cookies = await cookieManager.getCookies(
+        url: WebUri(FAUrls.baseUrl),
+      );
+
+      String? cookieA;
+      final List<List<String>> cookiePairs = [];
+      for (final cookie in cookies) {
+        cookiePairs.add([cookie.name, cookie.value]);
+        if (cookie.name == 'a') {
+          cookieA = cookie.value;
+        }
+      }
+
+      if (cookieA != null && cookieA.isNotEmpty) {
+        String username = '';
+        if (isUserPage) {
+          final parts = path.split('/');
+          for (final part in parts) {
+            if (part.isNotEmpty && part != 'user') {
+              username = part;
+              break;
+            }
+          }
+        }
+
+        if (username.isEmpty) {
+          try {
+            final result = await controller.evaluateJavascript(
+              source: "document.querySelector('a[href*=\"/user/\"]')?.textContent || ''",
+            );
+            if (result != null && result is String && result.isNotEmpty) {
+              username = result.trim();
+            }
+          } catch (_) {}
+        }
+
+        if (username.isEmpty) {
+          username = 'user';
+        }
+
+        final session = UserSession(
+          username: username,
+          avatarUrl: FAUrls.avatar(username),
+          isLoggedIn: true,
+          cookies: jsonEncode(cookiePairs),
+        );
+
+            if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
+              await widget.authService.saveSession(session);
+              _loginCompleter!.complete(session);
+            }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: SafeArea(
+        child: _showWebView
+            ? Column(
+                children: [
+                  Container(
+                    color: AppColors.bgCard,
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Sign in to FurAffinity',
+                            style: TextStyle(
+                              color: AppColors.text,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _cancelLogin,
+                          child: const Text('Cancel'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const LinearProgressIndicator(
+                    color: AppColors.accent,
+                    backgroundColor: AppColors.bgInput,
+                  ),
+                  Expanded(
+                    child: InAppWebView(
+                      initialSettings: InAppWebViewSettings(
+                        userAgent: 'ceylo.FurAffinityApp/1.0',
+                        useShouldOverrideUrlLoading: true,
+                        javaScriptEnabled: true,
+                        supportZoom: true,
+                        mediaPlaybackRequiresUserGesture: false,
+                        allowsInlineMediaPlayback: true,
+                      ),
+                      initialUrlRequest: URLRequest(
+                        url: WebUri('${FAUrls.login}/'),
+                      ),
+                      onLoadStop: (controller, url) async {
+                        await _handleNavigation(controller, url);
+                      },
+                    ),
+                  ),
+                ],
+              )
+            : Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.pets,
+                          color: AppColors.accent,
+                          size: 40,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'FurClient',
+                        style: TextStyle(
+                          color: AppColors.text,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'A FurAffinity client',
+                        style: TextStyle(
+                          color: AppColors.textDim,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 48),
+                      if (_errorMessage != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.danger.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.danger.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: const TextStyle(color: AppColors.danger, fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _startLogin,
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.login, size: 20),
+                                    SizedBox(width: 10),
+                                    Text('Sign in with FurAffinity'),
+                                  ],
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'You will be redirected to FurAffinity to sign in.\nYour credentials are handled securely.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
