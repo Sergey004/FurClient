@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -90,7 +91,7 @@ class AppTheme {
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.bg,
       colorScheme: colorScheme,
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.bgCard,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -118,13 +119,15 @@ class AppTheme {
         unselectedItemColor: AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        selectedLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        selectedLabelStyle:
+            TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         unselectedLabelStyle: TextStyle(fontSize: 12),
       ),
       navigationRailTheme: const NavigationRailThemeData(
         backgroundColor: AppColors.bgCard,
         selectedIconTheme: IconThemeData(color: AppColors.fluentCyan, size: 24),
-        unselectedIconTheme: IconThemeData(color: AppColors.textMuted, size: 22),
+        unselectedIconTheme:
+            IconThemeData(color: AppColors.textMuted, size: 22),
         selectedLabelTextStyle: TextStyle(
           color: AppColors.fluentCyan,
           fontSize: 11,
@@ -143,7 +146,8 @@ class AppTheme {
         backgroundColor: AppColors.bgInput,
         selectedColor: AppColors.materialLavenderBg,
         labelStyle: const TextStyle(color: AppColors.textDim, fontSize: 13),
-        secondaryLabelStyle: const TextStyle(color: AppColors.materialLavender, fontSize: 13),
+        secondaryLabelStyle:
+            const TextStyle(color: AppColors.materialLavender, fontSize: 13),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
@@ -167,7 +171,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(24),
           borderSide: const BorderSide(color: AppColors.fluentCyan, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.border,
@@ -200,7 +205,9 @@ class AppTheme {
           return AppColors.textMuted;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return AppColors.fluentCyanDark;
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.fluentCyanDark;
+          }
           return AppColors.bgInput;
         }),
       ),
@@ -262,7 +269,7 @@ class AppTheme {
           fontSize: 11,
         ),
       ),
-      pageTransitionsTheme: const PageTransitionsTheme(
+      pageTransitionsTheme: PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),

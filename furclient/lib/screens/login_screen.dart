@@ -11,13 +11,18 @@ class LoginScreen extends StatefulWidget {
   final AuthService authService;
   final VoidCallback onLogin;
 
-  const LoginScreen({super.key, required this.authService, required this.onLogin});
+  const LoginScreen({
+    super.key,
+    required this.authService,
+    required this.onLogin,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   bool _isLoading = false;
   bool _showWebView = false;
   String? _errorMessage;
@@ -47,27 +52,29 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       _loginCompleter = Completer<UserSession?>();
     });
 
-    _loginCompleter!.future.then((session) {
-      if (!mounted) return;
-      setState(() {
-        _showWebView = false;
-        _isLoading = false;
-      });
-      if (session != null && session.isLoggedIn) {
-        widget.onLogin();
-      } else {
-        setState(() {
-          _errorMessage = 'Login was not completed. Please try again.';
+    _loginCompleter!.future
+        .then((session) {
+          if (!mounted) return;
+          setState(() {
+            _showWebView = false;
+            _isLoading = false;
+          });
+          if (session != null && session.isLoggedIn) {
+            widget.onLogin();
+          } else {
+            setState(() {
+              _errorMessage = 'Login was not completed. Please try again.';
+            });
+          }
+        })
+        .catchError((e) {
+          if (!mounted) return;
+          setState(() {
+            _showWebView = false;
+            _isLoading = false;
+            _errorMessage = 'Login failed: $e';
+          });
         });
-      }
-    }).catchError((e) {
-      if (!mounted) return;
-      setState(() {
-        _showWebView = false;
-        _isLoading = false;
-        _errorMessage = 'Login failed: $e';
-      });
-    });
   }
 
   void _cancelLogin() {
@@ -78,7 +85,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     });
   }
 
-  Future<void> _handleNavigation(InAppWebViewController controller, Uri? url) async {
+  Future<void> _handleNavigation(
+    InAppWebViewController controller,
+    Uri? url,
+  ) async {
     if (url == null) return;
     final path = url.path;
     final isRoot = path == '/' || path == '';
@@ -114,7 +124,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         if (username.isEmpty) {
           try {
             final result = await controller.evaluateJavascript(
-              source: "document.querySelector('a[href*=\"/user/\"]')?.textContent || ''",
+              source:
+                  "document.querySelector('a[href*=\"/user/\"]')?.textContent || ''",
             );
             if (result != null && result is String && result.isNotEmpty) {
               username = result.trim();
@@ -187,12 +198,23 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         supportZoom: true,
                         mediaPlaybackRequiresUserGesture: false,
                         allowsInlineMediaPlayback: true,
+                        disableDefaultErrorPage: false,
+                        transparentBackground: false,
                       ),
                       initialUrlRequest: URLRequest(
                         url: WebUri('${FAUrls.login}/'),
                       ),
+                      onLoadStart: (controller, url) {
+                        // Handle load start
+                      },
                       onLoadStop: (controller, url) async {
                         await _handleNavigation(controller, url);
+                      },
+                      onReceivedError: (controller, request, error) {
+                        print('WebView Error: ${error.description}');
+                      },
+                      onWebViewCreated: (controller) {
+                        print('WebView created');
                       },
                     ),
                   ),
@@ -202,7 +224,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: isDesktop ? 480 : double.infinity),
+                    constraints: BoxConstraints(
+                      maxWidth: isDesktop ? 480 : double.infinity,
+                    ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -217,12 +241,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 color: AppColors.fluentCyanBg,
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: AppColors.fluentCyan.withOpacity(0.3 + glow * 0.4),
+                                  color: AppColors.fluentCyan.withOpacity(
+                                    0.3 + glow * 0.4,
+                                  ),
                                   width: 1.5,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.fluentCyan.withOpacity(0.08 * glow),
+                                    color: AppColors.fluentCyan.withOpacity(
+                                      0.08 * glow,
+                                    ),
                                     blurRadius: 24,
                                     spreadRadius: 2,
                                   ),
@@ -264,16 +292,25 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             decoration: BoxDecoration(
                               color: AppColors.danger.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.danger.withOpacity(0.2)),
+                              border: Border.all(
+                                color: AppColors.danger.withOpacity(0.2),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+                                const Icon(
+                                  Icons.error_outline,
+                                  color: AppColors.danger,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
                                     _errorMessage!,
-                                    style: const TextStyle(color: AppColors.danger, fontSize: 14),
+                                    style: const TextStyle(
+                                      color: AppColors.danger,
+                                      fontSize: 14,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -288,16 +325,24 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.fluentCyanDark,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 16,
+                              ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(isDesktop ? 8 : 24),
+                                borderRadius: BorderRadius.circular(
+                                  isDesktop ? 8 : 24,
+                                ),
                               ),
                             ),
                             child: _isLoading
                                 ? const SizedBox(
                                     width: 20,
                                     height: 20,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
                                   )
                                 : const Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -310,38 +355,45 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           ),
                         ),
                         const SizedBox(height: 24),
-        const Text(
-          'You will be redirected to FurAffinity to sign in.\nYour credentials are handled securely.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 13,
-            height: 1.5,
-          ),
-        ),
+                        const Text(
+                          'You will be redirected to FurAffinity to sign in.\nYour credentials are handled securely.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 13,
+                            height: 1.5,
+                          ),
+                        ),
                         if (isDesktop) ...[
                           const SizedBox(height: 32),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.monitor, size: 14, color: AppColors.textMuted),
-              SizedBox(width: 6),
-              Text(
-                'Windows • Linux • macOS • Android • iOS',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                  fontFamily: 'JetBrains Mono',
-                ),
-              ),
-            ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgCard,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.monitor,
+                                  size: 14,
+                                  color: AppColors.textMuted,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Windows • Linux • macOS • Android • iOS',
+                                  style: TextStyle(
+                                    color: AppColors.textMuted,
+                                    fontSize: 11,
+                                    fontFamily: 'JetBrains Mono',
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],

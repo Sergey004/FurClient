@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:system_theme/system_theme.dart';
 import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
@@ -8,10 +9,16 @@ import 'services/fa_client.dart';
 import 'screens/login_screen.dart';
 import 'navigation/app_navigator.dart';
 
-bool get _isDesktop => Platform.isLinux || Platform.isWindows || Platform.isMacOS;
+bool get _isDesktop =>
+    Platform.isLinux || Platform.isWindows || Platform.isMacOS;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (Platform.isWindows) {
+    await InAppWebViewController.setWebContentsDebuggingEnabled(true);
+  }
+
   if (_isDesktop) {
     SystemTheme.fallbackColor = AppColors.fluentCyanDark;
     await SystemTheme.accentColor.load();
@@ -135,7 +142,10 @@ class _FurClientAppState extends State<FurClientApp> {
             children: [
               CircularProgressIndicator(color: AppColors.fluentCyan),
               SizedBox(height: 16),
-              Text('Restoring session...', style: TextStyle(color: AppColors.textDim, fontSize: 14)),
+              Text(
+                'Restoring session...',
+                style: TextStyle(color: AppColors.textDim, fontSize: 14),
+              ),
             ],
           ),
         ),
