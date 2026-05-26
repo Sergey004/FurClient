@@ -19,7 +19,6 @@ class GalleryScreen extends StatefulWidget {
 
 class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController _searchController = TextEditingController();
 
   List<Submission> _submissions = [];
   int _currentPage = 1;
@@ -50,7 +49,6 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
   @override
   void dispose() {
     _scrollController.dispose();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -113,7 +111,6 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
   }
 
   Future<void> _onRefresh() async {
-    _searchController.clear();
     await _loadSubmissions();
   }
 
@@ -135,6 +132,14 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
     );
   }
 
+  int _getCrossAxisCount(double width) {
+    if (width >= 1200) return 5;
+    if (width >= 900) return 4;
+    if (width >= AppBreakpoints.desktop) return 3;
+    if (width >= AppBreakpoints.tablet) return 3;
+    return 2;
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -144,27 +149,39 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
       ),
       body: Column(
         children: [
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final cat = _categories[index];
-                final selected = cat == _selectedCategory;
-                return FilterChip(
-                  label: Text(_categoryLabels[cat] ?? cat),
-                  selected: selected,
-                  onSelected: (_) => _onCategoryChanged(cat),
-                );
-              },
-            ),
-          ),
+          _buildCategoryChips(),
           const SizedBox(height: 8),
           Expanded(child: _buildBody()),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChips() {
+    final isDesktop = MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
+
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final cat = _categories[index];
+          final selected = cat == _selectedCategory;
+          return FilterChip(
+            label: Text(_categoryLabels[cat] ?? cat),
+            selected: selected,
+            onSelected: (_) => _onCategoryChanged(cat),
+            selectedColor: isDesktop
+                ? AppColors.fluentCyanBg
+                : AppColors.materialLavenderBg,
+            checkmarkColor: isDesktop
+                ? AppColors.fluentCyan
+                : AppColors.materialLavender,
+          );
+        },
       ),
     );
   }
@@ -194,31 +211,38 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
     }
 
     return RefreshIndicator(
-      color: AppColors.accent,
+      color: AppColors.fluentCyan,
       backgroundColor: AppColors.bgCard,
       onRefresh: _onRefresh,
-      child: GridView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.65,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-        ),
-        itemCount: _submissions.length + (_isLoadingMore ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index >= _submissions.length) {
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2)),
-            );
-          }
-          final sub = _submissions[index];
-          return SubmissionCard(
-            submission: sub,
-            sfwMode: widget.sfwMode,
-            onTap: () => _navigateToDetail(sub),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final crossAxisCount = _getCrossAxisCount(constraints.maxWidth);
+          final isDesktop = constraints.maxWidth >= AppBreakpoints.desktop;
+
+          return GridView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              childAspectRatio: isDesktop ? 0.7 : 0.65,
+              crossAxisSpacing: isDesktop ? 16 : 12,
+              mainAxisSpacing: isDesktop ? 16 : 12,
+            ),
+            itemCount: _submissions.length + (_isLoadingMore ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index >= _submissions.length) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator(color: AppColors.fluentCyan, strokeWidth: 2)),
+                );
+              }
+              final sub = _submissions[index];
+              return SubmissionCard(
+                submission: sub,
+                sfwMode: widget.sfwMode,
+                onTap: () => _navigateToDetail(sub),
+              );
+            },
           );
         },
       ),

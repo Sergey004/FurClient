@@ -28,23 +28,20 @@ class _AppNavigatorState extends State<AppNavigator> {
   int _currentIndex = 0;
   bool _sfwMode = false;
 
-  void _onSfwModeChanged(bool value) {
-    setState(() {
-      _sfwMode = value;
-    });
-  }
-
-  static const _tabs = [
-    _NavTab(icon: Icons.photo_library, label: 'Gallery'),
-    _NavTab(icon: Icons.search, label: 'Search'),
-    _NavTab(icon: Icons.notifications, label: 'Notifications'),
-    _NavTab(icon: Icons.person, label: 'Profile'),
-    _NavTab(icon: Icons.settings, label: 'Settings'),
+  static const _navItems = [
+    _NavItem(icon: Icons.photo_library_outlined, selectedIcon: Icons.photo_library, label: 'Gallery', accent: AppColors.fluentCyan),
+    _NavItem(icon: Icons.search_outlined, selectedIcon: Icons.search, label: 'Search', accent: AppColors.materialGreen),
+    _NavItem(icon: Icons.notifications_outlined, selectedIcon: Icons.notifications, label: 'Notifications', accent: AppColors.cupertinoPurple),
+    _NavItem(icon: Icons.person_outline, selectedIcon: Icons.person, label: 'Profile', accent: AppColors.materialLavender),
+    _NavItem(icon: Icons.settings_outlined, selectedIcon: Icons.settings, label: 'Settings', accent: AppColors.textMuted),
   ];
 
-  @override
-  Widget build(BuildContext context) {
-    final screens = [
+  void _onSfwModeChanged(bool value) {
+    setState(() => _sfwMode = value);
+  }
+
+  List<Widget> _buildScreens() {
+    return [
       GalleryScreen(client: widget.client, sfwMode: _sfwMode),
       SearchScreen(client: widget.client, sfwMode: _sfwMode),
       NotificationsScreen(client: widget.client),
@@ -55,36 +52,118 @@ class _AppNavigatorState extends State<AppNavigator> {
         onLogout: widget.onLogout,
       ),
     ];
+  }
 
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= AppBreakpoints.desktop;
+
+    final screens = _buildScreens();
+
+    if (isDesktop) {
+      return _buildDesktopLayout(screens);
+    }
+    return _buildMobileLayout(screens);
+  }
+
+  Widget _buildDesktopLayout(List<Widget> screens) {
+    final isExtended = MediaQuery.of(context).size.width >= 1000;
+    final currentAccent = _navItems[_currentIndex].accent;
+
+    return Scaffold(
+      body: Row(
+        children: [
+          Container(
+        decoration: const BoxDecoration(
+          color: AppColors.bgCard,
+          border: Border(
+            right: BorderSide(color: AppColors.border, width: 1),
+              ),
+            ),
+            child: NavigationRail(
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (index) => setState(() => _currentIndex = index),
+              extended: isExtended,
+              leading: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: isExtended
+                    ? Row(
+                        children: [
+                          Icon(Icons.pets, color: currentAccent, size: 28),
+                          const SizedBox(width: 12),
+                          Text(
+                            'FurClient',
+                            style: TextStyle(
+                              color: currentAccent,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Icon(Icons.pets, color: currentAccent, size: 28),
+              ),
+              indicatorColor: currentAccent.withOpacity(0.15),
+              destinations: _navItems.map((item) {
+                return NavigationRailDestination(
+                  icon: Icon(item.icon, color: AppColors.textMuted),
+                  selectedIcon: Icon(item.selectedIcon, color: currentAccent),
+                  label: Text(item.label),
+                );
+              }).toList(),
+            ),
+          ),
+          Expanded(child: screens[_currentIndex]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(List<Widget> screens) {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         children: screens,
       ),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: AppColors.border, width: 1),
+      decoration: const BoxDecoration(
+        color: AppColors.bgCard,
+        border: Border(
+          top: BorderSide(color: AppColors.border, width: 1),
           ),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          items: _tabs
-              .map((tab) => BottomNavigationBarItem(
-                    icon: Icon(tab.icon),
-                    label: tab.label,
-                  ))
-              .toList(),
+        child: NavigationBar(
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (index) => setState(() => _currentIndex = index),
+          backgroundColor: AppColors.bgCard,
+          indicatorColor: _navItems[_currentIndex].accent.withOpacity(0.15),
+          height: 64,
+          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+          destinations: _navItems.map((item) {
+            return NavigationDestination(
+              icon: Icon(item.icon, size: 22),
+              selectedIcon: Icon(item.selectedIcon, size: 24),
+              label: item.label,
+            );
+          }).toList(),
         ),
       ),
     );
   }
 }
 
-class _NavTab {
+class _NavItem {
   final IconData icon;
+  final IconData selectedIcon;
   final String label;
+  final Color accent;
 
-  const _NavTab({required this.icon, required this.label});
+  const _NavItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.accent,
+  });
 }

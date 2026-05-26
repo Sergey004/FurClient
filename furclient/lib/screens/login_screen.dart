@@ -17,15 +17,26 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   bool _isLoading = false;
   bool _showWebView = false;
   String? _errorMessage;
   Completer<UserSession?>? _loginCompleter;
+  late AnimationController _glowController;
 
   @override
   void initState() {
     super.initState();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
   }
 
   Future<void> _startLogin() async {
@@ -122,16 +133,19 @@ class _LoginScreenState extends State<LoginScreen> {
           cookies: jsonEncode(cookiePairs),
         );
 
-            if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
-              await widget.authService.saveSession(session);
-              _loginCompleter!.complete(session);
-            }
+        if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
+          await widget.authService.saveSession(session);
+          _loginCompleter!.complete(session);
+        }
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= AppBreakpoints.desktop;
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
@@ -161,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const LinearProgressIndicator(
-                    color: AppColors.accent,
+                    color: AppColors.fluentCyan,
                     backgroundColor: AppColors.bgInput,
                   ),
                   Expanded(
@@ -187,95 +201,152 @@ class _LoginScreenState extends State<LoginScreen> {
             : Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: AppColors.accent.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(
-                          Icons.pets,
-                          color: AppColors.accent,
-                          size: 40,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'FurClient',
-                        style: TextStyle(
-                          color: AppColors.text,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'A FurAffinity client',
-                        style: TextStyle(
-                          color: AppColors.textDim,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 48),
-                      if (_errorMessage != null) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.danger.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.danger.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: const TextStyle(color: AppColors.danger, fontSize: 14),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: isDesktop ? 480 : double.infinity),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedBuilder(
+                          animation: _glowController,
+                          builder: (context, child) {
+                            final glow = _glowController.value;
+                            return Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: AppColors.fluentCyanBg,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: AppColors.fluentCyan.withOpacity(0.3 + glow * 0.4),
+                                  width: 1.5,
                                 ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.fluentCyan.withOpacity(0.08 * glow),
+                                    blurRadius: 24,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
                               ),
-                            ],
+                              child: const Icon(
+                                Icons.pets,
+                                color: AppColors.fluentCyan,
+                                size: 40,
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'FA Nexus',
+                          style: TextStyle(
+                            color: AppColors.text,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.5,
                           ),
                         ),
-                        const SizedBox(height: 20),
-                      ],
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _startLogin,
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                )
-                              : const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.login, size: 20),
-                                    SizedBox(width: 10),
-                                    Text('Sign in with FurAffinity'),
-                                  ],
+                        const SizedBox(height: 4),
+                        Text(
+                          'FurAffinity Client',
+                          style: TextStyle(
+                            color: AppColors.fluentCyan.withOpacity(0.7),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        const SizedBox(height: 48),
+                        if (_errorMessage != null) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.danger.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.danger.withOpacity(0.2)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: const TextStyle(color: AppColors.danger, fontSize: 14),
+                                  ),
                                 ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _startLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.fluentCyanDark,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(isDesktop ? 8 : 24),
+                              ),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  )
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.login, size: 20),
+                                      SizedBox(width: 10),
+                                      Text('Sign in with FurAffinity'),
+                                    ],
+                                  ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'You will be redirected to FurAffinity to sign in.\nYour credentials are handled securely.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 13,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
+                        const SizedBox(height: 24),
+        const Text(
+          'You will be redirected to FurAffinity to sign in.\nYour credentials are handled securely.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 13,
+            height: 1.5,
+          ),
+        ),
+                        if (isDesktop) ...[
+                          const SizedBox(height: 32),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.monitor, size: 14, color: AppColors.textMuted),
+              SizedBox(width: 6),
+              Text(
+                'Windows • Linux • macOS • Android • iOS',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                  fontFamily: 'JetBrains Mono',
+                ),
+              ),
+            ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ),

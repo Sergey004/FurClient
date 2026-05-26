@@ -1,51 +1,97 @@
 # FurClient — Fur Affinity Client
 
-Кроссплатформенный клиент для Fur Affinity на React Native.
+A cross-platform Fur Affinity client built with Flutter & Dart.
 
-## Платформы
+## Platforms
 
-| Платформа | Технология | Бинарник |
+| Platform | Tech | Build Command |
 |---|---|---|
-| Windows | Electron | `npm run electron:build:win` → EXE |
-| macOS | Electron | `npm run electron:build:mac` → DMG |
-| Linux | Electron | `npm run electron:build:linux` → AppImage |
-| Android | Capacitor | `cd android && ./gradlew assembleRelease` → APK |
+| Windows | Flutter (WinUI 3 style) | `flutter build windows` |
+| Linux | Flutter (GNOME style) | `flutter build linux` |
+| macOS | Flutter (Cupertino style) | `flutter build macos` |
+| Android | Flutter (Material 3) | `flutter build apk` |
+| iOS | Flutter (Cupertino) | `flutter build ios` |
 
-## Команды
+## Design System
+
+FurClient adapts its UI to match the host OS design language (see [DESIGN.md](DESIGN.md)):
+
+- **Desktop** (Windows/Linux/macOS) — Fluent WinUI 3 layout: sidebar navigation, Mica-style transparency, cyan `#60cdff` accents, rectangular inputs
+- **Mobile** (Android/iOS) — Material 3 / Material You layout: bottom navigation bar, pill indicators, lavender `#e8def8` accents, capsule inputs, rounded-2xl cards
+- **Color-coded navigation** — each tab has a distinct accent color (Gallery=cyan, Search=green, Notifications=purple, Profile=lavender)
+- **Dynamic color** — Material You wallpaper-derived colors on Android 12+, OS accent color on desktop
+
+## Commands
 
 ```bash
-# Установка
-npm install
+# Setup
+flutter pub get
 
-# Веб-сборка (общая для всех десктоп-платформ)
-npm run web:build
+# Development
+flutter run -d linux
+flutter run -d windows
+flutter run -d chrome
+flutter run -d <device_id>
 
-# Linux
-npm run electron:build:linux
+# Build
+flutter build linux
+flutter build windows
+flutter build apk --release
+flutter build ios --release
 
-# Android
-cd android && ./gradlew assembleDebug
-
-# Разработка
-npm run web:dev          # браузер
-npm run electron:dev     # Electron окно
+# Analysis
+flutter analyze
 ```
 
-## Структура
+## Project Structure
 
 ```
-src/           — React Native код (общий)
-electron/      — Electron main process
-android/       — Capacitor Android проект
-web-build/     — собранные веб-ресурсы (gitignored)
-dist-electron/ — Electron бинарники (gitignored)
+furclient/
+  lib/
+    main.dart              — App entry, DynamicColorBuilder, session restore
+    theme/
+      app_theme.dart       — Color system, breakpoints, adaptive theme
+    navigation/
+      app_navigator.dart   — NavigationRail (desktop) / NavigationBar (mobile)
+    screens/
+      login_screen.dart    — WebView-based FA login
+      gallery_screen.dart  — Browse submissions with adaptive grid
+      search_screen.dart   — Search with history
+      notifications_screen.dart — Color-coded notification types
+      profile_screen.dart  — User profile with desktop sidebar layout
+      settings_screen.dart — Adaptive Fluent/M3 toggles
+      submission_detail_screen.dart — Side-by-side desktop / scroll mobile
+    services/
+      auth_service.dart    — Session storage, WebView login flow
+      fa_client.dart       — Dio HTTP client with cookie jar, CF handling
+      fa_urls.dart         — FA URL builders
+    models/
+      submission.dart      — Submission model with HTML parsing
+      fa_notification.dart — Notification model with type detection
+      fa_user.dart         — User profile model with HTML parsing
+      fa_comment.dart      — Comment model
+      user_session.dart    — Session/cookie model
+    widgets/
+      submission_card.dart — Reusable submission card
+      loading_indicator.dart
+      error_view.dart
 ```
 
-## Git workflow
+## Authentication
+
+FurClient uses WebView-based login (same approach as the iOS reference app `FurAffinityApp`):
+
+1. Opens FA login page in `flutter_inappwebview`
+2. Captures cookies after successful login
+3. Stores cookies in `PersistCookieJar` for Dio requests
+4. All HTTP requests carry the FA session cookies
+5. `verifySession()` validates cookies on app launch (lenient on 5xx)
+
+## Git Workflow
 
 ```bash
 git add .
-git commit -m "что сделано"
-git push          # залить на GitHub
-git pull          # скачать изменения
+git commit -m "description"
+git push
+git pull
 ```

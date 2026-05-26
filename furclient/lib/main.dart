@@ -1,12 +1,22 @@
+import 'dart:io' show Platform;
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
+import 'package:system_theme/system_theme.dart';
 import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'services/fa_client.dart';
 import 'screens/login_screen.dart';
 import 'navigation/app_navigator.dart';
 
-void main() {
+bool get _isDesktop => Platform.isLinux || Platform.isWindows || Platform.isMacOS;
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (_isDesktop) {
+    SystemTheme.fallbackColor = AppColors.fluentCyanDark;
+    await SystemTheme.accentColor.load();
+  }
+  AppTheme.setSystemOverlay();
   runApp(const FurClientApp());
 }
 
@@ -77,11 +87,41 @@ class _FurClientAppState extends State<FurClientApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FurClient',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: _buildHome(),
+    if (!_isDesktop) {
+      return DynamicColorBuilder(
+        builder: (lightDynamic, darkDynamic) {
+          final theme = darkDynamic != null
+              ? AppTheme.buildFromDynamicColor(darkDynamic)
+              : AppTheme.darkTheme;
+          return MaterialApp(
+            title: 'FurClient',
+            debugShowCheckedModeBanner: false,
+            theme: theme,
+            home: _buildHome(),
+          );
+        },
+      );
+    }
+
+    return DynamicColorBuilder(
+      builder: (lightDynamic, darkDynamic) {
+        return SystemThemeBuilder(
+          builder: (context, systemAccent) {
+            final ThemeData theme;
+            if (darkDynamic != null) {
+              theme = AppTheme.buildFromDynamicColor(darkDynamic);
+            } else {
+              theme = AppTheme.buildFromSystemAccent(systemAccent.accent);
+            }
+            return MaterialApp(
+              title: 'FurClient',
+              debugShowCheckedModeBanner: false,
+              theme: theme,
+              home: _buildHome(),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -93,7 +133,7 @@ class _FurClientAppState extends State<FurClientApp> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(color: AppColors.accent),
+              CircularProgressIndicator(color: AppColors.fluentCyan),
               SizedBox(height: 16),
               Text('Restoring session...', style: TextStyle(color: AppColors.textDim, fontSize: 14)),
             ],

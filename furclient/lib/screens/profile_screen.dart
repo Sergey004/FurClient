@@ -10,8 +10,14 @@ import '../widgets/error_view.dart';
 class ProfileScreen extends StatefulWidget {
   final FAClient client;
   final UserSession session;
+  final String? targetUsername;
 
-  const ProfileScreen({super.key, required this.client, required this.session});
+  const ProfileScreen({
+    super.key,
+    required this.client,
+    required this.session,
+    this.targetUsername,
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -31,6 +37,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
     _loadProfile();
   }
 
+  String get _username => widget.targetUsername ?? widget.session.username;
+
   Future<void> _loadProfile() async {
     setState(() {
       _isLoading = true;
@@ -38,7 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
     });
 
     try {
-      final profile = await widget.client.getUser(widget.session.username);
+      final profile = await widget.client.getUser(_username);
       if (mounted) {
         setState(() {
           _profile = profile;
@@ -59,7 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
   Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: Text(widget.targetUsername != null ? _username : 'Profile')),
       body: _buildBody(),
     );
   }
@@ -78,35 +86,130 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
     }
 
     final p = _profile!;
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= AppBreakpoints.desktop;
+
     return RefreshIndicator(
-      color: AppColors.accent,
+      color: AppColors.materialLavender,
       backgroundColor: AppColors.bgCard,
       onRefresh: _loadProfile,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildBanner(p),
-            _buildHeader(p),
-            const SizedBox(height: 16),
-            _buildStats(p),
-            if (p.description.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              _buildBio(p),
-            ],
-            const SizedBox(height: 20),
-            _buildLinks(p),
-            const SizedBox(height: 32),
-          ],
-        ),
+        child: isDesktop
+            ? _buildDesktopLayout(p)
+            : _buildMobileLayout(p),
       ),
     );
   }
 
-  Widget _buildBanner(FAUser p) {
+  Widget _buildMobileLayout(FAUser p) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildBanner(p),
+        _buildHeader(p),
+        const SizedBox(height: 16),
+        _buildStats(p, crossAxisCount: 3),
+        if (p.description.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _buildBio(p),
+        ],
+        const SizedBox(height: 20),
+        _buildLinks(p),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildDesktopLayout(FAUser p) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildBanner(p, height: 200),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDesktopSidebar(p),
+              const SizedBox(width: 32),
+              Expanded(child: _buildDesktopContent(p)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopSidebar(FAUser p) {
     return SizedBox(
-      height: 160,
+      width: 240,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Transform.translate(
+            offset: const Offset(0, -40),
+            child: Column(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.bg, width: 4),
+                  ),
+                  child: CircleAvatar(
+                    radius: 56,
+                    backgroundColor: AppColors.bgInput,
+                    backgroundImage: p.avatarUrl.isNotEmpty
+                        ? CachedNetworkImageProvider(p.avatarUrl)
+                        : null,
+                    child: p.avatarUrl.isEmpty
+                        ? const Icon(Icons.person, color: AppColors.textMuted, size: 56)
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  p.displayName,
+                  style: const TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w700),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '@${p.username}',
+                  style: const TextStyle(color: AppColors.materialLavender, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                _buildWatchButton(p),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildStats(p, crossAxisCount: 2),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopContent(FAUser p) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (p.description.isNotEmpty) ...[
+            _buildBio(p),
+            const SizedBox(height: 20),
+          ],
+          _buildLinks(p),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBanner(FAUser p, {double height = 160}) {
+    return SizedBox(
+      height: height,
       width: double.infinity,
       child: p.bannerUrl.isNotEmpty
           ? CachedNetworkImage(
@@ -124,7 +227,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    AppColors.accent.withOpacity(0.3),
+                    AppColors.materialLavender.withOpacity(0.2),
                     AppColors.bgInput,
                   ],
                 ),
@@ -169,79 +272,83 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                   const SizedBox(height: 2),
                   Text(
                     '@${p.username}',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+                    style: const TextStyle(color: AppColors.materialLavender, fontSize: 14),
                   ),
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: p.isWatching ? AppColors.bgInput : AppColors.accent,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: p.isWatching ? AppColors.border : AppColors.accent),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    p.isWatching ? Icons.visibility : Icons.visibility_off,
-                    size: 16,
-                    color: p.isWatching ? AppColors.textDim : Colors.white,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    p.isWatching ? 'Watching' : 'Watch',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: p.isWatching ? AppColors.textDim : Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _buildWatchButton(p),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStats(FAUser p) {
+  Widget _buildWatchButton(FAUser p) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: p.isWatching ? AppColors.bgInput : AppColors.materialLavenderDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: p.isWatching ? AppColors.border : AppColors.materialLavender),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            p.isWatching ? Icons.visibility : Icons.visibility_off,
+            size: 16,
+            color: p.isWatching ? AppColors.textDim : Colors.white,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            p.isWatching ? 'Watching' : 'Watch',
+            style: TextStyle(
+              fontSize: 14,
+              color: p.isWatching ? AppColors.textDim : Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStats(FAUser p, {int crossAxisCount = 3}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GridView.count(
-        crossAxisCount: 3,
+        crossAxisCount: crossAxisCount,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         childAspectRatio: 2.0,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
         children: [
-          _statCard(Icons.visibility, '${p.stats.views}', 'Views'),
-          _statCard(Icons.collections, '${p.stats.submissions}', 'Submissions'),
-          _statCard(Icons.favorite, '${p.stats.favorites}', 'Faves'),
-          _statCard(Icons.comment, '${p.stats.comments}', 'Comments'),
-          _statCard(Icons.book, '${p.stats.journals}', 'Journals'),
+          _statCard(Icons.visibility, '${p.stats.views}', 'Views', AppColors.fluentCyan),
+          _statCard(Icons.collections, '${p.stats.submissions}', 'Submissions', AppColors.materialGreen),
+          _statCard(Icons.favorite, '${p.stats.favorites}', 'Faves', AppColors.notifFave),
+          _statCard(Icons.comment, '${p.stats.comments}', 'Comments', AppColors.materialLavender),
+          _statCard(Icons.book, '${p.stats.journals}', 'Journals', AppColors.notifJournal),
         ],
       ),
     );
   }
 
-  Widget _statCard(IconData icon, String value, String label) {
+  Widget _statCard(IconData icon, String value, String label, Color color) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
+        color: color.withOpacity(0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: color.withOpacity(0.1)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: AppColors.accentLight, size: 18),
+          Icon(icon, color: color, size: 18),
           const SizedBox(height: 4),
           Text(value, style: const TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w700)),
-          Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+          Text(label, style: TextStyle(color: color.withOpacity(0.7), fontSize: 11)),
         ],
       ),
     );
@@ -281,25 +388,25 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
         children: [
           const Text('Quick Links', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          _linkTile(Icons.collections, 'Gallery', FAUrls.gallery(p.username)),
-          _linkTile(Icons.favorite, 'Favorites', FAUrls.favorites(p.username)),
-          _linkTile(Icons.book, 'Journals', FAUrls.journals(p.username)),
+          _linkTile(Icons.collections, 'Gallery', FAUrls.gallery(p.username), AppColors.fluentCyan),
+          _linkTile(Icons.favorite, 'Favorites', FAUrls.favorites(p.username), AppColors.materialGreen),
+          _linkTile(Icons.book, 'Journals', FAUrls.journals(p.username), AppColors.notifJournal),
         ],
       ),
     );
   }
 
-  Widget _linkTile(IconData icon, String title, String url) {
+  Widget _linkTile(IconData icon, String title, String url, Color color) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
+        color: color.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: color.withOpacity(0.1)),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: Icon(icon, color: AppColors.accentLight, size: 22),
+        leading: Icon(icon, color: color, size: 22),
         title: Text(title, style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w500)),
         trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),
         onTap: () {

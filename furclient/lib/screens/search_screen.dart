@@ -135,9 +135,19 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
     );
   }
 
+  int _getCrossAxisCount(double width) {
+    if (width >= 1200) return 5;
+    if (width >= 900) return 4;
+    if (width >= AppBreakpoints.desktop) return 3;
+    if (width >= AppBreakpoints.tablet) return 3;
+    return 2;
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final isDesktop = MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search'),
@@ -152,8 +162,9 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
               style: const TextStyle(color: AppColors.text, fontSize: 14),
               onSubmitted: _search,
               decoration: InputDecoration(
-                hintText: 'Search submissions...',
-                prefixIcon: const Icon(Icons.search, size: 20),
+      hintText: 'Search submissions...',
+      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+      prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.materialGreen),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 20),
@@ -172,13 +183,13 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
             ),
           ),
           const SizedBox(height: 8),
-          Expanded(child: _buildBody()),
+          Expanded(child: _buildBody(isDesktop)),
         ],
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(bool isDesktop) {
     if (_isLoading) {
       return const LoadingIndicator(message: 'Searching...');
     }
@@ -204,28 +215,34 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
       );
     }
 
-    return GridView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.65,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: _results.length + (_isLoadingMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index >= _results.length) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2)),
-          );
-        }
-        final sub = _results[index];
-        return SubmissionCard(
-          submission: sub,
-          sfwMode: widget.sfwMode,
-          onTap: () => _navigateToDetail(sub),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = _getCrossAxisCount(constraints.maxWidth);
+
+        return GridView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.all(16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: isDesktop ? 0.7 : 0.65,
+            crossAxisSpacing: isDesktop ? 16 : 12,
+            mainAxisSpacing: isDesktop ? 16 : 12,
+          ),
+          itemCount: _results.length + (_isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index >= _results.length) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator(color: AppColors.materialGreen, strokeWidth: 2)),
+              );
+            }
+            final sub = _results[index];
+            return SubmissionCard(
+              submission: sub,
+              sfwMode: widget.sfwMode,
+              onTap: () => _navigateToDetail(sub),
+            );
+          },
         );
       },
     );
@@ -237,13 +254,13 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
     }
     final recent = _searchHistory.recent;
     if (recent.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search, color: AppColors.textMuted, size: 48),
-            SizedBox(height: 16),
-            Text('Search for submissions', style: TextStyle(color: AppColors.textDim, fontSize: 16)),
+            Icon(Icons.search, color: AppColors.materialGreen.withOpacity(0.5), size: 48),
+            const SizedBox(height: 16),
+            const Text('Search for submissions', style: TextStyle(color: AppColors.textDim, fontSize: 16)),
           ],
         ),
       );
@@ -277,7 +294,7 @@ class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClie
               final term = recent[index];
               return ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                leading: const Icon(Icons.history, color: AppColors.textMuted, size: 20),
+                leading: const Icon(Icons.history, color: AppColors.materialGreen, size: 20),
                 title: Text(term, style: const TextStyle(color: AppColors.textDim, fontSize: 14)),
                 trailing: IconButton(
                   icon: const Icon(Icons.close, color: AppColors.textMuted, size: 18),

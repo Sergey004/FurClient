@@ -70,6 +70,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
     }
   }
 
+  Color _typeColor(String type) {
+    switch (type) {
+      case 'fave':
+        return AppColors.notifFave;
+      case 'comment':
+        return AppColors.notifComment;
+      case 'watch':
+        return AppColors.notifWatch;
+      case 'journal':
+        return AppColors.notifJournal;
+      default:
+        return AppColors.textDim;
+    }
+  }
+
   IconData _typeIcon(String type) {
     switch (type) {
       case 'fave':
@@ -82,21 +97,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
         return Icons.book;
       default:
         return Icons.notifications;
-    }
-  }
-
-  Color _typeColor(String type) {
-    switch (type) {
-      case 'fave':
-        return AppColors.accentLight;
-      case 'comment':
-        return AppColors.success;
-      case 'watch':
-        return const Color(0xFFa78bfa);
-      case 'journal':
-        return const Color(0xFFf59e0b);
-      default:
-        return AppColors.textDim;
     }
   }
 
@@ -136,13 +136,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
     }
 
     return RefreshIndicator(
-      color: AppColors.accent,
+      color: AppColors.cupertinoPurple,
       backgroundColor: AppColors.bgCard,
       onRefresh: _loadNotifications,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _notifications.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
+        separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.border, indent: 62),
         itemBuilder: (context, index) {
           final notif = _notifications[index];
           return _buildNotificationTile(notif);
@@ -152,21 +152,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
   }
 
   Widget _buildNotificationTile(FANotification notif) {
+    final color = _typeColor(notif.type);
+
     return InkWell(
       onTap: () => _onNotificationTap(notif),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: AppColors.bgInput,
-              backgroundImage: notif.avatarUrl.isNotEmpty
-                  ? CachedNetworkImageProvider(notif.avatarUrl)
-                  : null,
-              child: notif.avatarUrl.isEmpty
-                  ? Icon(_typeIcon(notif.type), color: _typeColor(notif.type), size: 22)
-                  : null,
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withOpacity(0.1),
+                border: Border.all(color: color.withOpacity(0.2), width: 1),
+              ),
+              child: CircleAvatar(
+                radius: 22,
+                backgroundColor: Colors.transparent,
+                backgroundImage: notif.avatarUrl.isNotEmpty
+                    ? CachedNetworkImageProvider(notif.avatarUrl)
+                    : null,
+                child: notif.avatarUrl.isEmpty
+                    ? Icon(_typeIcon(notif.type), color: color, size: 22)
+                    : null,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -191,11 +200,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(_typeIcon(notif.type), color: _typeColor(notif.type), size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        notif.type.toUpperCase(),
-                        style: TextStyle(color: _typeColor(notif.type), fontSize: 11, fontWeight: FontWeight.w600),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_typeIcon(notif.type), color: color, size: 12),
+                            const SizedBox(width: 4),
+                            Text(
+                              notif.type.toUpperCase(),
+                              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
