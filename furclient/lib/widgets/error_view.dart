@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../widgets/adaptive/adaptive.dart';
 
 class ErrorView extends StatelessWidget {
   final String message;
@@ -31,10 +32,17 @@ class ErrorView extends StatelessWidget {
             ),
             if (onRetry != null) ...[
               const SizedBox(height: 20),
-              ElevatedButton.icon(
+              AdaptiveButton(
+                label: 'Retry',
                 onPressed: onRetry,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Retry'),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.refresh, size: 18),
+                    SizedBox(width: 8),
+                    Text('Retry'),
+                  ],
+                ),
               ),
             ],
           ],

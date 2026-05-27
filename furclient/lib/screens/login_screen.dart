@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/fa_urls.dart';
+import '../utils/platform_utils.dart';
+import '../widgets/adaptive/adaptive.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthService authService;
@@ -30,10 +33,13 @@ class _LoginScreenState extends State<LoginScreen>
   Completer<UserSession?>? _loginCompleter;
   late AnimationController _glowController;
 
+  static final _allowedHosts = ['www.furaffinity.net', 'furaffinity.net'];
+
   static final _allowedPaths = [
     RegExp(r'^/(\?(.)*)?$'),
     RegExp(r'^/login(/(\?(.)*)?)?$'),
     RegExp(r'^/user/(.)+$'),
+    RegExp(r'^/cdn-cgi/(.)*$'),
   ];
 
   static final _externalPaths = [
@@ -53,6 +59,11 @@ class _LoginScreenState extends State<LoginScreen>
       if (pattern.hasMatch(path)) return true;
     }
     return false;
+  }
+
+  bool _isFAHost(String? host) {
+    if (host == null) return false;
+    return _allowedHosts.contains(host) || host.endsWith('.furaffinity.net');
   }
 
   @override
@@ -117,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen>
     Uri? url,
   ) async {
     if (url == null) return;
-    if (url.host != 'www.furaffinity.net') return;
+    if (!_isFAHost(url.host)) return;
 
     final path = url.path;
     final isRoot = path == '/' || path == '';
@@ -188,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen>
     final url = action.request.url;
     if (url == null) return NavigationActionPolicy.CANCEL;
 
-    if (url.host != 'www.furaffinity.net') {
+    if (!_isFAHost(url.host)) {
       return NavigationActionPolicy.CANCEL;
     }
 
@@ -212,263 +223,270 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final isDesktop = width >= AppBreakpoints.desktop;
+    final isDesktopWidth = width >= AppBreakpoints.desktop;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
         child: _showWebView
-            ? Column(
-                children: [
-                  Container(
-                    color: AppColors.bgCard,
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Sign in to FurAffinity',
-                            style: TextStyle(
-                              color: AppColors.text,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: _cancelLogin,
-                          child: const Text('Cancel'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const LinearProgressIndicator(
-                    color: AppColors.fluentCyan,
-                    backgroundColor: AppColors.bgInput,
-                  ),
-                Expanded(
-                  child: InAppWebView(
-                    initialSettings: InAppWebViewSettings(
-                      useShouldOverrideUrlLoading: true,
-                      javaScriptEnabled: true,
-                      domStorageEnabled: true,
-                      databaseEnabled: true,
-                      supportZoom: true,
-                      mediaPlaybackRequiresUserGesture: false,
-                      allowsInlineMediaPlayback: true,
-                      disableDefaultErrorPage: false,
-                      transparentBackground: false,
-                      thirdPartyCookiesEnabled: true,
-                      allowFileAccessFromFileURLs: false,
-                      allowUniversalAccessFromFileURLs: false,
-                    ),
-                    initialUrlRequest: URLRequest(
-                      url: WebUri(FAUrls.login),
-                    ),
-                    shouldOverrideUrlLoading: _shouldOverrideUrlLoading,
-                    onLoadStart: (controller, url) {},
-                    onLoadStop: (controller, url) async {
-                      await _handleNavigation(controller, url);
-                    },
-                    onReceivedError: (controller, request, error) {
-                      if (error.type == WebResourceErrorType.HOST_LOOKUP ||
-                          error.type ==
-                              WebResourceErrorType.CANNOT_CONNECT_TO_HOST) {
-                        if (_loginCompleter != null &&
-                            !_loginCompleter!.isCompleted) {
-                          _loginCompleter!.completeError(
-                            'Cannot connect to FurAffinity. Check your internet connection.',
-                          );
-                        }
-                      }
-                    },
-                    onWebViewCreated: (controller) {},
-                  ),
-                ),
-                ],
-              )
-            : Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: isDesktop ? 480 : double.infinity,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        AnimatedBuilder(
-                          animation: _glowController,
-                          builder: (context, child) {
-                            final glow = _glowController.value;
-                            return Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                color: AppColors.fluentCyanBg,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: AppColors.fluentCyan.withValues(
-                                    alpha: 0.3 + glow * 0.4,
-                                  ),
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.fluentCyan.withValues(
-                                      alpha: 0.08 * glow,
-                                    ),
-                                    blurRadius: 24,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.pets,
-                                color: AppColors.fluentCyan,
-                                size: 40,
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'FA Nexus',
-                          style: TextStyle(
-                            color: AppColors.text,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'FurAffinity Client',
-                          style: TextStyle(
-                            color: AppColors.fluentCyan.withValues(alpha: 0.7),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                        const SizedBox(height: 48),
-                        if (_errorMessage != null) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppColors.danger.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: AppColors.danger.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  color: AppColors.danger,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: const TextStyle(
-                                      color: AppColors.danger,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _startLogin,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.fluentCyanDark,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 16,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  isDesktop ? 8 : 24,
-                                ),
-                              ),
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.login, size: 20),
-                                      SizedBox(width: 10),
-                                      Text('Sign in with FurAffinity'),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'You will be redirected to FurAffinity to sign in.\nYour credentials are handled securely.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 13,
-                            height: 1.5,
-                          ),
-                        ),
-                        if (isDesktop) ...[
-                          const SizedBox(height: 32),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.bgCard,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.monitor,
-                                  size: 14,
-                                  color: AppColors.textMuted,
-                                ),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Windows • Linux • macOS • Android • iOS',
-                                  style: TextStyle(
-                                    color: AppColors.textMuted,
-                                    fontSize: 11,
-                                    fontFamily: 'JetBrains Mono',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+            ? _buildWebView(isDesktopWidth)
+            : _buildLoginForm(isDesktopWidth),
+      ),
+    );
+  }
+
+  Widget _buildWebView(bool isDesktopWidth) {
+    final webView = Column(
+      children: [
+        Container(
+          color: AppColors.bgCard,
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Sign in to FurAffinity',
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
+              TextButton(
+                onPressed: _cancelLogin,
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        ),
+        const LinearProgressIndicator(
+          color: AppColors.fluentCyan,
+          backgroundColor: AppColors.bgInput,
+        ),
+        Expanded(
+          child: InAppWebView(
+            initialSettings: InAppWebViewSettings(
+              useShouldOverrideUrlLoading: true,
+              javaScriptEnabled: true,
+              domStorageEnabled: true,
+              databaseEnabled: true,
+              supportZoom: true,
+              mediaPlaybackRequiresUserGesture: false,
+              allowsInlineMediaPlayback: true,
+              disableDefaultErrorPage: false,
+              transparentBackground: false,
+              thirdPartyCookiesEnabled: true,
+              allowFileAccessFromFileURLs: false,
+              allowUniversalAccessFromFileURLs: false,
+            ),
+            initialUrlRequest: URLRequest(
+              url: WebUri(FAUrls.login),
+            ),
+            shouldOverrideUrlLoading: _shouldOverrideUrlLoading,
+            onLoadStart: (controller, url) {},
+            onLoadStop: (controller, url) async {
+              await _handleNavigation(controller, url);
+            },
+            onReceivedError: (controller, request, error) {
+              if (error.type == WebResourceErrorType.HOST_LOOKUP ||
+                  error.type ==
+                      WebResourceErrorType.CANNOT_CONNECT_TO_HOST) {
+                if (_loginCompleter != null &&
+                    !_loginCompleter!.isCompleted) {
+                  _loginCompleter!.completeError(
+                    'Cannot connect to FurAffinity. Check your internet connection.',
+                  );
+                }
+              }
+            },
+            onWebViewCreated: (controller) {},
+          ),
+        ),
+      ],
+    );
+
+    if (isWindows) {
+      return fluent.ContentDialog(
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        content: SizedBox(
+          height: 600,
+          child: webView,
+        ),
+        actions: [],
+      );
+    }
+
+    return webView;
+  }
+
+  Widget _buildLoginForm(bool isDesktopWidth) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isDesktopWidth ? 480 : double.infinity,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedBuilder(
+                animation: _glowController,
+                builder: (context, child) {
+                  final glow = _glowController.value;
+                  return Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: AppColors.fluentCyanBg,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.fluentCyan.withValues(
+                          alpha: 0.3 + glow * 0.4,
+                        ),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.fluentCyan.withValues(
+                            alpha: 0.08 * glow,
+                          ),
+                          blurRadius: 24,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.pets,
+                      color: AppColors.fluentCyan,
+                      size: 40,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'FA Nexus',
+                style: TextStyle(
+                  color: AppColors.text,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'FurAffinity Client',
+                style: TextStyle(
+                  color: AppColors.fluentCyan.withValues(alpha: 0.7),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 48),
+              if (_errorMessage != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.danger.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppColors.danger,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: AdaptiveButton(
+                  label: 'Sign in with FurAffinity',
+                  onPressed: _isLoading ? null : _startLogin,
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: AdaptiveProgress(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.login, size: 20),
+                            SizedBox(width: 10),
+                            Text('Sign in with FurAffinity'),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'You will be redirected to FurAffinity to sign in.\nYour credentials are handled securely.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              if (isDesktopWidth) ...[
+                const SizedBox(height: 32),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.monitor,
+                        size: 14,
+                        color: AppColors.textMuted,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Windows • Linux • macOS • Android • iOS',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                          fontFamily: 'JetBrains Mono',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../screens/profile_screen.dart';
+import '../widgets/adaptive/adaptive.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
   final FAClient client;
@@ -93,33 +94,33 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppBreakpoints.desktop;
 
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.fluentCyan))
-          : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.error_outline,
-                            color: AppColors.danger, size: 48),
-                        const SizedBox(height: 16),
-                        Text(_error!,
-                            style: const TextStyle(
-                                color: AppColors.textDim, fontSize: 14),
-                            textAlign: TextAlign.center),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                            onPressed: _loadSubmission,
-                            child: const Text('Retry')),
-                      ],
-                    ),
-                  ),
-                )
+  return AdaptiveScaffold(
+    backgroundColor: AppColors.bg,
+    body: _isLoading
+    ? const Center(child: AdaptiveProgress())
+    : _error != null
+      ? Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline,
+                    color: AppColors.danger, size: 48),
+                const SizedBox(height: 16),
+                Text(_error!,
+                    style: const TextStyle(
+                        color: AppColors.textDim, fontSize: 14),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                AdaptiveButton(
+                  label: 'Retry',
+                  onPressed: _loadSubmission,
+                ),
+              ],
+            ),
+          ),
+        )
               : _buildContent(isDesktop),
     );
   }
@@ -182,9 +183,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               placeholder: (context, url) => Container(
                 height: 300,
                 color: AppColors.bgInput,
-                child: const Center(
-                    child: CircularProgressIndicator(
-                        color: AppColors.fluentCyan, strokeWidth: 2)),
+        child: const Center(
+          child: AdaptiveProgress(strokeWidth: 2)),
               ),
               errorWidget: (context, url, error) => Container(
                 height: 200,
@@ -353,8 +353,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(
-                    color: AppColors.fluentCyan, strokeWidth: 2),
+        child: AdaptiveProgress(strokeWidth: 2),
               ),
             )
           else if (_comments.isEmpty)

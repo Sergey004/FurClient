@@ -5,6 +5,7 @@ import '../services/fa_client.dart';
 import '../widgets/submission_card.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
+import '../widgets/adaptive/adaptive.dart';
 import 'submission_detail_screen.dart';
 
 class GalleryScreen extends StatefulWidget {
@@ -143,7 +144,7 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Scaffold(
+    return AdaptiveScaffold(
       appBar: AppBar(
         title: const Text('Gallery'),
       ),
@@ -231,9 +232,9 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
             itemCount: _submissions.length + (_isLoadingMore ? 1 : 0),
             itemBuilder: (context, index) {
               if (index >= _submissions.length) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(child: CircularProgressIndicator(color: AppColors.fluentCyan, strokeWidth: 2)),
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: AdaptiveProgress(strokeWidth: 2)),
                 );
               }
               final sub = _submissions[index];

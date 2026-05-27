@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../widgets/adaptive/adaptive.dart';
 
 class LoadingIndicator extends StatelessWidget {
   final String? message;
@@ -12,10 +13,7 @@ class LoadingIndicator extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CircularProgressIndicator(
-            color: AppColors.accent,
-            strokeWidth: 3,
-          ),
+          const AdaptiveProgress(),
           if (message != null) ...[
             const SizedBox(height: 16),
             Text(

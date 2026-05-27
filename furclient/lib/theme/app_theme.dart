@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
 class AppColors {
   static const bg = Color(0xFF0f0f11);
@@ -289,5 +290,39 @@ class AppTheme {
       systemNavigationBarColor: AppColors.bgCard,
       systemNavigationBarIconBrightness: Brightness.light,
     ));
+  }
+
+  static fluent.FluentThemeData get fluentDarkTheme {
+    return fluent.FluentThemeData(
+      brightness: Brightness.dark,
+      accentColor: fluent.AccentColor.swatch(const <String, Color>{
+        'darkest': AppColors.fluentCyanDark,
+        'darker': AppColors.fluentCyanDark,
+        'dark': AppColors.fluentCyanDark,
+        'normal': AppColors.fluentCyan,
+        'light': AppColors.fluentCyan,
+        'lighter': AppColors.fluentCyan,
+        'lightest': AppColors.fluentCyan,
+      }),
+      scaffoldBackgroundColor: AppColors.bg,
+      cardColor: AppColors.bgCard,
+    );
+  }
+
+  static fluent.FluentThemeData fluentFromSystemAccent(Color accent) {
+    return fluent.FluentThemeData(
+      brightness: Brightness.dark,
+      accentColor: fluent.AccentColor.swatch(<String, Color>{
+        'darkest': Color.lerp(accent, Colors.black, 0.5)!,
+        'darker': Color.lerp(accent, Colors.black, 0.3)!,
+        'dark': Color.lerp(accent, Colors.black, 0.1)!,
+        'normal': accent,
+        'light': Color.lerp(accent, Colors.white, 0.4)!,
+        'lighter': Color.lerp(accent, Colors.white, 0.6)!,
+        'lightest': Color.lerp(accent, Colors.white, 0.8)!,
+      }),
+      scaffoldBackgroundColor: AppColors.bg,
+      cardColor: AppColors.bgCard,
+    );
   }
 }

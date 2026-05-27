@@ -6,6 +6,7 @@ import '../services/fa_client.dart';
 import '../services/fa_urls.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
+import '../widgets/adaptive/adaptive.dart';
 
 class ProfileScreen extends StatefulWidget {
   final FAClient client;
@@ -67,9 +68,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Scaffold(
-      appBar: AppBar(
-          title: Text(widget.targetUsername != null ? _username : 'Profile')),
+    return AdaptiveScaffold(
+      appBar: AppBar(title: Text(widget.targetUsername != null ? _username : 'Profile')),
       body: _buildBody(),
     );
   }
@@ -471,10 +471,10 @@ class _LinkPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AdaptiveScaffold(
       appBar: AppBar(title: Text(title)),
       body: Center(
-          child: Text(url, style: const TextStyle(color: AppColors.textDim))),
+        child: Text(url, style: const TextStyle(color: AppColors.textDim))),
     );
   }
 }

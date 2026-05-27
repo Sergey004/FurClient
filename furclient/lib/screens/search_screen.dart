@@ -6,6 +6,7 @@ import '../services/search_history.dart';
 import '../widgets/submission_card.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
+import '../widgets/adaptive/adaptive.dart';
 import 'submission_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -150,7 +151,7 @@ class _SearchScreenState extends State<SearchScreen>
     final isDesktop =
         MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
 
-    return Scaffold(
+    return AdaptiveScaffold(
       appBar: AppBar(
         title: const Text('Search'),
       ),
@@ -238,9 +239,9 @@ class _SearchScreenState extends State<SearchScreen>
             if (index >= _results.length) {
               return const Padding(
                 padding: EdgeInsets.all(16),
-                child: Center(
-                    child: CircularProgressIndicator(
-                        color: AppColors.materialGreen, strokeWidth: 2)),
+          child: Center(
+              child: AdaptiveProgress(
+                color: AppColors.materialGreen, strokeWidth: 2)),
               );
             }
             final sub = _results[index];

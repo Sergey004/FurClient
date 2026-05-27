@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
+import '../widgets/adaptive/adaptive.dart';
 import 'submission_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -104,7 +105,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Scaffold(
+    return AdaptiveScaffold(
       appBar: AppBar(
         title: const Text('Notifications'),
       ),

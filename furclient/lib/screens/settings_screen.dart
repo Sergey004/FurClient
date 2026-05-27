@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../widgets/adaptive/adaptive.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool sfwMode;
@@ -68,7 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppBreakpoints.desktop;
 
-    return Scaffold(
+    return AdaptiveScaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: isDesktop ? _buildDesktopBody() : _buildMobileBody(),
     );

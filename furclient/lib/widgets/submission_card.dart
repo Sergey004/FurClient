@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
+import '../widgets/adaptive/adaptive.dart';
 
 class SubmissionCard extends StatelessWidget {
   final Submission submission;
@@ -43,12 +44,9 @@ class SubmissionCard extends StatelessWidget {
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Container(
                               color: AppColors.bgInput,
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  color: AppColors.accent,
-                                  strokeWidth: 2,
-                                ),
-                              ),
+          child: const Center(
+            child: AdaptiveProgress(strokeWidth: 2),
+          ),
                             ),
                             errorWidget: (context, url, error) => Container(
                               color: AppColors.bgInput,
