@@ -1,8 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application
-        android:label="furclient"
-        android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+  <uses-permission android:name="android.permission.INTERNET"/>
+
+<!-- Когда дойдёт до уведомлений (Android 13+) -->
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+<!-- Если будет скачивание файлов/артов -->
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+    android:maxSdkVersion="28"/>
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+    android:maxSdkVersion="32"/>
+  <application
+    android:label="FurClient"
+    android:name="${applicationName}"
+    android:icon="@mipmap/ic_launcher"
+    android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
