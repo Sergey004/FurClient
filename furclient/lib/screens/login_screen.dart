@@ -90,59 +90,45 @@ class _LoginScreenState extends State<LoginScreen>
       _isProcessingNavigation = false;
     });
 
-    _loginCompleter!.future.then((session) {
+    _loginCompleter!.future.then((session) async {
       if (!mounted) return;
       debugPrint('=== Login future completed with session: $session');
 
-      // Показываем оверлей поверх WebView вместо полного скрытия браузера
-      if (mounted) {
+      if (session == null) {
         setState(() {
-          _showLoginOverlay = true;
+          _showWebView = false;
           _isLoading = false;
+          _errorMessage = 'Login was not completed. Please try again.';
         });
+        return;
       }
 
-      // Затем асинхронно вызываем onLogin чтобы не блокировать UI
-    Future.microtask(() async {
+      // Показываем оверлей поверх WebView пока идёт onLogin
+      setState(() {
+        _showLoginOverlay = true;
+        _isLoading = false;
+      });
+
       try {
         debugPrint('=== Starting onLogin() call');
         await widget.onLogin();
         debugPrint('=== onLogin() returned successfully');
-
-        if (mounted) {
-          debugPrint('=== Setting _showWebView=false and _isLoading=false');
-          setState(() {
-            _showWebView = false;
-            _isLoading = false;
-          });
-          debugPrint('=== setState completed');
-        } else {
-          debugPrint('=== Widget not mounted, skipping setState');
-        }
       } catch (e) {
         debugPrint('=== Error in onLogin(): $e');
         if (mounted) {
           setState(() {
-            _showWebView = false;
-            _isLoading = false;
             _errorMessage = 'Error completing login: $e';
           });
         }
-      }
-      debugPrint('=== Future.microtask completed');
-    });
-          }
-        } finally {
-          // Скрываем WebView и оверлей после завершения onLogin
-          if (mounted) {
-            setState(() {
-              _showWebView = false;
-              _showLoginOverlay = false;
-            });
-          }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _showWebView = false;
+            _showLoginOverlay = false;
+            _isLoading = false;
+          });
         }
-        debugPrint('=== Future.microtask completed');
-      });
+      }
     }).catchError((e) {
       if (!mounted) return;
       debugPrint('=== Login future error: $e');
@@ -166,13 +152,11 @@ class _LoginScreenState extends State<LoginScreen>
     InAppWebViewController controller,
     Uri? url,
   ) async {
-    // Если логин уже завершен - не обрабатываем дальше
     if (_loginCompleter?.isCompleted ?? false) {
       debugPrint('=== Login already completed, ignoring navigation');
       return;
     }
 
-    // Избегаем параллельной обработки
     if (_isProcessingNavigation) {
       debugPrint('=== Already processing navigation, skipping');
       return;
@@ -191,13 +175,11 @@ class _LoginScreenState extends State<LoginScreen>
 
       final Map<String, String> cookieMap = {};
 
-      // Способ 1: Читаем cookies через CookieManager (Android/iOS/Windows)
+      // Способ 1: CookieManager (Android/iOS)
       try {
         final cm = CookieManager();
         final faCookies = await cm
-            .getCookies(
-              url: WebUri(FAUrls.baseUrl),
-            )
+            .getCookies(url: WebUri(FAUrls.baseUrl))
             .timeout(const Duration(seconds: 5));
         debugPrint('=== CookieManager found ${faCookies.length} cookies');
         for (final c in faCookies) {
@@ -207,15 +189,13 @@ class _LoginScreenState extends State<LoginScreen>
         debugPrint('=== CookieManager error: $e');
       }
 
-      // Способ 2: Читаем cookies через document.cookie (ВСЕГДА, чтобы не потерять cookies)
+      // Способ 2: document.cookie через JS (Windows + fallback)
       try {
         final rawCookies = await controller
-            .evaluateJavascript(
-              source: 'document.cookie',
-            )
+            .evaluateJavascript(source: 'document.cookie')
             .timeout(const Duration(seconds: 5)) as String?;
 
-        debugPrint('=== document.cookie from JS: $rawCookies');
+        debugPrint('=== document.cookie: $rawCookies');
 
         if (rawCookies != null && rawCookies.isNotEmpty) {
           for (final part in rawCookies.split(';')) {
@@ -232,14 +212,10 @@ class _LoginScreenState extends State<LoginScreen>
         debugPrint('=== JS cookie error: $e');
       }
 
-      // Преобразуем Map в список пар для JSON сохранения
-      final List<List<String>> cookiePairs =
-          cookieMap.entries.map((e) => [e.key, e.value]).toList();
-
       debugPrint(
-          '=== Collected ${cookieMap.length} cookies: ${cookieMap.keys.join(", ")}');
+        '=== Collected ${cookieMap.length} cookies: ${cookieMap.keys.join(", ")}',
+      );
 
-      // Проверяем что собрали хотя бы какие-то cookies
       if (cookieMap.isEmpty) return;
 
       // Извлекаем username из URL или DOM
@@ -270,6 +246,9 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (username.isEmpty) username = 'user';
 
+      final cookiePairs =
+          cookieMap.entries.map((e) => [e.key, e.value]).toList();
+
       final session = UserSession(
         username: username,
         avatarUrl: FAUrls.avatar(username),
@@ -287,7 +266,6 @@ class _LoginScreenState extends State<LoginScreen>
         );
         debugPrint('=== Session saved, completing login');
         _loginCompleter!.complete(session);
-        debugPrint('=== Login completed successfully');
       }
     } finally {
       _isProcessingNavigation = false;
@@ -314,140 +292,121 @@ class _LoginScreenState extends State<LoginScreen>
       children: [
         Column(
           children: [
-        Container(
-          color: AppColors.bgCard,
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Sign in to FurAffinity',
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+            Container(
+              color: AppColors.bgCard,
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Sign in to FurAffinity',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
+                  TextButton(
+                    onPressed: _cancelLogin,
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
+            ),
+            const LinearProgressIndicator(
+              color: AppColors.fluentCyan,
+              backgroundColor: AppColors.bgInput,
+            ),
+            Expanded(
+              child: InAppWebView(
+                webViewEnvironment: webViewEnvironment,
+                initialSettings: InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                  domStorageEnabled: true,
+                  databaseEnabled: true,
+                  supportZoom: true,
+                  mediaPlaybackRequiresUserGesture: false,
+                  allowsInlineMediaPlayback: true,
+                  disableDefaultErrorPage: false,
+                  transparentBackground: false,
+                  thirdPartyCookiesEnabled: true,
+                  allowFileAccessFromFileURLs: false,
+                  allowUniversalAccessFromFileURLs: false,
                 ),
-              ),
-              TextButton(
-                onPressed: _cancelLogin,
-                child: const Text('Cancel'),
-              ),
-            ],
-          ),
-        ),
-        const LinearProgressIndicator(
-          color: AppColors.fluentCyan,
-          backgroundColor: AppColors.bgInput,
-        ),
-        Expanded(
-          child: InAppWebView(
-            webViewEnvironment: webViewEnvironment,
-            initialSettings: InAppWebViewSettings(
-              javaScriptEnabled: true,
-              domStorageEnabled: true,
-              databaseEnabled: true,
-              supportZoom: true,
-              mediaPlaybackRequiresUserGesture: false,
-              allowsInlineMediaPlayback: true,
-              disableDefaultErrorPage: false,
-              transparentBackground: false,
-              thirdPartyCookiesEnabled: true,
-              allowFileAccessFromFileURLs: false,
-              allowUniversalAccessFromFileURLs: false,
-            ),
-            initialUrlRequest: URLRequest(
-              url: WebUri(FAUrls.login),
-            ),
-            onLoadStart: (controller, url) {
-              debugPrint('onLoadStart: $url');
-            },
-            onLoadStop: (controller, url) async {
-              debugPrint('onLoadStop: $url');
-              try {
-                await _handleNavigation(controller, url).timeout(
-                  const Duration(seconds: 15),
-                  onTimeout: () async {
-                    debugPrint('=== Timeout in _handleNavigation');
-                  },
-                );
-              } catch (e) {
-                debugPrint('=== Error in onLoadStop: $e');
-              }
-
-              // Если уже обработана успешная навигация - не продолжаем
-              if (_loginCompleter?.isCompleted ?? false) {
-                debugPrint('=== Login completed, skipping post-navigation');
-                return;
-              }
-
-              if (url == null) return;
-              if (!_isFAHost(url.host)) {
-                final uri = Uri.parse(url.toString());
-                try {
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication)
-                        .timeout(const Duration(seconds: 5));
+                initialUrlRequest: URLRequest(
+                  url: WebUri(FAUrls.login),
+                ),
+                onLoadStart: (controller, url) {
+                  debugPrint('onLoadStart: $url');
+                },
+                onLoadStop: (controller, url) async {
+                  debugPrint('onLoadStop: $url');
+                  try {
+                    await _handleNavigation(controller, url).timeout(
+                      const Duration(seconds: 15),
+                      onTimeout: () async {
+                        debugPrint('=== Timeout in _handleNavigation');
+                      },
+                    );
+                  } catch (e) {
+                    debugPrint('=== Error in onLoadStop: $e');
                   }
-                  if (mounted) {
+
+                  if (_loginCompleter?.isCompleted ?? false) return;
+                  if (url == null) return;
+
+                  if (!_isFAHost(url.host) || _isExternalPath(url.path)) {
+                    final uri = Uri.parse(url.toString());
                     try {
-                      await controller
-                          .goBack()
-                          .timeout(const Duration(seconds: 5));
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        ).timeout(const Duration(seconds: 5));
+                      }
+                      if (mounted) {
+                        await controller
+                            .goBack()
+                            .timeout(const Duration(seconds: 5));
+                      }
                     } catch (e) {
-                      debugPrint('=== Error on controller.goBack(): $e');
+                      debugPrint('=== Error launching external URL: $e');
                     }
                   }
-                } catch (e) {
-                  debugPrint('=== Error launching external URL: $e');
-                }
-              } else if (_isExternalPath(url.path)) {
-                final uri = Uri.parse(url.toString());
-                try {
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication)
-                        .timeout(const Duration(seconds: 5));
-                  }
-                  if (mounted) {
-                    try {
-                      await controller
-                          .goBack()
-                          .timeout(const Duration(seconds: 5));
-                    } catch (e) {
-                      debugPrint('=== Error on controller.goBack(): $e');
+                },
+                onReceivedError: (controller, request, error) {
+                  if (!(request.isForMainFrame ?? false)) return;
+                  if (error.type == WebResourceErrorType.HOST_LOOKUP ||
+                      error.type ==
+                          WebResourceErrorType.CANNOT_CONNECT_TO_HOST) {
+                    if (_loginCompleter != null &&
+                        !_loginCompleter!.isCompleted) {
+                      _loginCompleter!.completeError(
+                        'Cannot connect to FurAffinity. Check your internet connection.',
+                      );
                     }
                   }
-                } catch (e) {
-                  debugPrint('=== Error launching external URL: $e');
-                }
-              }
-            },
-            onReceivedError: (controller, request, error) {
-              if (!(request.isForMainFrame ?? false)) return;
-              if (error.type == WebResourceErrorType.HOST_LOOKUP ||
-                  error.type == WebResourceErrorType.CANNOT_CONNECT_TO_HOST) {
-                if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
-                  _loginCompleter!.completeError(
-                    'Cannot connect to FurAffinity. Check your internet connection.',
-                  );
-                }
-              }
-            },
-            onWebViewCreated: (controller) {},
+                },
+                onWebViewCreated: (controller) {},
+              ),
             ),
+          ],
         ),
-
         if (_showLoginOverlay)
           Positioned.fill(
             child: Container(
               color: Colors.black54,
-              child: Center(
+              child: const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
+                  children: [
                     CircularProgressIndicator(),
                     SizedBox(height: 12),
-                    Text('Completing login...', style: TextStyle(color: Colors.white)),
+                    Text(
+                      'Completing login...',
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ],
                 ),
               ),
