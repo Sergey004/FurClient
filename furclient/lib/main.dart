@@ -11,13 +11,24 @@ import 'services/fa_client.dart';
 import 'screens/login_screen.dart';
 import 'navigation/adaptive_shell.dart';
 import 'utils/platform_utils.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    if (Platform.isWindows) {
+    if (Platform.isAndroid) {
       await InAppWebViewController.setWebContentsDebuggingEnabled(true);
+    }
+
+    // ← добавить сюда:
+    if (Platform.isWindows) {
+      final dir = await getApplicationSupportDirectory();
+      await InAppWebViewController.initializeWindows(
+        InAppWebViewWindowsEnvironmentSettings(
+          userDataFolder: '${dir.path}\\webview2_data',
+        ),
+      );
     }
 
     if (isDesktop) {
@@ -146,7 +157,8 @@ class _FurClientAppState extends State<FurClientApp> {
               if (darkDynamic != null) {
                 desktopTheme = AppTheme.buildFromDynamicColor(darkDynamic);
               } else {
-                desktopTheme = AppTheme.buildFromSystemAccent(systemAccent.accent);
+                desktopTheme =
+                    AppTheme.buildFromSystemAccent(systemAccent.accent);
               }
               return MaterialApp(
                 title: 'FurClient',
@@ -217,10 +229,10 @@ class _FurClientAppState extends State<FurClientApp> {
     }
 
     if (isWindows) {
-    return fluent.ScaffoldPage(
-      content: LoginScreen(authService: _authService, onLogin: _onLogin),
-    );
-  }
-  return LoginScreen(authService: _authService, onLogin: _onLogin);
+      return fluent.ScaffoldPage(
+        content: LoginScreen(authService: _authService, onLogin: _onLogin),
+      );
+    }
+    return LoginScreen(authService: _authService, onLogin: _onLogin);
   }
 }
