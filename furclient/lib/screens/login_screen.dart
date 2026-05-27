@@ -33,6 +33,7 @@ class _LoginScreenState extends State<LoginScreen>
   Completer<UserSession?>? _loginCompleter;
   late AnimationController _glowController;
   bool _isProcessingNavigation = false;
+  bool _showLoginOverlay = false;
 
   static final _allowedHosts = ['www.furaffinity.net', 'furaffinity.net'];
 
@@ -94,32 +95,33 @@ class _LoginScreenState extends State<LoginScreen>
       if (!mounted) return;
       debugPrint('=== Login future completed with session: $session');
 
-      // Запускаем onLogin асинхронно чтобы не заблокировать UI
+      // Показываем оверлей поверх WebView вместо полного скрытия браузера
+      if (mounted) {
+        setState(() {
+          _showLoginOverlay = true;
+          _isLoading = false;
+        });
+      }
+
+      // Затем асинхронно вызываем onLogin чтобы не блокировать UI
       Future.microtask(() async {
         try {
-          debugPrint('=== Starting onLogin() call');
+          debugPrint('=== Calling onLogin()');
           widget.onLogin();
           debugPrint('=== onLogin() returned successfully');
-
-          await Future.delayed(const Duration(milliseconds: 100));
-
-          if (mounted) {
-            debugPrint('=== Setting _showWebView=false and _isLoading=false');
-            setState(() {
-              _showWebView = false;
-              _isLoading = false;
-            });
-            debugPrint('=== setState completed');
-          } else {
-            debugPrint('=== Widget not mounted, skipping setState');
-          }
         } catch (e) {
-          debugPrint('=== Error in onLogin(): $e, stacktrace: $e');
+          debugPrint('=== Error in onLogin(): $e');
+          if (mounted) {
+            setState(() {
+              _errorMessage = 'Error completing login: $e';
+            });
+          }
+        } finally {
+          // Скрываем WebView и оверлей после завершения onLogin
           if (mounted) {
             setState(() {
               _showWebView = false;
-              _isLoading = false;
-              _errorMessage = 'Error completing login: $e';
+              _showLoginOverlay = false;
             });
           }
         }
@@ -292,8 +294,10 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildWebView(bool isDesktopWidth) {
-    return Column(
+    return Stack(
       children: [
+        Column(
+          children: [
         Container(
           color: AppColors.bgCard,
           padding: const EdgeInsets.all(12),
@@ -369,7 +373,15 @@ class _LoginScreenState extends State<LoginScreen>
                     await launchUrl(uri, mode: LaunchMode.externalApplication)
                         .timeout(const Duration(seconds: 5));
                   }
-                  if (mounted) await controller.goBack();
+                  if (mounted) {
+                    try {
+                      await controller
+                          .goBack()
+                          .timeout(const Duration(seconds: 5));
+                    } catch (e) {
+                      debugPrint('=== Error on controller.goBack(): $e');
+                    }
+                  }
                 } catch (e) {
                   debugPrint('=== Error launching external URL: $e');
                 }
@@ -380,7 +392,15 @@ class _LoginScreenState extends State<LoginScreen>
                     await launchUrl(uri, mode: LaunchMode.externalApplication)
                         .timeout(const Duration(seconds: 5));
                   }
-                  if (mounted) await controller.goBack();
+                  if (mounted) {
+                    try {
+                      await controller
+                          .goBack()
+                          .timeout(const Duration(seconds: 5));
+                    } catch (e) {
+                      debugPrint('=== Error on controller.goBack(): $e');
+                    }
+                  }
                 } catch (e) {
                   debugPrint('=== Error launching external URL: $e');
                 }
@@ -398,8 +418,25 @@ class _LoginScreenState extends State<LoginScreen>
               }
             },
             onWebViewCreated: (controller) {},
-          ),
+            ),
         ),
+
+        if (_showLoginOverlay)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black54,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 12),
+                    Text('Completing login...', style: TextStyle(color: Colors.white)),
+                  ],
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
