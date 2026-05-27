@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
@@ -29,6 +30,31 @@ class _LoginScreenState extends State<LoginScreen>
   Completer<UserSession?>? _loginCompleter;
   late AnimationController _glowController;
 
+  static final _allowedPaths = [
+    RegExp(r'^/(\?(.)*)?$'),
+    RegExp(r'^/login(/(\?(.)*)?)?$'),
+    RegExp(r'^/user/(.)+$'),
+  ];
+
+  static final _externalPaths = [
+    RegExp(r'^/register/?$'),
+    RegExp(r'^/lostpw/?$'),
+  ];
+
+  bool _isAllowedPath(String path) {
+    for (final pattern in _allowedPaths) {
+      if (pattern.hasMatch(path)) return true;
+    }
+    return false;
+  }
+
+  bool _isExternalPath(String path) {
+    for (final pattern in _externalPaths) {
+      if (pattern.hasMatch(path)) return true;
+    }
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +71,9 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _startLogin() async {
+    final cookieManager = CookieManager();
+    await cookieManager.deleteAllCookies();
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -88,6 +117,8 @@ class _LoginScreenState extends State<LoginScreen>
     Uri? url,
   ) async {
     if (url == null) return;
+    if (url.host != 'www.furaffinity.net') return;
+
     final path = url.path;
     final isRoot = path == '/' || path == '';
     final isUserPage = path.startsWith('/user/');
@@ -150,6 +181,34 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  Future<NavigationActionPolicy> _shouldOverrideUrlLoading(
+    InAppWebViewController controller,
+    NavigationAction action,
+  ) async {
+    final url = action.request.url;
+    if (url == null) return NavigationActionPolicy.CANCEL;
+
+    if (url.host != 'www.furaffinity.net') {
+      return NavigationActionPolicy.CANCEL;
+    }
+
+    final path = url.path;
+
+    if (_isAllowedPath(path)) {
+      return NavigationActionPolicy.ALLOW;
+    }
+
+    if (_isExternalPath(path)) {
+      final uri = Uri.parse(url.toString());
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return NavigationActionPolicy.CANCEL;
+    }
+
+    return NavigationActionPolicy.CANCEL;
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -187,35 +246,45 @@ class _LoginScreenState extends State<LoginScreen>
                     color: AppColors.fluentCyan,
                     backgroundColor: AppColors.bgInput,
                   ),
-                  Expanded(
-                    child: InAppWebView(
-                      initialSettings: InAppWebViewSettings(
-                        userAgent: 'ceylo.FurAffinityApp/1.0',
-                        useShouldOverrideUrlLoading: true,
-                        javaScriptEnabled: true,
-                        supportZoom: true,
-                        mediaPlaybackRequiresUserGesture: false,
-                        allowsInlineMediaPlayback: true,
-                        disableDefaultErrorPage: false,
-                        transparentBackground: false,
-                      ),
-                      initialUrlRequest: URLRequest(
-                        url: WebUri('${FAUrls.login}/'),
-                      ),
-                      onLoadStart: (controller, url) {
-                        // Handle load start
-                      },
-                      onLoadStop: (controller, url) async {
-                        await _handleNavigation(controller, url);
-                      },
-                      onReceivedError: (controller, request, error) {
-                        print('WebView Error: ${error.description}');
-                      },
-                      onWebViewCreated: (controller) {
-                        print('WebView created');
-                      },
+                Expanded(
+                  child: InAppWebView(
+                    initialSettings: InAppWebViewSettings(
+                      useShouldOverrideUrlLoading: true,
+                      javaScriptEnabled: true,
+                      domStorageEnabled: true,
+                      databaseEnabled: true,
+                      supportZoom: true,
+                      mediaPlaybackRequiresUserGesture: false,
+                      allowsInlineMediaPlayback: true,
+                      disableDefaultErrorPage: false,
+                      transparentBackground: false,
+                      thirdPartyCookiesEnabled: true,
+                      allowFileAccessFromFileURLs: false,
+                      allowUniversalAccessFromFileURLs: false,
                     ),
+                    initialUrlRequest: URLRequest(
+                      url: WebUri(FAUrls.login),
+                    ),
+                    shouldOverrideUrlLoading: _shouldOverrideUrlLoading,
+                    onLoadStart: (controller, url) {},
+                    onLoadStop: (controller, url) async {
+                      await _handleNavigation(controller, url);
+                    },
+                    onReceivedError: (controller, request, error) {
+                      if (error.type == WebResourceErrorType.HOST_LOOKUP ||
+                          error.type ==
+                              WebResourceErrorType.CANNOT_CONNECT_TO_HOST) {
+                        if (_loginCompleter != null &&
+                            !_loginCompleter!.isCompleted) {
+                          _loginCompleter!.completeError(
+                            'Cannot connect to FurAffinity. Check your internet connection.',
+                          );
+                        }
+                      }
+                    },
+                    onWebViewCreated: (controller) {},
                   ),
+                ),
                 ],
               )
             : Center(
