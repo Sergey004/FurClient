@@ -10,6 +10,7 @@ import '../services/auth_service.dart';
 import '../services/fa_urls.dart';
 import '../utils/platform_utils.dart';
 import '../widgets/adaptive/adaptive.dart';
+import '../main.dart' show webViewEnvironment;
 
 class LoginScreen extends StatefulWidget {
   final AuthService authService;
@@ -224,7 +225,8 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         Expanded(
           child: InAppWebView(
-        initialSettings: InAppWebViewSettings(
+            webViewEnvironment: webViewEnvironment,
+            initialSettings: InAppWebViewSettings(
           javaScriptEnabled: true,
           domStorageEnabled: true,
           databaseEnabled: true,
@@ -279,17 +281,6 @@ class _LoginScreenState extends State<LoginScreen>
         ),
       ],
     );
-
-    if (isWindows) {
-      return fluent.ContentDialog(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
-        content: SizedBox(
-          height: 600,
-          child: webView,
-        ),
-        actions: [],
-      );
-    }
 
     return webView;
   }

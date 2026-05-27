@@ -13,6 +13,8 @@ import 'navigation/adaptive_shell.dart';
 import 'utils/platform_utils.dart';
 import 'package:path_provider/path_provider.dart';
 
+WebViewEnvironment? webViewEnvironment;
+
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
@@ -23,10 +25,13 @@ void main() {
 
     // ← добавить сюда:
     if (Platform.isWindows) {
+      final availableVersion = await WebViewEnvironment.getAvailableVersion();
+      assert(availableVersion != null, 'WebView2 Runtime not found.');
       final dir = await getApplicationSupportDirectory();
-      await InAppWebViewController.initializeWindows(
-        InAppWebViewWindowsEnvironmentSettings(
+      webViewEnvironment = await WebViewEnvironment.create(
+        settings: WebViewEnvironmentSettings(
           userDataFolder: '${dir.path}\\webview2_data',
+          additionalBrowserArguments: '--disable-gpu --use-gl=swiftshader',
         ),
       );
     }
