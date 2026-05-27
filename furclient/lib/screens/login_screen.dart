@@ -175,21 +175,24 @@ class _LoginScreenState extends State<LoginScreen>
 
       final Map<String, String> cookieMap = {};
 
-      // Способ 1: CookieManager (Android/iOS)
+      // Способ 1: CookieManager - получить ВСЕ куки без фильтра
       try {
         final cm = CookieManager();
-        final faCookies = await cm
-            .getCookies(url: WebUri(FAUrls.baseUrl))
+        // Получаем ВСЕ куки, не фильтруя по URL
+        final allCookies = await cm
+            .getCookies(url: WebUri('https://www.furaffinity.net'))
             .timeout(const Duration(seconds: 5));
-        debugPrint('=== CookieManager found ${faCookies.length} cookies');
-        for (final c in faCookies) {
+        debugPrint('=== CookieManager found ${allCookies.length} cookies');
+        for (final c in allCookies) {
+          debugPrint(
+              '=== Cookie: ${c.name} = ${c.value} (domain: ${c.domain}, path: ${c.path})');
           cookieMap[c.name] = c.value;
         }
       } catch (e) {
         debugPrint('=== CookieManager error: $e');
       }
 
-      // Способ 2: document.cookie через JS (Windows + fallback)
+      // Способ 2: document.cookie через JS - захватываем все видимые куки
       try {
         final rawCookies = await controller
             .evaluateJavascript(source: 'document.cookie')
@@ -204,7 +207,10 @@ class _LoginScreenState extends State<LoginScreen>
             final name = part.substring(0, idx).trim();
             final value = part.substring(idx + 1).trim();
             if (name.isNotEmpty && value.isNotEmpty) {
-              cookieMap[name] = value;
+              // Если куки с таким именем ещё нет, добавляем
+              if (!cookieMap.containsKey(name)) {
+                cookieMap[name] = value;
+              }
             }
           }
         }

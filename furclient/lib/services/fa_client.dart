@@ -28,12 +28,24 @@ class FAClient {
   bool _initialized = false;
   Completer<void>? _initCompleter;
 
-  static const String _userAgent = 'ceylo.FurAffinityApp/1.0';
+  // Using a realistic browser User-Agent to avoid Cloudflare blocks
+  static const String _userAgent =
+      'Mozilla/5.0 (Linux; Android 13; SM-A325F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
 
   FAClient() {
     _dio = Dio(BaseOptions(
       headers: {
         'User-Agent': _userAgent,
+        'Accept':
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0',
       },
       validateStatus: (status) => status != null && status < 600,
       followRedirects: true,
@@ -138,13 +150,24 @@ class FAClient {
     try {
       await _ensureInitialized();
       final response = await _dio.get<String>(FAUrls.home);
+      // Detect Cloudflare mitigation if present in headers
+      try {
+        _checkCloudflare(response);
+      } on CloudflareError {
+        return false;
+      }
+
       final status = response.statusCode ?? 0;
       if (status == 401 || status == 403) return false;
       if (status >= 500) return true;
       if (status >= 200 && status < 300) return true;
       return false;
-    } catch (_) {
-      return true;
+    } on CloudflareError {
+      return false;
+    } catch (e) {
+      // Network or parsing errors — treat as invalid session so UI can let WebView finish challenge
+      debugPrint('verifySession error: $e');
+      return false;
     }
   }
 

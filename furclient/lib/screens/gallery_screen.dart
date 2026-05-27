@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -7,6 +8,7 @@ import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import 'submission_detail_screen.dart';
+import '../utils/platform_utils.dart';
 
 class GalleryScreen extends StatefulWidget {
   final FAClient client;
@@ -18,7 +20,8 @@ class GalleryScreen extends StatefulWidget {
   State<GalleryScreen> createState() => _GalleryScreenState();
 }
 
-class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveClientMixin {
+class _GalleryScreenState extends State<GalleryScreen>
+    with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
 
   List<Submission> _submissions = [];
@@ -95,7 +98,8 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
     _currentPage += 1;
 
     try {
-      final results = await widget.client.getSubmissions(_currentPage, _selectedCategory);
+      final results =
+          await widget.client.getSubmissions(_currentPage, _selectedCategory);
       if (mounted) {
         setState(() {
           _submissions.addAll(results);
@@ -159,32 +163,56 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
   }
 
   Widget _buildCategoryChips() {
-    final isDesktop = MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
+    final isDesktopWidth =
+        MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
 
-    return SizedBox(
-      height: 40,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cat = _categories[index];
-          final selected = cat == _selectedCategory;
-          return FilterChip(
-            label: Text(_categoryLabels[cat] ?? cat),
-            selected: selected,
-            onSelected: (_) => _onCategoryChanged(cat),
-            selectedColor: isDesktop
-                ? AppColors.fluentCyanBg
-                : AppColors.materialLavenderBg,
-            checkmarkColor: isDesktop
-                ? AppColors.fluentCyan
-                : AppColors.materialLavender,
-          );
-        },
-      ),
-    );
+    if (isWindows) {
+      return SizedBox(
+        height: 40,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: _categories.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final cat = _categories[index];
+            final selected = cat == _selectedCategory;
+            return fluent.ToggleButton(
+              checked: selected,
+              onChanged: (_) => _onCategoryChanged(cat),
+              child: Text(_categoryLabels[cat] ?? cat),
+            );
+          },
+        ),
+      );
+    } else {
+      return Theme(
+        data: Theme.of(context),
+        child: Material(
+          color: Colors.transparent,
+          child: SizedBox(
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _categories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final cat = _categories[index];
+                final selected = cat == _selectedCategory;
+                return FilterChip(
+                  label: Text(_categoryLabels[cat] ?? cat),
+                  selected: selected,
+                  onSelected: (_) => _onCategoryChanged(cat),
+                  selectedColor: AppColors.materialLavenderBg,
+                  checkmarkColor: AppColors.materialLavender,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildBody() {
@@ -201,11 +229,14 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.photo_library_outlined, color: AppColors.textMuted, size: 48),
+            const Icon(Icons.photo_library_outlined,
+                color: AppColors.textMuted, size: 48),
             const SizedBox(height: 16),
-            const Text('No submissions found', style: TextStyle(color: AppColors.textDim, fontSize: 16)),
+            const Text('No submissions found',
+                style: TextStyle(color: AppColors.textDim, fontSize: 16)),
             const SizedBox(height: 8),
-            TextButton(onPressed: _loadSubmissions, child: const Text('Refresh')),
+            TextButton(
+                onPressed: _loadSubmissions, child: const Text('Refresh')),
           ],
         ),
       );
@@ -232,9 +263,9 @@ class _GalleryScreenState extends State<GalleryScreen> with AutomaticKeepAliveCl
             itemCount: _submissions.length + (_isLoadingMore ? 1 : 0),
             itemBuilder: (context, index) {
               if (index >= _submissions.length) {
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: AdaptiveProgress(strokeWidth: 2)),
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: AdaptiveProgress(strokeWidth: 2)),
                 );
               }
               final sub = _submissions[index];

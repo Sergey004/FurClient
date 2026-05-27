@@ -75,8 +75,8 @@ class _FurClientAppState extends State<FurClientApp> {
       await _authService.loadSavedSession();
       final session = _authService.currentSession;
 
-    if (session != null && session.isLoggedIn) {
-      await _client.setSession(session);
+      if (session != null && session.isLoggedIn) {
+        await _client.setSession(session);
         final valid = await _client.verifySession();
         if (valid) {
           if (mounted) {
@@ -107,6 +107,14 @@ class _FurClientAppState extends State<FurClientApp> {
     final session = _authService.currentSession;
     if (session != null) {
       await _client.setSession(session);
+      // После установки сессии проверяем, не активен ли Cloudflare-челлендж.
+      // Если он активен, не делаем автоматический logout — позволим UI
+      // показать соответствующую ошибку и дать пользователю пройти челлендж.
+      final valid = await _client.verifySession();
+      if (!valid) {
+        debugPrint(
+            '=== Session appears invalid (Cloudflare challenge?) — continuing to app so user can complete challenge');
+      }
     }
     if (mounted) {
       setState(() => _isLoggedIn = true);
