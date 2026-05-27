@@ -77,7 +77,6 @@ class _FurClientAppState extends State<FurClientApp> {
 
       if (session != null && session.isLoggedIn) {
         _client.setSession(session);
-        await _authService.restoreSessionCookies();
         final valid = await _client.verifySession();
         if (valid) {
           if (mounted) {
@@ -104,11 +103,17 @@ class _FurClientAppState extends State<FurClientApp> {
   }
 
   void _onLogin() {
+    debugPrint('=== _onLogin() called');
     final session = _authService.currentSession;
     if (session != null) {
+      // Запускаем операцию асинхронно чтобы не заблокировать UI
       _client.setSession(session);
+      // Не ждем завершения восстановления cookies
     }
-    setState(() => _isLoggedIn = true);
+    if (mounted) {
+      setState(() => _isLoggedIn = true);
+    }
+    debugPrint('=== _onLogin() setState completed');
   }
 
   void _onLogout() async {

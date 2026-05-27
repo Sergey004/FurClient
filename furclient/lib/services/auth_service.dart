@@ -65,27 +65,4 @@ class AuthService {
     _currentSession = null;
     await _storage.clear();
   }
-
-  Future<bool> restoreSessionCookies() async {
-    if (_currentSession?.cookies == null) return false;
-    try {
-      final List<dynamic> cookiePairs =
-          jsonDecode(_currentSession!.cookies!);
-      final cookieManager = inapp.CookieManager();
-      for (final pair in cookiePairs) {
-        if (pair is List && pair.length >= 2) {
-          await cookieManager.setCookie(
-            url: inapp.WebUri(FAUrls.baseUrl),
-            name: pair[0].toString(),
-            value: pair[1].toString(),
-            domain: '.furaffinity.net',
-            path: '/',
-          );
-        }
-      }
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
 }

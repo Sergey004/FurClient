@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/models.dart';
@@ -14,7 +15,7 @@ class CloudflareError implements Exception {
   final String message;
   CloudflareError()
       : message =
-          'FA is currently protected by Cloudflare challenge. Please try again later.';
+            'FA is currently protected by Cloudflare challenge. Please try again later.';
 
   @override
   String toString() => 'CloudflareError: $message';
@@ -83,20 +84,29 @@ class FAClient {
     await _ensureInitialized();
     try {
       final List<dynamic> cookiePairs = jsonDecode(_session!.cookies!);
+      final cookies = <Cookie>[];
       for (final pair in cookiePairs) {
         if (pair is List && pair.length >= 2) {
           final name = pair[0].toString();
           final value = pair[1].toString();
-          final cookie = Cookie(name, value)
-            ..domain = '.furaffinity.net'
-            ..path = '/';
-          await _cookieJar.saveFromResponse(
-            Uri.parse(FAUrls.baseUrl),
-            [cookie],
-          );
+          if (name.isNotEmpty && value.isNotEmpty) {
+            final cookie = Cookie(name, value)
+              ..domain = '.furaffinity.net'
+              ..path = '/';
+            cookies.add(cookie);
+          }
         }
       }
-    } catch (_) {}
+      if (cookies.isNotEmpty) {
+        await _cookieJar.saveFromResponse(
+          Uri.parse(FAUrls.baseUrl),
+          cookies,
+        );
+        debugPrint('=== Restored ${cookies.length} cookies from session');
+      }
+    } catch (e) {
+      debugPrint('=== Error restoring cookies from session: $e');
+    }
   }
 
   void _checkCloudflare(Response response) {

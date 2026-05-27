@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
@@ -33,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen>
   String? _errorMessage;
   Completer<UserSession?>? _loginCompleter;
   late AnimationController _glowController;
+  bool _isProcessingNavigation = false;
 
   static final _allowedHosts = ['www.furaffinity.net', 'furaffinity.net'];
 
@@ -70,30 +70,64 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _startLogin() async {
     final cookieManager = CookieManager();
-    await cookieManager.deleteAllCookies();
+    try {
+      await cookieManager.deleteAllCookies().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () async {
+          debugPrint('=== Timeout clearing cookies');
+          return false;
+        },
+      );
+    } catch (e) {
+      debugPrint('=== Error clearing cookies: $e');
+    }
 
     setState(() {
       _isLoading = true;
       _errorMessage = null;
       _showWebView = true;
       _loginCompleter = Completer<UserSession?>();
+      _isProcessingNavigation = false;
     });
 
     _loginCompleter!.future.then((session) {
       if (!mounted) return;
-      setState(() {
-        _showWebView = false;
-        _isLoading = false;
+      debugPrint('=== Login future completed with session: $session');
+
+      // Запускаем onLogin асинхронно чтобы не заблокировать UI
+      Future.microtask(() async {
+        try {
+          debugPrint('=== Starting onLogin() call');
+          widget.onLogin();
+          debugPrint('=== onLogin() returned successfully');
+
+          await Future.delayed(const Duration(milliseconds: 100));
+
+          if (mounted) {
+            debugPrint('=== Setting _showWebView=false and _isLoading=false');
+            setState(() {
+              _showWebView = false;
+              _isLoading = false;
+            });
+            debugPrint('=== setState completed');
+          } else {
+            debugPrint('=== Widget not mounted, skipping setState');
+          }
+        } catch (e) {
+          debugPrint('=== Error in onLogin(): $e, stacktrace: $e');
+          if (mounted) {
+            setState(() {
+              _showWebView = false;
+              _isLoading = false;
+              _errorMessage = 'Error completing login: $e';
+            });
+          }
+        }
+        debugPrint('=== Future.microtask completed');
       });
-      if (session != null && session.isLoggedIn) {
-        widget.onLogin();
-      } else {
-        setState(() {
-          _errorMessage = 'Login was not completed. Please try again.';
-        });
-      }
     }).catchError((e) {
       if (!mounted) return;
+      debugPrint('=== Login future error: $e');
       setState(() {
         _showWebView = false;
         _isLoading = false;
@@ -114,68 +148,131 @@ class _LoginScreenState extends State<LoginScreen>
     InAppWebViewController controller,
     Uri? url,
   ) async {
-    if (url == null) return;
-    if (!_isFAHost(url.host)) return;
+    // Если логин уже завершен - не обрабатываем дальше
+    if (_loginCompleter?.isCompleted ?? false) {
+      debugPrint('=== Login already completed, ignoring navigation');
+      return;
+    }
 
-    final path = url.path;
-    final isRoot = path == '/' || path == '';
-    final isUserPage = path.startsWith('/user/');
+    // Избегаем параллельной обработки
+    if (_isProcessingNavigation) {
+      debugPrint('=== Already processing navigation, skipping');
+      return;
+    }
 
-    if (isRoot || isUserPage) {
-      final cookieManager = CookieManager();
-      final cookies = await cookieManager.getCookies(
-        url: WebUri(FAUrls.baseUrl),
-      );
+    _isProcessingNavigation = true;
+    try {
+      if (url == null) return;
+      if (!_isFAHost(url.host)) return;
 
-      String? cookieA;
-      final List<List<String>> cookiePairs = [];
-      for (final cookie in cookies) {
-        cookiePairs.add([cookie.name, cookie.value]);
-        if (cookie.name == 'a') {
-          cookieA = cookie.value;
+      final path = url.path;
+      final isRoot = path == '/' || path == '';
+      final isUserPage = path.startsWith('/user/');
+
+      if (!isRoot && !isUserPage) return;
+
+      final Map<String, String> cookieMap = {};
+
+      // Способ 1: Читаем cookies через CookieManager (Android/iOS/Windows)
+      try {
+        final cm = CookieManager();
+        final faCookies = await cm
+            .getCookies(
+              url: WebUri(FAUrls.baseUrl),
+            )
+            .timeout(const Duration(seconds: 5));
+        debugPrint('=== CookieManager found ${faCookies.length} cookies');
+        for (final c in faCookies) {
+          cookieMap[c.name] = c.value;
         }
+      } catch (e) {
+        debugPrint('=== CookieManager error: $e');
       }
 
-      if (cookieA != null && cookieA.isNotEmpty) {
-        String username = '';
-        if (isUserPage) {
-          final parts = path.split('/');
-          for (final part in parts) {
-            if (part.isNotEmpty && part != 'user') {
-              username = part;
-              break;
+      // Способ 2: Читаем cookies через document.cookie (ВСЕГДА, чтобы не потерять cookies)
+      try {
+        final rawCookies = await controller
+            .evaluateJavascript(
+              source: 'document.cookie',
+            )
+            .timeout(const Duration(seconds: 5)) as String?;
+
+        debugPrint('=== document.cookie from JS: $rawCookies');
+
+        if (rawCookies != null && rawCookies.isNotEmpty) {
+          for (final part in rawCookies.split(';')) {
+            final idx = part.indexOf('=');
+            if (idx < 0) continue;
+            final name = part.substring(0, idx).trim();
+            final value = part.substring(idx + 1).trim();
+            if (name.isNotEmpty && value.isNotEmpty) {
+              cookieMap[name] = value;
             }
           }
         }
+      } catch (e) {
+        debugPrint('=== JS cookie error: $e');
+      }
 
-        if (username.isEmpty) {
-          try {
-            final result = await controller.evaluateJavascript(
-              source:
-                  "document.querySelector('a[href*=\"/user/\"]')?.textContent || ''",
-            );
-            if (result != null && result is String && result.isNotEmpty) {
-              username = result.trim();
-            }
-          } catch (_) {}
-        }
+      // Преобразуем Map в список пар для JSON сохранения
+      final List<List<String>> cookiePairs =
+          cookieMap.entries.map((e) => [e.key, e.value]).toList();
 
-        if (username.isEmpty) {
-          username = 'user';
-        }
+      debugPrint(
+          '=== Collected ${cookieMap.length} cookies: ${cookieMap.keys.join(", ")}');
 
-        final session = UserSession(
-          username: username,
-          avatarUrl: FAUrls.avatar(username),
-          isLoggedIn: true,
-          cookies: jsonEncode(cookiePairs),
-        );
+      // Проверяем что собрали хотя бы какие-то cookies
+      if (cookieMap.isEmpty) return;
 
-        if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
-          await widget.authService.saveSession(session);
-          _loginCompleter!.complete(session);
+      // Извлекаем username из URL или DOM
+      String username = '';
+      if (isUserPage) {
+        final parts = path.split('/');
+        for (final part in parts) {
+          if (part.isNotEmpty && part != 'user') {
+            username = part;
+            break;
+          }
         }
       }
+
+      if (username.isEmpty) {
+        try {
+          final result = await controller
+              .evaluateJavascript(
+                source:
+                    "document.querySelector('a[href*=\"/user/\"]')?.textContent?.trim() || ''",
+              )
+              .timeout(const Duration(seconds: 5));
+          if (result != null && result is String && result.isNotEmpty) {
+            username = result.trim();
+          }
+        } catch (_) {}
+      }
+
+      if (username.isEmpty) username = 'user';
+
+      final session = UserSession(
+        username: username,
+        avatarUrl: FAUrls.avatar(username),
+        isLoggedIn: true,
+        cookies: jsonEncode(cookiePairs),
+      );
+
+      if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
+        debugPrint('=== Saving session for user: $username');
+        await widget.authService.saveSession(session).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () async {
+            debugPrint('=== Timeout saving session');
+          },
+        );
+        debugPrint('=== Session saved, completing login');
+        _loginCompleter!.complete(session);
+        debugPrint('=== Login completed successfully');
+      }
+    } finally {
+      _isProcessingNavigation = false;
     }
   }
 
@@ -195,7 +292,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildWebView(bool isDesktopWidth) {
-    final webView = Column(
+    return Column(
       children: [
         Container(
           color: AppColors.bgCard,
@@ -227,49 +324,73 @@ class _LoginScreenState extends State<LoginScreen>
           child: InAppWebView(
             webViewEnvironment: webViewEnvironment,
             initialSettings: InAppWebViewSettings(
-          javaScriptEnabled: true,
-          domStorageEnabled: true,
-          databaseEnabled: true,
-          supportZoom: true,
-          mediaPlaybackRequiresUserGesture: false,
-          allowsInlineMediaPlayback: true,
-          disableDefaultErrorPage: false,
-          transparentBackground: false,
-          thirdPartyCookiesEnabled: true,
-          allowFileAccessFromFileURLs: false,
-          allowUniversalAccessFromFileURLs: false,
-        ),
-        initialUrlRequest: URLRequest(
-          url: WebUri(FAUrls.login),
-        ),
-        onLoadStart: (controller, url) {
-          debugPrint('onLoadStart: $url');
-        },
-        onLoadStop: (controller, url) async {
-          debugPrint('onLoadStop: $url');
-          await _handleNavigation(controller, url);
-          if (url == null) return;
-          if (!_isFAHost(url.host)) {
-            final uri = Uri.parse(url.toString());
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
-            await controller.goBack();
-          } else if (_isExternalPath(url.path)) {
-            final uri = Uri.parse(url.toString());
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
-            await controller.goBack();
-          }
-        },
-        onReceivedError: (controller, request, error) {
-          if (!(request.isForMainFrame ?? false)) return;
-          if (error.type == WebResourceErrorType.HOST_LOOKUP ||
-                  error.type ==
-                      WebResourceErrorType.CANNOT_CONNECT_TO_HOST) {
-                if (_loginCompleter != null &&
-                    !_loginCompleter!.isCompleted) {
+              javaScriptEnabled: true,
+              domStorageEnabled: true,
+              databaseEnabled: true,
+              supportZoom: true,
+              mediaPlaybackRequiresUserGesture: false,
+              allowsInlineMediaPlayback: true,
+              disableDefaultErrorPage: false,
+              transparentBackground: false,
+              thirdPartyCookiesEnabled: true,
+              allowFileAccessFromFileURLs: false,
+              allowUniversalAccessFromFileURLs: false,
+            ),
+            initialUrlRequest: URLRequest(
+              url: WebUri(FAUrls.login),
+            ),
+            onLoadStart: (controller, url) {
+              debugPrint('onLoadStart: $url');
+            },
+            onLoadStop: (controller, url) async {
+              debugPrint('onLoadStop: $url');
+              try {
+                await _handleNavigation(controller, url).timeout(
+                  const Duration(seconds: 15),
+                  onTimeout: () async {
+                    debugPrint('=== Timeout in _handleNavigation');
+                  },
+                );
+              } catch (e) {
+                debugPrint('=== Error in onLoadStop: $e');
+              }
+
+              // Если уже обработана успешная навигация - не продолжаем
+              if (_loginCompleter?.isCompleted ?? false) {
+                debugPrint('=== Login completed, skipping post-navigation');
+                return;
+              }
+
+              if (url == null) return;
+              if (!_isFAHost(url.host)) {
+                final uri = Uri.parse(url.toString());
+                try {
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication)
+                        .timeout(const Duration(seconds: 5));
+                  }
+                  if (mounted) await controller.goBack();
+                } catch (e) {
+                  debugPrint('=== Error launching external URL: $e');
+                }
+              } else if (_isExternalPath(url.path)) {
+                final uri = Uri.parse(url.toString());
+                try {
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication)
+                        .timeout(const Duration(seconds: 5));
+                  }
+                  if (mounted) await controller.goBack();
+                } catch (e) {
+                  debugPrint('=== Error launching external URL: $e');
+                }
+              }
+            },
+            onReceivedError: (controller, request, error) {
+              if (!(request.isForMainFrame ?? false)) return;
+              if (error.type == WebResourceErrorType.HOST_LOOKUP ||
+                  error.type == WebResourceErrorType.CANNOT_CONNECT_TO_HOST) {
+                if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
                   _loginCompleter!.completeError(
                     'Cannot connect to FurAffinity. Check your internet connection.',
                   );
@@ -281,8 +402,6 @@ class _LoginScreenState extends State<LoginScreen>
         ),
       ],
     );
-
-    return webView;
   }
 
   Widget _buildLoginForm(bool isDesktopWidth) {
@@ -394,7 +513,9 @@ class _LoginScreenState extends State<LoginScreen>
                           width: 20,
                           height: 20,
                           child: AdaptiveProgress(
-                              color: Colors.white, strokeWidth: 2),
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -431,11 +552,7 @@ class _LoginScreenState extends State<LoginScreen>
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.monitor,
-                        size: 14,
-                        color: AppColors.textMuted,
-                      ),
+                      Icon(Icons.monitor, size: 14, color: AppColors.textMuted),
                       SizedBox(width: 6),
                       Text(
                         'Windows • Linux • macOS • Android • iOS',
