@@ -216,6 +216,11 @@ class _FurClientAppState extends State<FurClientApp> {
       }
     }
 
-    return LoginScreen(authService: _authService, onLogin: _onLogin);
+    if (isWindows) {
+    return fluent.ScaffoldPage(
+      content: LoginScreen(authService: _authService, onLogin: _onLogin),
+    );
+  }
+  return LoginScreen(authService: _authService, onLogin: _onLogin);
   }
 }

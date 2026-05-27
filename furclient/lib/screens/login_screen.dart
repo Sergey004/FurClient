@@ -178,27 +178,6 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  Future<NavigationActionPolicy> _shouldOverrideUrlLoading(
-    InAppWebViewController controller,
-    NavigationAction action,
-  ) async {
-    final url = action.request.url;
-    if (url == null) return NavigationActionPolicy.CANCEL;
-
-    if (_isFAHost(url.host)) {
-      if (_isExternalPath(url.path)) {
-        final uri = Uri.parse(url.toString());
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-        return NavigationActionPolicy.CANCEL;
-      }
-      return NavigationActionPolicy.ALLOW;
-    }
-
-    return NavigationActionPolicy.CANCEL;
-  }
-
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -245,28 +224,40 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         Expanded(
           child: InAppWebView(
-            initialSettings: InAppWebViewSettings(
-              useShouldOverrideUrlLoading: true,
-              javaScriptEnabled: true,
-              domStorageEnabled: true,
-              databaseEnabled: true,
-              supportZoom: true,
-              mediaPlaybackRequiresUserGesture: false,
-              allowsInlineMediaPlayback: true,
-              disableDefaultErrorPage: false,
-              transparentBackground: false,
-              thirdPartyCookiesEnabled: true,
-              allowFileAccessFromFileURLs: false,
-              allowUniversalAccessFromFileURLs: false,
-            ),
-            initialUrlRequest: URLRequest(
-              url: WebUri(FAUrls.login),
-            ),
-            shouldOverrideUrlLoading: _shouldOverrideUrlLoading,
-            onLoadStart: (controller, url) {},
-            onLoadStop: (controller, url) async {
-              await _handleNavigation(controller, url);
-            },
+        initialSettings: InAppWebViewSettings(
+          javaScriptEnabled: true,
+          domStorageEnabled: true,
+          databaseEnabled: true,
+          supportZoom: true,
+          mediaPlaybackRequiresUserGesture: false,
+          allowsInlineMediaPlayback: true,
+          disableDefaultErrorPage: false,
+          transparentBackground: false,
+          thirdPartyCookiesEnabled: true,
+          allowFileAccessFromFileURLs: false,
+          allowUniversalAccessFromFileURLs: false,
+        ),
+        initialUrlRequest: URLRequest(
+          url: WebUri(FAUrls.login),
+        ),
+        onLoadStart: (controller, url) {},
+        onLoadStop: (controller, url) async {
+          await _handleNavigation(controller, url);
+          if (url == null) return;
+          if (!_isFAHost(url.host)) {
+            final uri = Uri.parse(url.toString());
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+            await controller.goBack();
+          } else if (_isExternalPath(url.path)) {
+            final uri = Uri.parse(url.toString());
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+            await controller.goBack();
+          }
+        },
             onReceivedError: (controller, request, error) {
               if (error.type == WebResourceErrorType.HOST_LOOKUP ||
                   error.type ==
