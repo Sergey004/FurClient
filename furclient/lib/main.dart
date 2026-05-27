@@ -170,6 +170,23 @@ class _FurClientAppState extends State<FurClientApp> {
 
   Widget _buildHome() {
     if (_isRestoringSession) {
+      if (isWindows) {
+        return fluent.ScaffoldPage(
+          content: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const fluent.ProgressRing(),
+                const SizedBox(height: 16),
+                Text(
+                  'Restoring session...',
+                  style: TextStyle(color: AppColors.textDim, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return Scaffold(
         backgroundColor: AppColors.bg,
         body: Center(
@@ -177,7 +194,7 @@ class _FurClientAppState extends State<FurClientApp> {
             mainAxisSize: MainAxisSize.min,
             children: [
               CircularProgressIndicator(color: AppColors.fluentCyan),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 'Restoring session...',
                 style: TextStyle(color: AppColors.textDim, fontSize: 14),

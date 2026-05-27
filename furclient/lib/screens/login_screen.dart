@@ -35,24 +35,10 @@ class _LoginScreenState extends State<LoginScreen>
 
   static final _allowedHosts = ['www.furaffinity.net', 'furaffinity.net'];
 
-  static final _allowedPaths = [
-    RegExp(r'^/(\?(.)*)?$'),
-    RegExp(r'^/login(/(\?(.)*)?)?$'),
-    RegExp(r'^/user/(.)+$'),
-    RegExp(r'^/cdn-cgi/(.)*$'),
-  ];
-
   static final _externalPaths = [
     RegExp(r'^/register/?$'),
     RegExp(r'^/lostpw/?$'),
   ];
-
-  bool _isAllowedPath(String path) {
-    for (final pattern in _allowedPaths) {
-      if (pattern.hasMatch(path)) return true;
-    }
-    return false;
-  }
 
   bool _isExternalPath(String path) {
     for (final pattern in _externalPaths) {
@@ -199,22 +185,15 @@ class _LoginScreenState extends State<LoginScreen>
     final url = action.request.url;
     if (url == null) return NavigationActionPolicy.CANCEL;
 
-    if (!_isFAHost(url.host)) {
-      return NavigationActionPolicy.CANCEL;
-    }
-
-    final path = url.path;
-
-    if (_isAllowedPath(path)) {
-      return NavigationActionPolicy.ALLOW;
-    }
-
-    if (_isExternalPath(path)) {
-      final uri = Uri.parse(url.toString());
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (_isFAHost(url.host)) {
+      if (_isExternalPath(url.path)) {
+        final uri = Uri.parse(url.toString());
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+        return NavigationActionPolicy.CANCEL;
       }
-      return NavigationActionPolicy.CANCEL;
+      return NavigationActionPolicy.ALLOW;
     }
 
     return NavigationActionPolicy.CANCEL;
