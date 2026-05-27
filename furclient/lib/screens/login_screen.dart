@@ -240,8 +240,11 @@ class _LoginScreenState extends State<LoginScreen>
         initialUrlRequest: URLRequest(
           url: WebUri(FAUrls.login),
         ),
-        onLoadStart: (controller, url) {},
+        onLoadStart: (controller, url) {
+          debugPrint('onLoadStart: $url');
+        },
         onLoadStop: (controller, url) async {
+          debugPrint('onLoadStop: $url');
           await _handleNavigation(controller, url);
           if (url == null) return;
           if (!_isFAHost(url.host)) {
@@ -258,8 +261,9 @@ class _LoginScreenState extends State<LoginScreen>
             await controller.goBack();
           }
         },
-            onReceivedError: (controller, request, error) {
-              if (error.type == WebResourceErrorType.HOST_LOOKUP ||
+        onReceivedError: (controller, request, error) {
+          if (!(request.isForMainFrame ?? false)) return;
+          if (error.type == WebResourceErrorType.HOST_LOOKUP ||
                   error.type ==
                       WebResourceErrorType.CANNOT_CONNECT_TO_HOST) {
                 if (_loginCompleter != null &&
