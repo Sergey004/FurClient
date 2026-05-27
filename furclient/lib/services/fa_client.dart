@@ -74,9 +74,9 @@ class FAClient {
 
   UserSession? get session => _session;
 
-  void setSession(UserSession? session) {
+  Future<void> setSession(UserSession? session) async {
     _session = session;
-    _restoreCookiesFromSession();
+    await _restoreCookiesFromSession();
   }
 
   Future<void> _restoreCookiesFromSession() async {

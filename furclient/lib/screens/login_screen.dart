@@ -7,13 +7,12 @@ import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/fa_urls.dart';
-import '../utils/platform_utils.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../main.dart' show webViewEnvironment;
 
 class LoginScreen extends StatefulWidget {
   final AuthService authService;
-  final VoidCallback onLogin;
+  final Future<void> Function() onLogin;
 
   const LoginScreen({
     super.key,
@@ -104,17 +103,34 @@ class _LoginScreenState extends State<LoginScreen>
       }
 
       // Затем асинхронно вызываем onLogin чтобы не блокировать UI
-      Future.microtask(() async {
-        try {
-          debugPrint('=== Calling onLogin()');
-          widget.onLogin();
-          debugPrint('=== onLogin() returned successfully');
-        } catch (e) {
-          debugPrint('=== Error in onLogin(): $e');
-          if (mounted) {
-            setState(() {
-              _errorMessage = 'Error completing login: $e';
-            });
+    Future.microtask(() async {
+      try {
+        debugPrint('=== Starting onLogin() call');
+        await widget.onLogin();
+        debugPrint('=== onLogin() returned successfully');
+
+        if (mounted) {
+          debugPrint('=== Setting _showWebView=false and _isLoading=false');
+          setState(() {
+            _showWebView = false;
+            _isLoading = false;
+          });
+          debugPrint('=== setState completed');
+        } else {
+          debugPrint('=== Widget not mounted, skipping setState');
+        }
+      } catch (e) {
+        debugPrint('=== Error in onLogin(): $e');
+        if (mounted) {
+          setState(() {
+            _showWebView = false;
+            _isLoading = false;
+            _errorMessage = 'Error completing login: $e';
+          });
+        }
+      }
+      debugPrint('=== Future.microtask completed');
+    });
           }
         } finally {
           // Скрываем WebView и оверлей после завершения onLogin
