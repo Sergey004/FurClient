@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
@@ -12,19 +13,26 @@ import 'navigation/app_navigator.dart';
 bool get _isDesktop =>
     Platform.isLinux || Platform.isWindows || Platform.isMacOS;
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  if (Platform.isWindows) {
-    await InAppWebViewController.setWebContentsDebuggingEnabled(true);
-  }
+    if (Platform.isWindows) {
+      await InAppWebViewController.setWebContentsDebuggingEnabled(true);
+    }
 
-  if (_isDesktop) {
-    SystemTheme.fallbackColor = AppColors.fluentCyanDark;
-    await SystemTheme.accentColor.load();
-  }
-  AppTheme.setSystemOverlay();
-  runApp(const FurClientApp());
+    if (_isDesktop) {
+      try {
+        SystemTheme.fallbackColor = AppColors.fluentCyanDark;
+        await SystemTheme.accentColor.load();
+      } catch (_) {}
+    }
+
+    AppTheme.setSystemOverlay();
+    runApp(const FurClientApp());
+  }, (error, stack) {
+    debugPrint('Unhandled error: $error\n$stack');
+  });
 }
 
 class FurClientApp extends StatefulWidget {
@@ -47,25 +55,29 @@ class _FurClientAppState extends State<FurClientApp> {
   }
 
   Future<void> _initApp() async {
-    await _client.init();
-    await _authService.loadSavedSession();
-    final session = _authService.currentSession;
+    try {
+      await _client.init();
+      await _authService.loadSavedSession();
+      final session = _authService.currentSession;
 
-    if (session != null && session.isLoggedIn) {
-      _client.setSession(session);
-      await _authService.restoreSessionCookies();
-      final valid = await _client.verifySession();
-      if (valid) {
-        if (mounted) {
-          setState(() {
-            _isLoggedIn = true;
-            _isRestoringSession = false;
-          });
+      if (session != null && session.isLoggedIn) {
+        _client.setSession(session);
+        await _authService.restoreSessionCookies();
+        final valid = await _client.verifySession();
+        if (valid) {
+          if (mounted) {
+            setState(() {
+              _isLoggedIn = true;
+              _isRestoringSession = false;
+            });
+          }
+          return;
+        } else {
+          await _authService.logout();
         }
-        return;
-      } else {
-        await _authService.logout();
       }
+    } catch (e) {
+      debugPrint('Init error: $e');
     }
 
     if (mounted) {
@@ -85,8 +97,10 @@ class _FurClientAppState extends State<FurClientApp> {
   }
 
   void _onLogout() async {
-    await _client.clearCookies();
-    await _authService.logout();
+    try {
+      await _client.clearCookies();
+      await _authService.logout();
+    } catch (_) {}
     if (mounted) {
       setState(() => _isLoggedIn = false);
     }
