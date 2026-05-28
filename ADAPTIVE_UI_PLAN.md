@@ -1,4 +1,4 @@
-# FA Nexus — План адаптивного UI (Fluent WinUI 3 + Material You)
+# FurClient — План адаптивного UI (Fluent WinUI 3 + Material You)
 
 ## Цель
 

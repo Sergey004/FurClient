@@ -28,24 +28,19 @@ class FAClient {
   bool _initialized = false;
   Completer<void>? _initCompleter;
 
-  // Using a realistic browser User-Agent to avoid Cloudflare blocks
-  static const String _userAgent =
-      'Mozilla/5.0 (Linux; Android 13; SM-A325F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+  // UA согласован с FA staff — как в iOS оригинале (ceylo.FurAffinityApp)
+  // и Android (Fur Affinity NOC). Кастомный non-browser UA не триггерит
+  // CF TLS-fingerprint mismatch в отличие от браузерного UA + Dart HttpClient.
+  static const String _userAgent = 'ceylo.FurAffinityApp/1.0';
 
   FAClient() {
     _dio = Dio(BaseOptions(
       headers: {
         'User-Agent': _userAgent,
         'Accept':
-            'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Cache-Control': 'max-age=0',
+        'Referer': FAUrls.baseUrl,
       },
       validateStatus: (status) => status != null && status < 600,
       followRedirects: true,
@@ -91,6 +86,36 @@ class FAClient {
     await _restoreCookiesFromSession();
   }
 
+  /// Строит Cookie: заголовок из сохранённой сессии.
+  /// Аналог iOS: setCookies(cookies, for: url, mainDocumentURL: url)
+  /// вызывается перед каждым запросом — все cookies включая cf_clearance.
+  String? _buildCookieHeader() {
+    if (_session?.cookies == null) return null;
+    try {
+      final List<dynamic> raw = jsonDecode(_session!.cookies!);
+      final parts = <String>[];
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          final name = item['name']?.toString() ?? '';
+          final value = item['value']?.toString() ?? '';
+          if (name.isNotEmpty && value.isNotEmpty) {
+            parts.add('$name=$value');
+          }
+        } else if (item is List && item.length >= 2) {
+          final name = item[0].toString();
+          final value = item[1].toString();
+          if (name.isNotEmpty && value.isNotEmpty) {
+            parts.add('$name=$value');
+          }
+        }
+      }
+      return parts.isEmpty ? null : parts.join('; ');
+    } catch (e) {
+      debugPrint('=== Error building cookie header: $e');
+      return null;
+    }
+  }
+
   Future<void> _restoreCookiesFromSession() async {
     if (_session?.cookies == null) return;
     await _ensureInitialized();
@@ -100,12 +125,19 @@ class FAClient {
       for (final item in raw) {
         Cookie? cookie;
         if (item is Map<String, dynamic>) {
-          final cd = CookieData.fromJson(item);
-          cookie = Cookie(cd.name, cd.value)
-            ..domain = cd.domain
-            ..path = cd.path
-            ..httpOnly = cd.isHttpOnly
-            ..secure = cd.isSecure;
+          final name = item['name']?.toString() ?? '';
+          final value = item['value']?.toString() ?? '';
+          final domain = item['domain']?.toString() ?? '.furaffinity.net';
+          final path = item['path']?.toString() ?? '/';
+          final httpOnly = item['isHttpOnly'] as bool? ?? false;
+          final secure = item['isSecure'] as bool? ?? true;
+          if (name.isNotEmpty && value.isNotEmpty) {
+            cookie = Cookie(name, value)
+              ..domain = domain
+              ..path = path
+              ..httpOnly = httpOnly
+              ..secure = secure;
+          }
         } else if (item is List && item.length >= 2) {
           final name = item[0].toString();
           final value = item[1].toString();
@@ -116,9 +148,7 @@ class FAClient {
               ..secure = true;
           }
         }
-        if (cookie != null) {
-          cookies.add(cookie);
-        }
+        if (cookie != null) cookies.add(cookie);
       }
       if (cookies.isNotEmpty) {
         await _cookieJar.saveFromResponse(
@@ -133,6 +163,7 @@ class FAClient {
   }
 
   void _checkCloudflare(Response response) {
+    // Детект CF challenge — как в iOS URLSession+HTTPDataSource.swift
     final cfMitigated = response.headers.value('cf-mitigated');
     if (cfMitigated == 'challenge') {
       throw CloudflareError();
@@ -160,7 +191,15 @@ class FAClient {
 
   Future<String> _getHtml(String url) async {
     await _ensureInitialized();
-    final response = await _dio.get<String>(url);
+
+    // Передаём все cookies явно в каждый запрос — как iOS setCookies() перед data(for:)
+    // Это гарантирует что cf_clearance (HttpOnly) всегда прокидывается
+    final cookieHeader = _buildCookieHeader();
+    final options = cookieHeader != null
+        ? Options(headers: {'Cookie': cookieHeader})
+        : null;
+
+    final response = await _dio.get<String>(url, options: options);
     _checkCloudflare(response);
     if (response.statusCode == null ||
         response.statusCode! < 200 ||
@@ -179,14 +218,16 @@ class FAClient {
     if (_session?.cookies == null) return false;
     try {
       await _ensureInitialized();
-      final response = await _dio.get<String>(FAUrls.home);
-      // Detect Cloudflare mitigation if present in headers
+      final cookieHeader = _buildCookieHeader();
+      final options = cookieHeader != null
+          ? Options(headers: {'Cookie': cookieHeader})
+          : null;
+      final response = await _dio.get<String>(FAUrls.home, options: options);
       try {
         _checkCloudflare(response);
       } on CloudflareError {
         return false;
       }
-
       final status = response.statusCode ?? 0;
       if (status == 401 || status == 403) return false;
       if (status >= 500) return true;
@@ -195,7 +236,6 @@ class FAClient {
     } on CloudflareError {
       return false;
     } catch (e) {
-      // Network or parsing errors — treat as invalid session so UI can let WebView finish challenge
       debugPrint('verifySession error: $e');
       return false;
     }
@@ -262,7 +302,11 @@ class FAClient {
     final action = currentlyWatching ? 'unwatch' : 'watch';
     final url = '${FAUrls.baseUrl}/$action/$username/';
     await _ensureInitialized();
-    await _dio.post<String>(url);
+    final cookieHeader = _buildCookieHeader();
+    final options = cookieHeader != null
+        ? Options(headers: {'Cookie': cookieHeader})
+        : null;
+    await _dio.post<String>(url, options: options);
     return !currentlyWatching;
   }
 }

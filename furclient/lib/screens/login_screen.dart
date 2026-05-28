@@ -173,66 +173,68 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (!isRoot && !isUserPage) return;
 
-    final Map<String, Map<String, dynamic>> cookieDataMap = {};
+      final Map<String, Map<String, dynamic>> cookieDataMap = {};
 
-    // Способ 1: CookieManager — получает ВСЕ куки включая httpOnly (cf_clearance)
-    try {
-      final cm = CookieManager();
-      final allCookies = await cm
-          .getCookies(url: WebUri('https://www.furaffinity.net'))
-          .timeout(const Duration(seconds: 5));
-      debugPrint('=== CookieManager found ${allCookies.length} cookies');
-      for (final c in allCookies) {
-        debugPrint(
-            '=== Cookie: ${c.name} = ${c.value} (domain: ${c.domain}, path: ${c.path}, httpOnly: ${c.isHttpOnly}, secure: ${c.isSecure})');
-        cookieDataMap[c.name] = {
-          'name': c.name,
-          'value': c.value,
-          'domain': c.domain ?? '.furaffinity.net',
-          'path': c.path ?? '/',
-          'isHttpOnly': c.isHttpOnly ?? false,
-          'isSecure': c.isSecure ?? true,
-        };
+      // Способ 1: CookieManager — получает ВСЕ куки включая httpOnly (cf_clearance)
+      try {
+        final cm = CookieManager();
+        final allCookies = await cm
+            .getCookies(url: WebUri('https://www.furaffinity.net'))
+            .timeout(const Duration(seconds: 5));
+        debugPrint('=== CookieManager found ${allCookies.length} cookies');
+        for (final c in allCookies) {
+          debugPrint(
+              '=== Cookie: ${c.name} = ${c.value} (domain: ${c.domain}, path: ${c.path}, httpOnly: ${c.isHttpOnly}, secure: ${c.isSecure})');
+          cookieDataMap[c.name] = {
+            'name': c.name,
+            'value': c.value,
+            'domain': c.domain ?? '.furaffinity.net',
+            'path': c.path ?? '/',
+            'isHttpOnly': c.isHttpOnly ?? false,
+            'isSecure': c.isSecure ?? true,
+          };
+        }
+      } catch (e) {
+        debugPrint('=== CookieManager error: $e');
       }
-    } catch (e) {
-      debugPrint('=== CookieManager error: $e');
-    }
 
-    // Способ 2: document.cookie — захватываем не-httpOnly куки, пропуская дубли
-    try {
-      final rawCookies = await controller
-          .evaluateJavascript(source: 'document.cookie')
-          .timeout(const Duration(seconds: 5)) as String?;
+      // Способ 2: document.cookie — захватываем не-httpOnly куки, пропуская дубли
+      try {
+        final rawCookies = await controller
+            .evaluateJavascript(source: 'document.cookie')
+            .timeout(const Duration(seconds: 5)) as String?;
 
-      debugPrint('=== document.cookie: $rawCookies');
+        debugPrint('=== document.cookie: $rawCookies');
 
-      if (rawCookies != null && rawCookies.isNotEmpty) {
-        for (final part in rawCookies.split(';')) {
-          final idx = part.indexOf('=');
-          if (idx < 0) continue;
-          final name = part.substring(0, idx).trim();
-          final value = part.substring(idx + 1).trim();
-          if (name.isNotEmpty && value.isNotEmpty && !cookieDataMap.containsKey(name)) {
-            cookieDataMap[name] = {
-              'name': name,
-              'value': value,
-              'domain': '.furaffinity.net',
-              'path': '/',
-              'isHttpOnly': false,
-              'isSecure': true,
-            };
+        if (rawCookies != null && rawCookies.isNotEmpty) {
+          for (final part in rawCookies.split(';')) {
+            final idx = part.indexOf('=');
+            if (idx < 0) continue;
+            final name = part.substring(0, idx).trim();
+            final value = part.substring(idx + 1).trim();
+            if (name.isNotEmpty &&
+                value.isNotEmpty &&
+                !cookieDataMap.containsKey(name)) {
+              cookieDataMap[name] = {
+                'name': name,
+                'value': value,
+                'domain': '.furaffinity.net',
+                'path': '/',
+                'isHttpOnly': false,
+                'isSecure': true,
+              };
+            }
           }
         }
+      } catch (e) {
+        debugPrint('=== JS cookie error: $e');
       }
-    } catch (e) {
-      debugPrint('=== JS cookie error: $e');
-    }
 
-    debugPrint(
-      '=== Collected ${cookieDataMap.length} cookies: ${cookieDataMap.keys.join(", ")}',
-    );
+      debugPrint(
+        '=== Collected ${cookieDataMap.length} cookies: ${cookieDataMap.keys.join(", ")}',
+      );
 
-    if (cookieDataMap.isEmpty) return;
+      if (cookieDataMap.isEmpty) return;
 
       // Извлекаем username из URL или DOM
       String username = '';
@@ -262,15 +264,14 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (username.isEmpty) username = 'user';
 
-    final cookieDataList =
-        cookieDataMap.values.map((e) => e).toList();
+      final cookieDataList = cookieDataMap.values.map((e) => e).toList();
 
-    final session = UserSession(
-      username: username,
-      avatarUrl: FAUrls.avatar(username),
-      isLoggedIn: true,
-      cookies: jsonEncode(cookieDataList),
-    );
+      final session = UserSession(
+        username: username,
+        avatarUrl: FAUrls.avatar(username),
+        isLoggedIn: true,
+        cookies: jsonEncode(cookieDataList),
+      );
 
       if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
         debugPrint('=== Saving session for user: $username');
@@ -479,7 +480,7 @@ class _LoginScreenState extends State<LoginScreen>
               ),
               const SizedBox(height: 24),
               const Text(
-                'FA Nexus',
+                'FurClient',
                 style: TextStyle(
                   color: AppColors.text,
                   fontSize: 28,
