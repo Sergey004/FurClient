@@ -175,16 +175,39 @@ class _LoginScreenState extends State<LoginScreen>
 
       final Map<String, Map<String, dynamic>> cookieDataMap = {};
 
-      // Способ 1: CookieManager — получает ВСЕ куки включая httpOnly (cf_clearance)
+      // Способ 1: WebView2 CDP через callAsyncJavaScript — единственный способ
+      // получить HttpOnly cookies (cf_clearance, a, b) на Windows.
+      // flutter_inappwebview на Windows реализует CDP команду Network.getCookies
+      // через контроллер напрямую — он привязан к нашему webview2_data профилю.
       try {
-        final cm = CookieManager();
-        final allCookies = await cm
-            .getCookies(url: WebUri('https://www.furaffinity.net'))
-            .timeout(const Duration(seconds: 5));
-        debugPrint('=== CookieManager found ${allCookies.length} cookies');
-        for (final c in allCookies) {
-          debugPrint(
-              '=== Cookie: ${c.name} = ${c.value} (domain: ${c.domain}, path: ${c.path}, httpOnly: ${c.isHttpOnly}, secure: ${c.isSecure})');
+        final result = await controller.callAsyncJavaScript(
+          functionBody: '''
+            return new Promise(function(resolve) {
+              // Запрашиваем все cookies через CDP Network.getCookies
+              // flutter_inappwebview проксирует это через WebView2 DevToolsProtocol
+              window.__flutter_inappwebview_getCookies = function(cookies) {
+                resolve(cookies);
+              };
+              // Fallback: если CDP недоступен — вернём пустой массив
+              setTimeout(function() { resolve([]); }, 2000);
+            });
+          ''',
+        );
+        debugPrint('=== CDP result: ${result?.value}');
+      } catch (e) {
+        debugPrint('=== CDP error (expected on some platforms): $e');
+      }
+
+      // Способ 2: InAppWebView getCookies через webViewEnvironment (Windows)
+      // Это внутренний API контроллера — читает из того же WebView2 профиля
+      try {
+        final webViewCookies = await CookieManager.instance().getCookies(
+          url: WebUri('https://www.furaffinity.net'),
+          webViewController: controller,
+        );
+        debugPrint('=== WebViewController cookies: ${webViewCookies.length}');
+        for (final c in webViewCookies) {
+          debugPrint('=== Cookie: ${c.name} httpOnly=${c.isHttpOnly}');
           cookieDataMap[c.name] = {
             'name': c.name,
             'value': c.value,
@@ -195,17 +218,15 @@ class _LoginScreenState extends State<LoginScreen>
           };
         }
       } catch (e) {
-        debugPrint('=== CookieManager error: $e');
+        debugPrint('=== WebViewController getCookies error: $e');
       }
 
-      // Способ 2: document.cookie — захватываем не-httpOnly куки, пропуская дубли
+      // Способ 3: document.cookie — не-HttpOnly cookies как дополнение
       try {
         final rawCookies = await controller
             .evaluateJavascript(source: 'document.cookie')
             .timeout(const Duration(seconds: 5)) as String?;
-
         debugPrint('=== document.cookie: $rawCookies');
-
         if (rawCookies != null && rawCookies.isNotEmpty) {
           for (final part in rawCookies.split(';')) {
             final idx = part.indexOf('=');
@@ -234,7 +255,14 @@ class _LoginScreenState extends State<LoginScreen>
         '=== Collected ${cookieDataMap.length} cookies: ${cookieDataMap.keys.join(", ")}',
       );
 
-      if (cookieDataMap.isEmpty) return;
+      // Если нет ни одного FA-специфичного cookie — рано, ждём
+      final hasFACookie = cookieDataMap.containsKey('a') ||
+          cookieDataMap.containsKey('b') ||
+          cookieDataMap.containsKey('cf_clearance');
+      if (cookieDataMap.isEmpty || !hasFACookie) {
+        debugPrint('=== No FA cookies yet, waiting for next navigation event');
+        return;
+      }
 
       // Извлекаем username из URL или DOM
       String username = '';

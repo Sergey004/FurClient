@@ -1,15 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' as io;
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
-import 'package:dio_cookie_manager/dio_cookie_manager.dart';
+import 'package:dio_cookie_manager/dio_cookie_manager.dart' as dio_cookies;
 import 'package:flutter/foundation.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/models.dart';
 import 'fa_urls.dart';
+import '../main.dart' show webViewEnvironment;
 
 class CloudflareError implements Exception {
   final String message;
@@ -28,9 +30,8 @@ class FAClient {
   bool _initialized = false;
   Completer<void>? _initCompleter;
 
-  // UA согласован с FA staff — как в iOS оригинале (ceylo.FurAffinityApp)
-  // и Android (Fur Affinity NOC). Кастомный non-browser UA не триггерит
-  // CF TLS-fingerprint mismatch в отличие от браузерного UA + Dart HttpClient.
+  // UA согласован с FA staff — как в iOS оригинале (ceylo.FurAffinityApp).
+  // Non-browser UA не триггерит CF TLS-fingerprint mismatch.
   static const String _userAgent = 'ceylo.FurAffinityApp/1.0';
 
   FAClient() {
@@ -56,16 +57,16 @@ class FAClient {
     }
     _initCompleter = Completer<void>();
     try {
-      final appDocDir = await getApplicationSupportDirectory();
-      final cookiePath = '${appDocDir.path}/.cookies';
-      final cookieDir = Directory(cookiePath);
+      final appDocDir = await io.Directory.systemTemp.path != ''
+          ? await getApplicationSupportDirectory()
+          : null;
+      final cookiePath = '${appDocDir?.path ?? '/tmp'}/.cookies';
+      final cookieDir = io.Directory(cookiePath);
       if (!cookieDir.existsSync()) {
         cookieDir.createSync(recursive: true);
       }
-      _cookieJar = PersistCookieJar(
-        storage: FileStorage(cookiePath),
-      );
-      _dio.interceptors.add(CookieManager(_cookieJar));
+      _cookieJar = PersistCookieJar(storage: FileStorage(cookiePath));
+      _dio.interceptors.add(dio_cookies.CookieManager(_cookieJar));
       _initialized = true;
       _initCompleter!.complete();
     } catch (e) {
@@ -75,20 +76,86 @@ class FAClient {
     }
   }
 
-  Future<void> init() async {
-    await _ensureInitialized();
-  }
+  Future<void> init() async => _ensureInitialized();
 
   UserSession? get session => _session;
 
   Future<void> setSession(UserSession? session) async {
     _session = session;
-    await _restoreCookiesFromSession();
+    if (!io.Platform.isWindows) {
+      await _restoreCookiesFromSession();
+    }
   }
 
-  /// Строит Cookie: заголовок из сохранённой сессии.
-  /// Аналог iOS: setCookies(cookies, for: url, mainDocumentURL: url)
-  /// вызывается перед каждым запросом — все cookies включая cf_clearance.
+  // ── Windows: запросы через HeadlessInAppWebView ─────────────────────────
+  // WebView2 автоматически шлёт ВСЕ cookies (включая HttpOnly cf_clearance)
+  // т.к. использует тот же webview2_data профиль что и login WebView.
+  // Аналог iOS setCookies(cookies, for: url) — только WebView2 делает это сам.
+
+  Future<String> _getHtmlViaWebView(String url) async {
+    final completer = Completer<String>();
+    HeadlessInAppWebView? headless;
+
+    headless = HeadlessInAppWebView(
+      webViewEnvironment: webViewEnvironment,
+      initialSettings: InAppWebViewSettings(
+        javaScriptEnabled: true,
+        userAgent: _userAgent,
+      ),
+      onLoadStop: (controller, loadedUrl) async {
+        try {
+          final html = await controller.getHtml();
+          if (!completer.isCompleted) completer.complete(html ?? '');
+        } catch (e) {
+          if (!completer.isCompleted) completer.completeError(e);
+        } finally {
+          await headless?.dispose();
+        }
+      },
+      onReceivedError: (controller, request, error) async {
+        if (!(request.isForMainFrame ?? false)) return;
+        if (!completer.isCompleted) {
+          completer.completeError(
+            Exception('WebView error: ${error.description}'),
+          );
+        }
+        await headless?.dispose();
+      },
+      onReceivedHttpError: (controller, request, response) async {
+        if (!(request.isForMainFrame ?? false)) return;
+        final status = response.statusCode ?? 0;
+        if (status == 403 || status == 503) {
+          if (!completer.isCompleted) completer.completeError(CloudflareError());
+          await headless?.dispose();
+        }
+      },
+    );
+
+    await headless.run();
+    await headless.webViewController?.loadUrl(
+      urlRequest: URLRequest(
+        url: WebUri(url),
+        headers: {
+          'User-Agent': _userAgent,
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Referer': FAUrls.baseUrl,
+        },
+      ),
+    );
+
+    return completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        headless?.dispose();
+        throw Exception('Request timeout: $url');
+      },
+    );
+  }
+
+  // ── Android/iOS/macOS: Dio + явный Cookie заголовок ────────────────────
+
   String? _buildCookieHeader() {
     if (_session?.cookies == null) return null;
     try {
@@ -98,15 +165,11 @@ class FAClient {
         if (item is Map<String, dynamic>) {
           final name = item['name']?.toString() ?? '';
           final value = item['value']?.toString() ?? '';
-          if (name.isNotEmpty && value.isNotEmpty) {
-            parts.add('$name=$value');
-          }
+          if (name.isNotEmpty && value.isNotEmpty) parts.add('$name=$value');
         } else if (item is List && item.length >= 2) {
           final name = item[0].toString();
           final value = item[1].toString();
-          if (name.isNotEmpty && value.isNotEmpty) {
-            parts.add('$name=$value');
-          }
+          if (name.isNotEmpty && value.isNotEmpty) parts.add('$name=$value');
         }
       }
       return parts.isEmpty ? null : parts.join('; ');
@@ -121,40 +184,32 @@ class FAClient {
     await _ensureInitialized();
     try {
       final List<dynamic> raw = jsonDecode(_session!.cookies!);
-      final cookies = <Cookie>[];
+      final cookies = <io.Cookie>[];
       for (final item in raw) {
-        Cookie? cookie;
         if (item is Map<String, dynamic>) {
           final name = item['name']?.toString() ?? '';
           final value = item['value']?.toString() ?? '';
           final domain = item['domain']?.toString() ?? '.furaffinity.net';
           final path = item['path']?.toString() ?? '/';
-          final httpOnly = item['isHttpOnly'] as bool? ?? false;
-          final secure = item['isSecure'] as bool? ?? true;
           if (name.isNotEmpty && value.isNotEmpty) {
-            cookie = Cookie(name, value)
-              ..domain = domain
-              ..path = path
-              ..httpOnly = httpOnly
-              ..secure = secure;
+            final c = io.Cookie(name, value);
+            c.domain = domain;
+            c.path = path;
+            cookies.add(c);
           }
         } else if (item is List && item.length >= 2) {
           final name = item[0].toString();
           final value = item[1].toString();
           if (name.isNotEmpty && value.isNotEmpty) {
-            cookie = Cookie(name, value)
-              ..domain = '.furaffinity.net'
-              ..path = '/'
-              ..secure = true;
+            final c = io.Cookie(name, value);
+            c.domain = '.furaffinity.net';
+            c.path = '/';
+            cookies.add(c);
           }
         }
-        if (cookie != null) cookies.add(cookie);
       }
       if (cookies.isNotEmpty) {
-        await _cookieJar.saveFromResponse(
-          Uri.parse(FAUrls.baseUrl),
-          cookies,
-        );
+        await _cookieJar.saveFromResponse(Uri.parse(FAUrls.baseUrl), cookies);
         debugPrint('=== Restored ${cookies.length} cookies from session');
       }
     } catch (e) {
@@ -163,18 +218,14 @@ class FAClient {
   }
 
   void _checkCloudflare(Response response) {
-    // Детект CF challenge — как в iOS URLSession+HTTPDataSource.swift
     final cfMitigated = response.headers.value('cf-mitigated');
-    if (cfMitigated == 'challenge') {
-      throw CloudflareError();
-    }
+    if (cfMitigated == 'challenge') throw CloudflareError();
     final status = response.statusCode ?? 0;
     if (status == 403) {
       final body = response.data?.toString() ?? '';
       if (body.contains('cf-browser-verification') ||
           body.contains('cf_chl_opt') ||
           body.contains('challenge-platform') ||
-          body.contains('Attention Required') ||
           body.contains('Cloudflare')) {
         throw CloudflareError();
       }
@@ -182,7 +233,6 @@ class FAClient {
     if (status == 503) {
       final body = response.data?.toString() ?? '';
       if (body.contains('cf-challenge-running') ||
-          body.contains('challenge-running') ||
           body.contains('Cloudflare')) {
         throw CloudflareError();
       }
@@ -190,15 +240,14 @@ class FAClient {
   }
 
   Future<String> _getHtml(String url) async {
+    if (io.Platform.isWindows) {
+      return _getHtmlViaWebView(url);
+    }
     await _ensureInitialized();
-
-    // Передаём все cookies явно в каждый запрос — как iOS setCookies() перед data(for:)
-    // Это гарантирует что cf_clearance (HttpOnly) всегда прокидывается
     final cookieHeader = _buildCookieHeader();
     final options = cookieHeader != null
         ? Options(headers: {'Cookie': cookieHeader})
         : null;
-
     final response = await _dio.get<String>(url, options: options);
     _checkCloudflare(response);
     if (response.statusCode == null ||
@@ -217,6 +266,10 @@ class FAClient {
   Future<bool> verifySession() async {
     if (_session?.cookies == null) return false;
     try {
+      if (io.Platform.isWindows) {
+        final html = await _getHtmlViaWebView(FAUrls.home);
+        return html.contains('logout') || html.contains(_session!.username);
+      }
       await _ensureInitialized();
       final cookieHeader = _buildCookieHeader();
       final options = cookieHeader != null
@@ -230,11 +283,7 @@ class FAClient {
       }
       final status = response.statusCode ?? 0;
       if (status == 401 || status == 403) return false;
-      if (status >= 500) return true;
-      if (status >= 200 && status < 300) return true;
-      return false;
-    } on CloudflareError {
-      return false;
+      return status >= 200 && status < 300;
     } catch (e) {
       debugPrint('verifySession error: $e');
       return false;
@@ -242,38 +291,31 @@ class FAClient {
   }
 
   Future<void> clearCookies() async {
-    if (_initialized) {
-      await _cookieJar.deleteAll();
-    }
+    if (_initialized) await _cookieJar.deleteAll();
   }
 
   Future<List<Submission>> getSubmissions(int page, String category) async {
-    final url = FAUrls.browse(filter: category, page: page);
-    final html = await _getHtml(url);
+    final html = await _getHtml(FAUrls.browse(filter: category, page: page));
     return Submission.parseSubmissionsPage(html);
   }
 
   Future<List<Submission>> getGallery(String username, {int page = 1}) async {
-    final url = '${FAUrls.gallery(username)}?page=$page';
-    final html = await _getHtml(url);
+    final html = await _getHtml('${FAUrls.gallery(username)}?page=$page');
     return Submission.parseSubmissionsPage(html);
   }
 
   Future<Submission?> getSubmission(String id) async {
-    final url = FAUrls.viewSubmission(id);
-    final html = await _getHtml(url);
+    final html = await _getHtml(FAUrls.viewSubmission(id));
     return Submission.parseSubmissionDetails(html, id);
   }
 
   Future<List<FAComment>> getComments(String id) async {
-    final url = FAUrls.viewSubmission(id);
-    final html = await _getHtml(url);
+    final html = await _getHtml(FAUrls.viewSubmission(id));
     return FAComment.parseComments(html);
   }
 
   Future<List<Submission>> search(String query, {int page = 1}) async {
-    final url = FAUrls.search(query, page: page);
-    final html = await _getHtml(url);
+    final html = await _getHtml(FAUrls.search(query, page: page));
     return Submission.parseSearchResults(html);
   }
 
@@ -283,8 +325,7 @@ class FAClient {
   }
 
   Future<FAUser?> getUser(String username) async {
-    final url = FAUrls.user(username);
-    final html = await _getHtml(url);
+    final html = await _getHtml(FAUrls.user(username));
     return FAUser.parseUserPage(html, username);
   }
 
@@ -301,6 +342,10 @@ class FAClient {
   Future<bool> toggleWatch(String username, bool currentlyWatching) async {
     final action = currentlyWatching ? 'unwatch' : 'watch';
     final url = '${FAUrls.baseUrl}/$action/$username/';
+    if (io.Platform.isWindows) {
+      await _getHtmlViaWebView(url);
+      return !currentlyWatching;
+    }
     await _ensureInitialized();
     final cookieHeader = _buildCookieHeader();
     final options = cookieHeader != null
