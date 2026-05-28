@@ -13,8 +13,9 @@ import '../utils/platform_utils.dart';
 class GalleryScreen extends StatefulWidget {
   final FAClient client;
   final bool sfwMode;
+  final VoidCallback? onLogout;
 
-  const GalleryScreen({super.key, required this.client, this.sfwMode = false});
+  const GalleryScreen({super.key, required this.client, this.sfwMode = false, this.onLogout});
 
   @override
   State<GalleryScreen> createState() => _GalleryScreenState();
@@ -221,7 +222,7 @@ class _GalleryScreenState extends State<GalleryScreen>
     }
 
     if (_error != null) {
-      return ErrorView(message: _error!, onRetry: _loadSubmissions);
+      return ErrorView(message: _error!, onRetry: _loadSubmissions, onRelogin: widget.onLogout);
     }
 
     if (_submissions.isEmpty) {

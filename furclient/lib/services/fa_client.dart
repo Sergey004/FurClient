@@ -13,12 +13,12 @@ import 'fa_urls.dart';
 
 class CloudflareError implements Exception {
   final String message;
-  CloudflareError()
-      : message =
-            'FA is currently protected by Cloudflare challenge. Please try again later.';
+  CloudflareError([String? customMessage])
+      : message = customMessage ??
+            'Cloudflare protection is active. Please re-login to pass the challenge.';
 
   @override
-  String toString() => 'CloudflareError: $message';
+  String toString() => message;
 }
 
 class FAClient {
@@ -95,18 +95,29 @@ class FAClient {
     if (_session?.cookies == null) return;
     await _ensureInitialized();
     try {
-      final List<dynamic> cookiePairs = jsonDecode(_session!.cookies!);
+      final List<dynamic> raw = jsonDecode(_session!.cookies!);
       final cookies = <Cookie>[];
-      for (final pair in cookiePairs) {
-        if (pair is List && pair.length >= 2) {
-          final name = pair[0].toString();
-          final value = pair[1].toString();
+      for (final item in raw) {
+        Cookie? cookie;
+        if (item is Map<String, dynamic>) {
+          final cd = CookieData.fromJson(item);
+          cookie = Cookie(cd.name, cd.value)
+            ..domain = cd.domain
+            ..path = cd.path
+            ..httpOnly = cd.isHttpOnly
+            ..secure = cd.isSecure;
+        } else if (item is List && item.length >= 2) {
+          final name = item[0].toString();
+          final value = item[1].toString();
           if (name.isNotEmpty && value.isNotEmpty) {
-            final cookie = Cookie(name, value)
+            cookie = Cookie(name, value)
               ..domain = '.furaffinity.net'
-              ..path = '/';
-            cookies.add(cookie);
+              ..path = '/'
+              ..secure = true;
           }
+        }
+        if (cookie != null) {
+          cookies.add(cookie);
         }
       }
       if (cookies.isNotEmpty) {
@@ -125,6 +136,25 @@ class FAClient {
     final cfMitigated = response.headers.value('cf-mitigated');
     if (cfMitigated == 'challenge') {
       throw CloudflareError();
+    }
+    final status = response.statusCode ?? 0;
+    if (status == 403) {
+      final body = response.data?.toString() ?? '';
+      if (body.contains('cf-browser-verification') ||
+          body.contains('cf_chl_opt') ||
+          body.contains('challenge-platform') ||
+          body.contains('Attention Required') ||
+          body.contains('Cloudflare')) {
+        throw CloudflareError();
+      }
+    }
+    if (status == 503) {
+      final body = response.data?.toString() ?? '';
+      if (body.contains('cf-challenge-running') ||
+          body.contains('challenge-running') ||
+          body.contains('Cloudflare')) {
+        throw CloudflareError();
+      }
     }
   }
 

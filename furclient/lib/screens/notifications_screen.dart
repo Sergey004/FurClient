@@ -10,8 +10,9 @@ import 'submission_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   final FAClient client;
+  final VoidCallback? onLogout;
 
-  const NotificationsScreen({super.key, required this.client});
+  const NotificationsScreen({super.key, required this.client, this.onLogout});
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -119,7 +120,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
 
     if (_error != null) {
-      return ErrorView(message: _error!, onRetry: _loadNotifications);
+      return ErrorView(message: _error!, onRetry: _loadNotifications, onRelogin: widget.onLogout);
     }
 
     if (_notifications.isEmpty) {

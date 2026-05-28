@@ -43,22 +43,22 @@ class _FluentShellState extends State<FluentShell> {
           fluent.PaneItem(
             icon: const fluent.Icon(fluent.FluentIcons.photo2),
             title: const fluent.Text('Gallery'),
-            body: GalleryScreen(client: widget.client, sfwMode: _sfwMode),
-          ),
-          fluent.PaneItem(
-            icon: const fluent.Icon(fluent.FluentIcons.search),
-            title: const fluent.Text('Search'),
-            body: SearchScreen(client: widget.client, sfwMode: _sfwMode),
-          ),
-          fluent.PaneItem(
-            icon: const fluent.Icon(fluent.FluentIcons.ringer),
-            title: const fluent.Text('Notifications'),
-            body: NotificationsScreen(client: widget.client),
-          ),
-          fluent.PaneItem(
-            icon: const fluent.Icon(fluent.FluentIcons.contact),
-            title: const fluent.Text('Profile'),
-            body: ProfileScreen(client: widget.client, session: widget.session),
+      body: GalleryScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+        ),
+        fluent.PaneItem(
+          icon: const fluent.Icon(fluent.FluentIcons.search),
+          title: const fluent.Text('Search'),
+          body: SearchScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+        ),
+        fluent.PaneItem(
+          icon: const fluent.Icon(fluent.FluentIcons.ringer),
+          title: const fluent.Text('Notifications'),
+          body: NotificationsScreen(client: widget.client, onLogout: widget.onLogout),
+        ),
+        fluent.PaneItem(
+          icon: const fluent.Icon(fluent.FluentIcons.contact),
+          title: const fluent.Text('Profile'),
+          body: ProfileScreen(client: widget.client, session: widget.session, onLogout: widget.onLogout),
           ),
           fluent.PaneItem(
             icon: const fluent.Icon(fluent.FluentIcons.settings),

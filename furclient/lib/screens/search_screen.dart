@@ -12,8 +12,9 @@ import 'submission_detail_screen.dart';
 class SearchScreen extends StatefulWidget {
   final FAClient client;
   final bool sfwMode;
+  final VoidCallback? onLogout;
 
-  const SearchScreen({super.key, required this.client, this.sfwMode = false});
+  const SearchScreen({super.key, required this.client, this.sfwMode = false, this.onLogout});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -200,7 +201,7 @@ class _SearchScreenState extends State<SearchScreen>
     }
 
     if (_error != null) {
-      return ErrorView(message: _error!, onRetry: () => _search(_query));
+      return ErrorView(message: _error!, onRetry: () => _search(_query), onRelogin: widget.onLogout);
     }
 
     if (!_hasSearched) {

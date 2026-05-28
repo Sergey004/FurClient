@@ -12,12 +12,14 @@ class ProfileScreen extends StatefulWidget {
   final FAClient client;
   final UserSession session;
   final String? targetUsername;
+  final VoidCallback? onLogout;
 
   const ProfileScreen({
     super.key,
     required this.client,
     required this.session,
     this.targetUsername,
+    this.onLogout,
   });
 
   @override
@@ -80,7 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     if (_error != null) {
-      return ErrorView(message: _error!, onRetry: _loadProfile);
+      return ErrorView(message: _error!, onRetry: _loadProfile, onRelogin: widget.onLogout);
     }
 
     if (_profile == null) {
