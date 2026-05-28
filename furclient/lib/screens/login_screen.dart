@@ -9,6 +9,7 @@ import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/fa_urls.dart';
 import '../widgets/adaptive/adaptive.dart';
+import '../utils/cookie_manager.dart';
 import '../main.dart' show webViewEnvironment;
 
 class LoginScreen extends StatefulWidget {
@@ -70,15 +71,8 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _startLogin() async {
-    final cookieManager = CookieManager();
     try {
-      await cookieManager.deleteAllCookies().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () async {
-          debugPrint('=== Timeout clearing cookies');
-          return false;
-        },
-      );
+      await FAICookieManager.deleteAll();
     } catch (e) {
       debugPrint('=== Error clearing cookies: $e');
     }
@@ -153,42 +147,23 @@ class _LoginScreenState extends State<LoginScreen>
     InAppWebViewController controller,
     Map<String, Map<String, dynamic>> cookieDataMap,
   ) async {
-    // Приоритет 1: CookieManager — может получить HttpOnly cookies
-    // (cf_clearance, a, b) на всех платформах
+    // CookieManager.instance() с webViewEnvironment — читает из нашего
+    // webview2_data профиля. Без webViewEnvironment читает системный профиль!
+    // Документация: "If you are using a custom WebViewEnvironment, set the
+    // webViewEnvironment parameter when calling CookieManager.instance()"
+    final cm = FAICookieManager.instance;
+
     try {
-      // Получаем cookies с основного домена
-      final mainDomainCookies = await CookieManager.instance().getCookies(
-        url: WebUri('https://www.furaffinity.net'),
-      );
-      debugPrint(
-        '=== Main domain cookies: ${mainDomainCookies.length}',
-      );
-      _addCookiesToMap(mainDomainCookies, cookieDataMap);
-
-      // Получаем cookies с поддомена (для wildcard .furaffinity.net)
-      final subdomainCookies = await CookieManager.instance().getCookies(
-        url: WebUri('https://furaffinity.net'),
-      );
-      debugPrint(
-        '=== Subdomain cookies: ${subdomainCookies.length}',
-      );
-      _addCookiesToMap(subdomainCookies, cookieDataMap);
-
-      // Получаем все cookies для основного домена
-      try {
-        final allCookies = await CookieManager.instance().getCookies(
-          url: WebUri('https://www.furaffinity.net'),
-        );
-        debugPrint('=== All cookies: ${allCookies.length}');
-        _addCookiesToMap(allCookies, cookieDataMap);
-      } catch (e) {
-        debugPrint('=== getAllCookies error: $e');
-      }
+      final cookies = await cm
+          .getCookies(url: WebUri('https://www.furaffinity.net'))
+          .timeout(const Duration(seconds: 5));
+      debugPrint('=== CookieManager cookies: ${cookies.length}');
+      _addCookiesToMap(cookies, cookieDataMap);
     } catch (e) {
       debugPrint('=== CookieManager error: $e');
     }
 
-    // Приоритет 2: document.cookie — не-HttpOnly cookies как дополнение
+    // document.cookie — не-HttpOnly cookies как дополнение
     try {
       final rawCookies = await controller
           .evaluateJavascript(source: 'document.cookie')
@@ -211,7 +186,6 @@ class _LoginScreenState extends State<LoginScreen>
               'isHttpOnly': false,
               'isSecure': true,
             };
-            debugPrint('=== Added from JS: $name');
           }
         }
       }
