@@ -421,7 +421,6 @@ class _LoginScreenState extends State<LoginScreen>
           thirdPartyCookiesEnabled: true,
           allowFileAccessFromFileURLs: false,
           allowUniversalAccessFromFileURLs: false,
-          userAgent: 'ceylo.FurAffinityApp/1.0',
         ),
                 initialUrlRequest: URLRequest(
                   url: WebUri(FAUrls.login),
