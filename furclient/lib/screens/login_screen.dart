@@ -147,21 +147,46 @@ class _LoginScreenState extends State<LoginScreen>
     InAppWebViewController controller,
     Map<String, Map<String, dynamic>> cookieDataMap,
   ) async {
-    // CookieManager.instance() с webViewEnvironment — читает из нашего
-    // webview2_data профиля. Без webViewEnvironment читает системный профиль!
-    // Документация: "If you are using a custom WebViewEnvironment, set the
-    // webViewEnvironment parameter when calling CookieManager.instance()"
     final cm = FAICookieManager.instance;
 
-    try {
-      final cookies = await cm
-          .getCookies(url: WebUri('https://www.furaffinity.net'))
-          .timeout(const Duration(seconds: 5));
-      debugPrint('=== CookieManager cookies: ${cookies.length}');
-      _addCookiesToMap(cookies, cookieDataMap);
-    } catch (e) {
-      debugPrint('=== CookieManager error: $e');
+    // cf_clearance может быть установлен на разных доменах:
+    // .furaffinity.net, www.furaffinity.net, furaffinity.net
+    // Также CF может установить его асинхронно — нужна задержка и retry
+    final urls = [
+      'https://www.furaffinity.net',
+      'https://furaffinity.net',
+      'https://www.furaffinity.net/',
+    ];
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        debugPrint('=== Cookie retry attempt ${attempt + 1}...');
+        await Future.delayed(const Duration(seconds: 1));
+      }
+
+      for (final url in urls) {
+        try {
+          final cookies = await cm
+              .getCookies(url: WebUri(url))
+              .timeout(const Duration(seconds: 3));
+          if (cookies.isNotEmpty) {
+            debugPrint('=== $url cookies: ${cookies.length} (${cookies.map((c) => c.name).join(", ")})');
+            _addCookiesToMap(cookies, cookieDataMap);
+          }
+        } catch (e) {
+          debugPrint('=== CookieManager error for $url: $e');
+        }
+      }
+
+      if (cookieDataMap.containsKey('cf_clearance')) {
+        debugPrint('=== cf_clearance found on attempt ${attempt + 1}');
+        break;
+      }
     }
+
+    debugPrint(
+      '=== CookieManager total: ${cookieDataMap.length} cookies (${cookieDataMap.keys.join(", ")})',
+    );
 
     // document.cookie — не-HttpOnly cookies как дополнение
     try {

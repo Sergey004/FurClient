@@ -94,14 +94,23 @@ class FAClient {
 
   Future<String?> _buildCookieHeaderFromWebView() async {
     try {
-      final cookies = await FAICookieManager.getCookies(
+      final urls = [
         'https://www.furaffinity.net',
-      );
-      if (cookies.isEmpty) return null;
-      final parts = cookies
-          .map((c) => '${c.name}=${c.value}')
-          .toList();
-      debugPrint('=== Live cookies for request: ${cookies.map((c) => c.name).join(", ")}');
+        'https://furaffinity.net',
+        'https://www.furaffinity.net/',
+      ];
+      final seen = <String>{};
+      final parts = <String>[];
+      for (final url in urls) {
+        final cookies = await FAICookieManager.getCookies(url);
+        for (final c in cookies) {
+          if (seen.add(c.name)) {
+            parts.add('${c.name}=${c.value}');
+          }
+        }
+      }
+      if (parts.isEmpty) return null;
+      debugPrint('=== Live cookies for request: ${seen.join(", ")}');
       return parts.join('; ');
     } catch (e) {
       debugPrint('=== Error reading live cookies: $e');
