@@ -4,6 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../widgets/adaptive/adaptive.dart';
+import '../services/fa_urls.dart';
+
+const _imageHeaders = {'Referer': FAUrls.baseUrl};
 
 class SubmissionCard extends StatelessWidget {
   final Submission submission;
@@ -39,9 +42,10 @@ class SubmissionCard extends StatelessWidget {
                     borderRadius:
                         const BorderRadius.vertical(top: Radius.circular(11)),
                     child: submission.imageUrl.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: submission.imageUrl,
-                            fit: BoxFit.cover,
+                    ? CachedNetworkImage(
+                    imageUrl: submission.imageUrl,
+                    httpHeaders: _imageHeaders,
+                    fit: BoxFit.cover,
                             placeholder: (context, url) => Container(
                               color: AppColors.bgInput,
           child: const Center(

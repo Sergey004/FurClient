@@ -3,8 +3,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
+import '../services/fa_urls.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/adaptive/adaptive.dart';
+
+const _imageHeaders = {'Referer': FAUrls.baseUrl};
 
 class SubmissionDetailScreen extends StatefulWidget {
   final FAClient client;
@@ -177,9 +180,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     return Container(
       color: AppColors.bgDeep,
       child: sub.imageUrl.isNotEmpty
-          ? CachedNetworkImage(
-              imageUrl: sub.imageUrl,
-              fit: BoxFit.contain,
+        ? CachedNetworkImage(
+          imageUrl: sub.imageUrl,
+          httpHeaders: _imageHeaders,
+          fit: BoxFit.contain,
               placeholder: (context, url) => Container(
                 height: 300,
                 color: AppColors.bgInput,
@@ -408,9 +412,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           CircleAvatar(
             radius: 18,
             backgroundColor: AppColors.bgInput,
-            backgroundImage: comment.avatarUrl.isNotEmpty
-                ? CachedNetworkImageProvider(comment.avatarUrl)
-                : null,
+              backgroundImage: comment.avatarUrl.isNotEmpty
+                  ? CachedNetworkImageProvider(comment.avatarUrl,
+                      httpHeaders: _imageHeaders)
+                  : null,
             child: comment.avatarUrl.isEmpty
                 ? const Icon(Icons.person, size: 18, color: AppColors.textMuted)
                 : null,

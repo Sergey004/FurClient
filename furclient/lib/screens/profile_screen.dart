@@ -8,6 +8,8 @@ import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 
+const _imageHeaders = {'Referer': FAUrls.baseUrl};
+
 class ProfileScreen extends StatefulWidget {
   final FAClient client;
   final UserSession session;
@@ -158,12 +160,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                     shape: BoxShape.circle,
                     border: Border.all(color: AppColors.bg, width: 4),
                   ),
-                  child: CircleAvatar(
-                    radius: 56,
-                    backgroundColor: AppColors.bgInput,
-                    backgroundImage: p.avatarUrl.isNotEmpty
-                        ? CachedNetworkImageProvider(p.avatarUrl)
-                        : null,
+                        child: CircleAvatar(
+                          radius: 56,
+                          backgroundColor: AppColors.bgInput,
+                          backgroundImage: p.avatarUrl.isNotEmpty
+                              ? CachedNetworkImageProvider(p.avatarUrl,
+                                  httpHeaders: _imageHeaders)
+                              : null,
                     child: p.avatarUrl.isEmpty
                         ? const Icon(Icons.person,
                             color: AppColors.textMuted, size: 56)
@@ -219,9 +222,10 @@ class _ProfileScreenState extends State<ProfileScreen>
       height: height,
       width: double.infinity,
       child: p.bannerUrl.isNotEmpty
-          ? CachedNetworkImage(
-              imageUrl: p.bannerUrl,
-              fit: BoxFit.cover,
+      ? CachedNetworkImage(
+        imageUrl: p.bannerUrl,
+        httpHeaders: _imageHeaders,
+        fit: BoxFit.cover,
               placeholder: (context, url) =>
                   Container(color: AppColors.bgInput),
               errorWidget: (context, url, error) => Container(
@@ -258,12 +262,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.bg, width: 4),
               ),
-              child: CircleAvatar(
-                radius: 44,
-                backgroundColor: AppColors.bgInput,
-                backgroundImage: p.avatarUrl.isNotEmpty
-                    ? CachedNetworkImageProvider(p.avatarUrl)
-                    : null,
+                  child: CircleAvatar(
+                    radius: 44,
+                    backgroundColor: AppColors.bgInput,
+                    backgroundImage: p.avatarUrl.isNotEmpty
+                        ? CachedNetworkImageProvider(p.avatarUrl,
+                            httpHeaders: _imageHeaders)
+                        : null,
                 child: p.avatarUrl.isEmpty
                     ? const Icon(Icons.person,
                         color: AppColors.textMuted, size: 44)

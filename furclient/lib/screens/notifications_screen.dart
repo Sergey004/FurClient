@@ -3,10 +3,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
+import '../services/fa_urls.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import 'submission_detail_screen.dart';
+
+const _imageHeaders = {'Referer': FAUrls.baseUrl};
 
 class NotificationsScreen extends StatefulWidget {
   final FAClient client;
@@ -177,9 +180,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               child: CircleAvatar(
                 radius: 22,
                 backgroundColor: Colors.transparent,
-                backgroundImage: notif.avatarUrl.isNotEmpty
-                    ? CachedNetworkImageProvider(notif.avatarUrl)
-                    : null,
+                  backgroundImage: notif.avatarUrl.isNotEmpty
+                      ? CachedNetworkImageProvider(notif.avatarUrl,
+                          httpHeaders: _imageHeaders)
+                      : null,
                 child: notif.avatarUrl.isEmpty
                     ? Icon(_typeIcon(notif.type), color: color, size: 22)
                     : null,

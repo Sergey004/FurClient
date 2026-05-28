@@ -554,6 +554,17 @@ class FAClient {
     }
   }
 
+  // ── Image Headers ────────────────────────────────────────────────────
+
+  Map<String, String> getImageHeaders() {
+    final cookie = _buildCookieHeader();
+    return {
+      if (cookie != null) 'Cookie': cookie,
+      'User-Agent': _userAgent,
+      'Referer': FAUrls.baseUrl,
+    };
+  }
+
   // ── Data Access Methods ──────────────────────────────────────────────
 
   Future<List<Submission>> getSubmissions(int page, String category) async {
