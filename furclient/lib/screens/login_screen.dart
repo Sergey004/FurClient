@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -148,6 +149,104 @@ class _LoginScreenState extends State<LoginScreen>
     });
   }
 
+  Future<void> _extractCookies(
+    InAppWebViewController controller,
+    Map<String, Map<String, dynamic>> cookieDataMap,
+  ) async {
+    // Приоритет 1: CookieManager — может получить HttpOnly cookies
+    // (cf_clearance, a, b) на всех платформах
+    try {
+      // Получаем cookies с основного домена
+      final mainDomainCookies = await CookieManager.instance().getCookies(
+        url: WebUri('https://www.furaffinity.net'),
+      );
+      debugPrint(
+        '=== Main domain cookies: ${mainDomainCookies.length}',
+      );
+      _addCookiesToMap(mainDomainCookies, cookieDataMap);
+
+      // Получаем cookies с поддомена (для wildcard .furaffinity.net)
+      final subdomainCookies = await CookieManager.instance().getCookies(
+        url: WebUri('https://furaffinity.net'),
+      );
+      debugPrint(
+        '=== Subdomain cookies: ${subdomainCookies.length}',
+      );
+      _addCookiesToMap(subdomainCookies, cookieDataMap);
+
+      // Получаем все cookies для основного домена
+      try {
+        final allCookies = await CookieManager.instance().getCookies(
+          url: WebUri('https://www.furaffinity.net'),
+        );
+        debugPrint('=== All cookies: ${allCookies.length}');
+        _addCookiesToMap(allCookies, cookieDataMap);
+      } catch (e) {
+        debugPrint('=== getAllCookies error: $e');
+      }
+    } catch (e) {
+      debugPrint('=== CookieManager error: $e');
+    }
+
+    // Приоритет 2: document.cookie — не-HttpOnly cookies как дополнение
+    try {
+      final rawCookies = await controller
+          .evaluateJavascript(source: 'document.cookie')
+          .timeout(const Duration(seconds: 5)) as String?;
+      if (rawCookies != null && rawCookies.isNotEmpty) {
+        debugPrint('=== document.cookie: $rawCookies');
+        for (final part in rawCookies.split(';')) {
+          final idx = part.indexOf('=');
+          if (idx < 0) continue;
+          final name = part.substring(0, idx).trim();
+          final value = part.substring(idx + 1).trim();
+          if (name.isNotEmpty &&
+              value.isNotEmpty &&
+              !cookieDataMap.containsKey(name)) {
+            cookieDataMap[name] = {
+              'name': name,
+              'value': value,
+              'domain': '.furaffinity.net',
+              'path': '/',
+              'isHttpOnly': false,
+              'isSecure': true,
+            };
+            debugPrint('=== Added from JS: $name');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('=== document.cookie error: $e');
+    }
+  }
+
+  void _addCookiesToMap(
+    List<Cookie> cookies,
+    Map<String, Map<String, dynamic>> cookieDataMap,
+  ) {
+    for (final c in cookies) {
+      if (!cookieDataMap.containsKey(c.name)) {
+        final String value = c.value as String? ?? '';
+        final displayValue = value.isNotEmpty
+            ? value.substring(0, min(value.length, 10))
+            : 'null';
+        debugPrint(
+          '=== Cookie: ${c.name} | domain=${c.domain} | httpOnly=${c.isHttpOnly} | value=$displayValue...',
+        );
+        final expiresDate = c.expiresDate is int ? c.expiresDate as int : 0;
+        cookieDataMap[c.name] = {
+          'name': c.name,
+          'value': value,
+          'domain': c.domain ?? '.furaffinity.net',
+          'path': c.path ?? '/',
+          'isHttpOnly': c.isHttpOnly ?? false,
+          'isSecure': c.isSecure ?? true,
+          'expiresDate': expiresDate,
+        };
+      }
+    }
+  }
+
   Future<void> _handleNavigation(
     InAppWebViewController controller,
     Uri? url,
@@ -175,81 +274,11 @@ class _LoginScreenState extends State<LoginScreen>
 
       final Map<String, Map<String, dynamic>> cookieDataMap = {};
 
-      // Способ 1: WebView2 CDP через callAsyncJavaScript — единственный способ
-      // получить HttpOnly cookies (cf_clearance, a, b) на Windows.
-      // flutter_inappwebview на Windows реализует CDP команду Network.getCookies
-      // через контроллер напрямую — он привязан к нашему webview2_data профилю.
-      try {
-        final result = await controller.callAsyncJavaScript(
-          functionBody: '''
-            return new Promise(function(resolve) {
-              // Запрашиваем все cookies через CDP Network.getCookies
-              // flutter_inappwebview проксирует это через WebView2 DevToolsProtocol
-              window.__flutter_inappwebview_getCookies = function(cookies) {
-                resolve(cookies);
-              };
-              // Fallback: если CDP недоступен — вернём пустой массив
-              setTimeout(function() { resolve([]); }, 2000);
-            });
-          ''',
-        );
-        debugPrint('=== CDP result: ${result?.value}');
-      } catch (e) {
-        debugPrint('=== CDP error (expected on some platforms): $e');
-      }
+      // Извлекаем cookies тремя способами для надежности
+      // 1. CookieManager — может получить HttpOnly cookies (cf_clearance)
+      // 2. document.cookie — для не-HttpOnly cookies как дополнение
 
-      // Способ 2: InAppWebView getCookies через webViewEnvironment (Windows)
-      // Это внутренний API контроллера — читает из того же WebView2 профиля
-      try {
-        final webViewCookies = await CookieManager.instance().getCookies(
-          url: WebUri('https://www.furaffinity.net'),
-          webViewController: controller,
-        );
-        debugPrint('=== WebViewController cookies: ${webViewCookies.length}');
-        for (final c in webViewCookies) {
-          debugPrint('=== Cookie: ${c.name} httpOnly=${c.isHttpOnly}');
-          cookieDataMap[c.name] = {
-            'name': c.name,
-            'value': c.value,
-            'domain': c.domain ?? '.furaffinity.net',
-            'path': c.path ?? '/',
-            'isHttpOnly': c.isHttpOnly ?? false,
-            'isSecure': c.isSecure ?? true,
-          };
-        }
-      } catch (e) {
-        debugPrint('=== WebViewController getCookies error: $e');
-      }
-
-      // Способ 3: document.cookie — не-HttpOnly cookies как дополнение
-      try {
-        final rawCookies = await controller
-            .evaluateJavascript(source: 'document.cookie')
-            .timeout(const Duration(seconds: 5)) as String?;
-        debugPrint('=== document.cookie: $rawCookies');
-        if (rawCookies != null && rawCookies.isNotEmpty) {
-          for (final part in rawCookies.split(';')) {
-            final idx = part.indexOf('=');
-            if (idx < 0) continue;
-            final name = part.substring(0, idx).trim();
-            final value = part.substring(idx + 1).trim();
-            if (name.isNotEmpty &&
-                value.isNotEmpty &&
-                !cookieDataMap.containsKey(name)) {
-              cookieDataMap[name] = {
-                'name': name,
-                'value': value,
-                'domain': '.furaffinity.net',
-                'path': '/',
-                'isHttpOnly': false,
-                'isSecure': true,
-              };
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('=== JS cookie error: $e');
-      }
+      await _extractCookies(controller, cookieDataMap);
 
       debugPrint(
         '=== Collected ${cookieDataMap.length} cookies: ${cookieDataMap.keys.join(", ")}',
@@ -263,6 +292,20 @@ class _LoginScreenState extends State<LoginScreen>
         debugPrint('=== No FA cookies yet, waiting for next navigation event');
         return;
       }
+
+      // Логируем найденные FA cookies
+      debugPrint('=== === Found FA Cookies === ===');
+      for (final name in ['a', 'b', 'cf_clearance', 'sz']) {
+        if (cookieDataMap.containsKey(name)) {
+          final cookie = cookieDataMap[name];
+          final value = cookie?['value'] as String? ?? '';
+          final displayLength = value.isNotEmpty ? min(value.length, 20) : 0;
+          final displayValue =
+              displayLength > 0 ? value.substring(0, displayLength) : 'N/A';
+          debugPrint('$name: $displayValue...');
+        }
+      }
+      debugPrint('=== === === === === === === ===');
 
       // Извлекаем username из URL или DOM
       String username = '';

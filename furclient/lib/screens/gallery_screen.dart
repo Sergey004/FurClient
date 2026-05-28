@@ -15,7 +15,8 @@ class GalleryScreen extends StatefulWidget {
   final bool sfwMode;
   final VoidCallback? onLogout;
 
-  const GalleryScreen({super.key, required this.client, this.sfwMode = false, this.onLogout});
+  const GalleryScreen(
+      {super.key, required this.client, this.sfwMode = false, this.onLogout});
 
   @override
   State<GalleryScreen> createState() => _GalleryScreenState();
@@ -164,9 +165,6 @@ class _GalleryScreenState extends State<GalleryScreen>
   }
 
   Widget _buildCategoryChips() {
-    final isDesktopWidth =
-        MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
-
     if (isWindows) {
       return SizedBox(
         height: 40,
@@ -222,7 +220,10 @@ class _GalleryScreenState extends State<GalleryScreen>
     }
 
     if (_error != null) {
-      return ErrorView(message: _error!, onRetry: _loadSubmissions, onRelogin: widget.onLogout);
+      return ErrorView(
+          message: _error!,
+          onRetry: _loadSubmissions,
+          onRelogin: widget.onLogout);
     }
 
     if (_submissions.isEmpty) {

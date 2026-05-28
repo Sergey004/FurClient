@@ -5,7 +5,6 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart' as inapp;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
-import 'fa_urls.dart';
 
 class _SessionStorageService {
   static const _sessionKey = 'fa_session';

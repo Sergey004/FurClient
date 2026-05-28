@@ -57,7 +57,7 @@ class FAClient {
     }
     _initCompleter = Completer<void>();
     try {
-      final appDocDir = await io.Directory.systemTemp.path != ''
+      final appDocDir = io.Directory.systemTemp.path != ''
           ? await getApplicationSupportDirectory()
           : null;
       final cookiePath = '${appDocDir?.path ?? '/tmp'}/.cookies';
@@ -125,7 +125,8 @@ class FAClient {
         if (!(request.isForMainFrame ?? false)) return;
         final status = response.statusCode ?? 0;
         if (status == 403 || status == 503) {
-          if (!completer.isCompleted) completer.completeError(CloudflareError());
+          if (!completer.isCompleted)
+            completer.completeError(CloudflareError());
           await headless?.dispose();
         }
       },
