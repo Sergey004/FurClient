@@ -1,4 +1,3 @@
-import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 
 import '../services/fa_urls.dart';
@@ -74,38 +73,37 @@ class Submission {
     final document = html_parser.parse(htmlString);
     final submissions = <Submission>[];
 
-    final sidElements = document.querySelectorAll('div[id^="sid-"]');
-    for (final el in sidElements) {
-      final id = (el.id).replaceFirst('sid-', '');
+    // iOS селектор из FASubmissionsPage.swift и FAUserGalleryLikePage.swift:
+    // figure[id^="sid-"] внутри section.gallery-section или messagecenter
+    final figures = document.querySelectorAll('figure[id^="sid-"]');
+
+    for (final fig in figures) {
+      final id = fig.id.replaceFirst('sid-', '');
       if (id.isEmpty) continue;
 
-      final link = el.querySelector('a[href*="/view/"]');
-      final title = link?.attributes['title'] ?? link?.text.trim() ?? 'Untitled';
-      final href = link?.attributes['href'] ?? '';
+      // iOS: figure b u a img
+      final img = fig.querySelector('b u a img') ??
+          fig.querySelector('img');
+      var imageUrl = img?.attributes['src'] ?? '';
+      if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
 
-      final authorLink = el.querySelector('a[href*="/user/"]');
-      final author = authorLink?.text.trim() ?? 'Unknown';
+      // iOS: figcaption p a — первый = title, второй = author
+      final captionLinks = fig.querySelectorAll('figcaption p a');
+      final title = captionLinks.isNotEmpty
+          ? captionLinks[0].text.trim()
+          : fig.attributes['title'] ?? 'Untitled';
 
-      final img = el.querySelector('img[alt]');
-      final imageUrl = img?.attributes['src'] ?? '';
+      String author = 'Unknown';
+      if (captionLinks.length >= 2) {
+        final authorHref = captionLinks[1].attributes['href'] ?? '';
+        final authorMatch = RegExp(r'/user/([^/]+)/').firstMatch(authorHref);
+        author = authorMatch?.group(1) ?? captionLinks[1].text.trim();
+      }
 
-      final statsContainer =
-          el.querySelector('.stats-container') ?? el.querySelector('.grid-info');
-      final statsText = statsContainer?.text ?? '';
-      final viewsMatch = RegExp(r'(\d+)\s+views?', caseSensitive: false)
-          .firstMatch(statsText);
-      final favesMatch = RegExp(r'(\d+)\s*[♥❤]').firstMatch(statsText);
-
-      final tagsEl = el.querySelector('.tags');
-      final tagsText = tagsEl?.text ?? '';
-      final tags = tagsText
-          .split(',')
-          .map((t) => t.trim().toLowerCase())
-          .where((t) => t.isNotEmpty)
-          .toList();
-
-      final isNsfw = el.querySelector('[data-rating="adult"]') != null ||
-          el.querySelector('[data-rating="mature"]') != null;
+      final isNsfw = fig.querySelector('[data-rating="adult"]') != null ||
+          fig.querySelector('[data-rating="mature"]') != null ||
+          fig.classes.contains('r-adult') ||
+          fig.classes.contains('r-mature');
 
       submissions.add(Submission(
         id: id,
@@ -113,14 +111,14 @@ class Submission {
         author: author,
         category: 'Digital',
         imageUrl: imageUrl,
-        views: int.tryParse(viewsMatch?.group(1) ?? '0') ?? 0,
-        faves: int.tryParse(favesMatch?.group(1) ?? '0') ?? 0,
+        views: 0,
+        faves: 0,
         commentsCount: 0,
         description: '',
-        tags: tags,
+        tags: [],
         date: DateTime.now().toIso8601String(),
         isNsfw: isNsfw,
-        url: 'https://www.furaffinity.net$href',
+        url: 'https://www.furaffinity.net/view/$id/',
       ));
     }
 
@@ -130,39 +128,57 @@ class Submission {
   static Submission? parseSubmissionDetails(String htmlString, String submissionId) {
     final document = html_parser.parse(htmlString);
 
-    final titleEl = document.querySelector('div.information h2');
+    // iOS: div.submission-area img#submissionImg — data-preview-src / data-fullview-src
+    final imgEl = document.querySelector('div.submission-area img#submissionImg');
+    var imageUrl = imgEl?.attributes['data-fullview-src'] ??
+        imgEl?.attributes['data-preview-src'] ??
+        imgEl?.attributes['src'] ?? '';
+    if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
+
+    // iOS: div.submission-title h2
+    final titleEl = document.querySelector('div.submission-title h2');
     final title = titleEl?.text.trim() ?? 'Untitled';
 
-    final authorEl = document.querySelector('a[href*="/user/"]');
-    final author = authorEl?.text.trim() ?? 'Unknown';
+    // iOS: span.c-usernameBlockSimple a
+    final authorEl = document.querySelector('span.c-usernameBlockSimple a');
+    String author = 'Unknown';
+    if (authorEl != null) {
+      final href = authorEl.attributes['href'] ?? '';
+      final m = RegExp(r'/user/([^/]+)/').firstMatch(href);
+      author = m?.group(1) ?? authorEl.text.trim();
+    }
 
-    final descEl = document.querySelector('div[class*="description"]');
+    // iOS: div.submission-description-text
+    final descEl = document.querySelector('div.submission-description-text');
     final description = descEl?.text.trim() ?? '';
 
-    final imageUrl = document
-            .querySelector('img[alt="Submission"]')
-            ?.attributes['src'] ??
-        document.querySelector('img#submissionImg')?.attributes['src'] ??
-        '';
+    // iOS: div[title="Views"] div, div[title="Favorites"] div, div[title="Comments"] div
+    int views = 0, faves = 0, comments = 0;
+    final viewsEl = document.querySelector('div[title="Views"] div');
+    final favesEl = document.querySelector('div[title="Favorites"] div');
+    final commentsEl = document.querySelector('div[title="Comments"] div');
+    views = int.tryParse(viewsEl?.text.trim() ?? '') ?? 0;
+    faves = int.tryParse(favesEl?.text.trim() ?? '') ?? 0;
+    comments = int.tryParse(commentsEl?.text.trim() ?? '') ?? 0;
 
-    final views = _parseDtValue(document, 'Views');
-    final faves = _parseDtValue(document, 'Favorites');
-    final commentsCount = _parseDtValue(document, 'Comments');
-
-    final tagsEl = document.querySelector('section.tags');
-    final tagsText = tagsEl?.text ?? '';
-    final tags = tagsText
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
+    // iOS: span.tags span[data-tag-name]
+    final tagEls = document.querySelectorAll('div.submission-tags div span.tags');
+    final tags = tagEls
+        .map((e) {
+          final tagBlock = e.querySelector('[data-tag-name]');
+          return tagBlock?.attributes['data-tag-name'] ?? e.text.trim();
+        })
         .where((t) => t.isNotEmpty)
         .toList();
 
-    final isNsfw =
-        document.querySelector('[data-rating="adult"]') != null ||
-            document.querySelector('[data-rating="mature"]') != null;
+    // iOS: div[class*="c-contentRating"]
+    final ratingEl = document.querySelector('[class*="c-contentRating"]');
+    final ratingText = ratingEl?.text.trim() ?? '';
+    final isNsfw = ratingText == 'Adult' || ratingText == 'Mature';
 
-    final dateEl = _findDtSibling(document, 'Posted');
-    final date = dateEl?.text.trim() ?? DateTime.now().toIso8601String();
+    // iOS: span.popup_date
+    final dateEl = document.querySelector('span.popup_date');
+    final date = dateEl?.attributes['title'] ?? dateEl?.text.trim() ?? '';
 
     return Submission(
       id: submissionId,
@@ -172,30 +188,13 @@ class Submission {
       imageUrl: imageUrl,
       views: views,
       faves: faves,
-      commentsCount: commentsCount,
+      commentsCount: comments,
       description: description,
       tags: tags,
       date: date,
       isNsfw: isNsfw,
       url: 'https://www.furaffinity.net/view/$submissionId/',
     );
-  }
-
-  static int _parseDtValue(dom.Document document, String label) {
-    final dd = _findDtSibling(document, label);
-    if (dd == null) return 0;
-    return int.tryParse(dd.text.trim()) ?? 0;
-  }
-
-  static dom.Element? _findDtSibling(dom.Document document, String label) {
-    final dts = document.querySelectorAll('dt');
-    for (final dt in dts) {
-      if (dt.text.trim() == label) {
-        final next = dt.nextElementSibling;
-        if (next != null && next.localName == 'dd') return next;
-      }
-    }
-    return null;
   }
 
   static List<Submission> parseSearchResults(String htmlString) {

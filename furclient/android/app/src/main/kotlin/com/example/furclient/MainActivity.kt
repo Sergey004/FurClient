@@ -1,4 +1,4 @@
-package com.example.furclient
+package com.furclient
 
 import io.flutter.embedding.android.FlutterActivity
 

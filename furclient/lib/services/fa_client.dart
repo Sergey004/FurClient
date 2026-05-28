@@ -294,10 +294,18 @@ class FAClient {
   Future<bool> verifySession() async {
     if (_session?.cookies == null) return false;
     try {
+      // На Windows делаем лёгкую проверку через cookies —
+      // HeadlessWebView слишком тяжёлый для startup
       if (io.Platform.isWindows) {
-        final html = await _getHtmlViaWebView(FAUrls.home);
-        return html.contains('logout') || html.contains(_session!.username);
+        final List<dynamic> raw = jsonDecode(_session!.cookies!);
+        final hasCookieA = raw.any((item) {
+          if (item is Map<String, dynamic>) return item['name'] == 'a';
+          if (item is List && item.length >= 2) return item[0] == 'a';
+          return false;
+        });
+        return hasCookieA;
       }
+      // Android/iOS/macOS — проверяем через Dio
       await _ensureInitialized();
       final cookieHeader = _buildCookieHeader();
       final options = cookieHeader != null
