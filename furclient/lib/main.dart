@@ -125,6 +125,9 @@ class _FurClientAppState extends State<FurClientApp> {
   void _onLogout() async {
     try {
       await _client.clearCookies();
+      if (!Platform.isWindows) {
+        await CookieManager.instance().deleteAllCookies();
+      }
       await _authService.logout();
     } catch (_) {}
     if (mounted) {

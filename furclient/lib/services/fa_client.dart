@@ -104,8 +104,12 @@ class FAClient {
       ),
       onLoadStop: (controller, loadedUrl) async {
         try {
-          final html = await controller.getHtml();
-          if (!completer.isCompleted) completer.complete(html ?? '');
+          final html = await controller.getHtml() ?? '';
+          if (_isCloudflarePage(html)) {
+            if (!completer.isCompleted) completer.completeError(CloudflareError());
+          } else if (!completer.isCompleted) {
+            completer.complete(html);
+          }
         } catch (e) {
           if (!completer.isCompleted) completer.completeError(e);
         } finally {
@@ -124,11 +128,12 @@ class FAClient {
       onReceivedHttpError: (controller, request, response) async {
         if (!(request.isForMainFrame ?? false)) return;
         final status = response.statusCode ?? 0;
-        if (status == 403 || status == 503) {
-          if (!completer.isCompleted)
-            completer.completeError(CloudflareError());
-          await headless?.dispose();
-        }
+            if (status == 403 || status == 503) {
+              if (!completer.isCompleted) {
+                completer.completeError(CloudflareError());
+              }
+              await headless?.dispose();
+            }
       },
     );
 
@@ -192,10 +197,12 @@ class FAClient {
           final value = item['value']?.toString() ?? '';
           final domain = item['domain']?.toString() ?? '.furaffinity.net';
           final path = item['path']?.toString() ?? '/';
+          final isSecure = item['isSecure'] as bool? ?? true;
           if (name.isNotEmpty && value.isNotEmpty) {
             final c = io.Cookie(name, value);
             c.domain = domain;
             c.path = path;
+            c.secure = isSecure;
             cookies.add(c);
           }
         } else if (item is List && item.length >= 2) {
@@ -205,6 +212,7 @@ class FAClient {
             final c = io.Cookie(name, value);
             c.domain = '.furaffinity.net';
             c.path = '/';
+            c.secure = true;
             cookies.add(c);
           }
         }
@@ -218,26 +226,45 @@ class FAClient {
     }
   }
 
+  Future<void> _clearAllCookies() async {
+    if (_initialized) {
+      try {
+        await _cookieJar.deleteAll();
+        debugPrint('=== Cleared all cookies from CookieJar');
+      } catch (e) {
+        debugPrint('=== Error clearing cookies: $e');
+      }
+    }
+    try {
+      if (!io.Platform.isWindows) {
+        await CookieManager.instance().deleteAllCookies();
+        debugPrint('=== Cleared all WebView cookies');
+      }
+    } catch (e) {
+      debugPrint('=== Error clearing WebView cookies: $e');
+    }
+  }
+
   void _checkCloudflare(Response response) {
     final cfMitigated = response.headers.value('cf-mitigated');
     if (cfMitigated == 'challenge') throw CloudflareError();
     final status = response.statusCode ?? 0;
-    if (status == 403) {
+    if (status == 403 || status == 503) {
       final body = response.data?.toString() ?? '';
-      if (body.contains('cf-browser-verification') ||
-          body.contains('cf_chl_opt') ||
-          body.contains('challenge-platform') ||
-          body.contains('Cloudflare')) {
-        throw CloudflareError();
-      }
+      if (_isCloudflarePage(body)) throw CloudflareError();
     }
-    if (status == 503) {
-      final body = response.data?.toString() ?? '';
-      if (body.contains('cf-challenge-running') ||
-          body.contains('Cloudflare')) {
-        throw CloudflareError();
-      }
-    }
+  }
+
+  static bool _isCloudflarePage(String body) {
+    return body.contains('DDoS protection by') ||
+        body.contains('/cdn-cgi/styles/challenges.css') ||
+        body.contains('/cdn-cgi/challenge-platform') ||
+        body.contains('cf-browser-verification') ||
+        body.contains('cf_chl_opt') ||
+        body.contains('cf-challenge-running') ||
+        body.contains('Just a moment...') ||
+        body.contains('challenge-platform') ||
+        body.contains('Cloudflare');
   }
 
   Future<String> _getHtml(String url) async {
@@ -293,6 +320,11 @@ class FAClient {
 
   Future<void> clearCookies() async {
     if (_initialized) await _cookieJar.deleteAll();
+  }
+
+  Future<void> handleCloudflareBreach() async {
+    debugPrint('=== Cloudflare breach detected — clearing all cookies');
+    await _clearAllCookies();
   }
 
   Future<List<Submission>> getSubmissions(int page, String category) async {

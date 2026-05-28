@@ -18,7 +18,9 @@ class ErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     final isCf = message.contains('Cloudflare') ||
         message.contains('cloudflare') ||
-        message.contains('challenge');
+        message.contains('challenge') ||
+        message.contains('DDoS protection') ||
+        message.contains('re-login');
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),

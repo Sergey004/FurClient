@@ -409,19 +409,20 @@ class _LoginScreenState extends State<LoginScreen>
             Expanded(
               child: InAppWebView(
                 webViewEnvironment: webViewEnvironment,
-                initialSettings: InAppWebViewSettings(
-                  javaScriptEnabled: true,
-                  domStorageEnabled: true,
-                  databaseEnabled: true,
-                  supportZoom: true,
-                  mediaPlaybackRequiresUserGesture: false,
-                  allowsInlineMediaPlayback: true,
-                  disableDefaultErrorPage: false,
-                  transparentBackground: false,
-                  thirdPartyCookiesEnabled: true,
-                  allowFileAccessFromFileURLs: false,
-                  allowUniversalAccessFromFileURLs: false,
-                ),
+        initialSettings: InAppWebViewSettings(
+          javaScriptEnabled: true,
+          domStorageEnabled: true,
+          databaseEnabled: true,
+          supportZoom: true,
+          mediaPlaybackRequiresUserGesture: false,
+          allowsInlineMediaPlayback: true,
+          disableDefaultErrorPage: false,
+          transparentBackground: false,
+          thirdPartyCookiesEnabled: true,
+          allowFileAccessFromFileURLs: false,
+          allowUniversalAccessFromFileURLs: false,
+          userAgent: 'ceylo.FurAffinityApp/1.0',
+        ),
                 initialUrlRequest: URLRequest(
                   url: WebUri(FAUrls.login),
                 ),
