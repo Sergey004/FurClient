@@ -54,12 +54,34 @@
 /// 2. Let the user log in through the native browser
 /// 3. Capture cookies from the WebView (especially cookie "a")
 /// 4. Create an [OnlineFASession] with those cookies
+///
+/// ## Navigation
+///
+/// Use [FATarget] to parse FurAffinity URLs into typed navigation targets:
+///
+/// ```dart
+/// final target = FATarget.parse(Uri.parse('https://www.furaffinity.net/view/12345/'));
+/// if (target?.type == FATargetType.submission) {
+///   // Navigate to submission detail view
+/// }
+/// ```
+///
+/// ## Offline / Testing
+///
+/// Use [OfflineFASession] for widget testing and UI previews:
+///
+/// ```dart
+/// final session = OfflineFASession(username: 'TestUser');
+/// final submissions = await session.submissionPreviews(); // Returns demo data
+/// ```
+library;
 
 // ── Public API exports ──
 
 // Session & Authentication
 export 'src/session/fa_session.dart';
 export 'src/session/online_fa_session.dart';
+export 'src/session/offline_fa_session.dart';
 export 'src/session/http_data_source.dart';
 export 'src/session/http_data_source_impl.dart';
 
@@ -93,5 +115,12 @@ export 'src/pages/fa_user_gallery_like_page.dart';
 export 'src/pages/fa_user_journals_page.dart';
 export 'src/pages/fa_watchlist_page.dart';
 
+// Navigation
+export 'src/navigation/fa_target.dart';
+
+// Login
+export 'src/login/fa_login.dart';
+
 // Utilities
 export 'src/utils/css_inliner.dart';
+export 'src/utils/fa_logger.dart';

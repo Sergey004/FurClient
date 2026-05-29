@@ -1,4 +1,4 @@
-import 'dart:io' show Cookie;
+import 'dart:io';
 import 'package:fa_kit/fa_kit.dart';
 
 /// Example: How to use FAKit in a Flutter/Dart application.

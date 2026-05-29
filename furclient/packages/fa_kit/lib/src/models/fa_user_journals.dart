@@ -10,6 +10,16 @@ class FAUserJournals {
     required this.journals,
   });
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FAUserJournals &&
+          displayAuthor == other.displayAuthor &&
+          journals == other.journals;
+
+  @override
+  int get hashCode => Object.hash(displayAuthor, journals);
+
   /// Create from a parsed user journals page.
   factory FAUserJournals.fromPage(FAUserJournalsPage page) {
     return FAUserJournals(

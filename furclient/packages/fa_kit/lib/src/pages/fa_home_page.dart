@@ -29,7 +29,8 @@ class FAHomePage {
 
     // Fallback: look for the profile header
     if (username == null) {
-      final profileLink = document.querySelector('div.username a[href*="/user/"]');
+      final profileLink =
+          document.querySelector('div.username a[href*="/user/"]');
       if (profileLink != null) {
         final href = profileLink.attributes['href'] ?? '';
         final nameMatch = RegExp(r'/user/([^/]+)/').firstMatch(href);

@@ -1,8 +1,6 @@
 import 'package:html/parser.dart' as parser;
-import 'package:html/dom.dart' as dom;
 import 'fa_page.dart';
 import 'fa_submissions_page.dart';
-import 'fa_urls.dart';
 
 /// Parsed user gallery/scraps page.
 class FAUserGalleryLikePage implements FAPage {

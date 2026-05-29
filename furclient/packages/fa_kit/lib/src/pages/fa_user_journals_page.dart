@@ -15,6 +15,19 @@ class FAUserJournalEntry {
     required this.naturalDatetime,
     required this.url,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FAUserJournalEntry &&
+          id == other.id &&
+          title == other.title &&
+          datetime == other.datetime &&
+          naturalDatetime == other.naturalDatetime &&
+          url == other.url;
+
+  @override
+  int get hashCode => Object.hash(id, title, datetime, naturalDatetime, url);
 }
 
 /// Parsed user journals list page.

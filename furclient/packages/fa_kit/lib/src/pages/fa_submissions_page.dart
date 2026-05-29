@@ -1,7 +1,6 @@
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart' as dom;
 import 'fa_page.dart';
-import 'fa_pages_error.dart';
 
 /// A single submission in a submissions list page.
 class FASubmissionsPageItem {

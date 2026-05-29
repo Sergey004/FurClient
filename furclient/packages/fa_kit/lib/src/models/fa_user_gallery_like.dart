@@ -14,6 +14,17 @@ class FolderGroup {
     required this.folders,
     required this.id,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FolderGroup &&
+          title == other.title &&
+          folders == other.folders &&
+          id == other.id;
+
+  @override
+  int get hashCode => Object.hash(title, folders, id);
 }
 
 /// A user's gallery/scrap/favorites page.
@@ -39,7 +50,7 @@ class FAUserGalleryLike {
       displayAuthor: page.displayAuthor,
       previews: page.previews
           .whereType<FASubmissionsPageItem>()
-          .map<FASubmissionPreview>(FASubmissionPreview.fromPageItem)
+          .map(FASubmissionPreview.fromPageItem)
           .toList(),
       nextPageUrl: page.nextPageUrl,
       folderGroups: page.folderGroups

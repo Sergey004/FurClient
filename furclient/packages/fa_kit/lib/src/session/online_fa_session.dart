@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io' show Cookie;
+import 'dart:io';
 import '../pages/fa_urls.dart';
 import '../pages/fa_page.dart';
 import '../pages/fa_home_page.dart';
@@ -23,6 +23,7 @@ import '../models/fa_user.dart';
 import '../models/fa_user_gallery_like.dart';
 import '../models/fa_user_journals.dart';
 import '../models/fa_watchlist.dart';
+import '../utils/fa_logger.dart';
 import 'http_data_source.dart';
 import 'http_data_source_impl.dart';
 import 'fa_session.dart';
@@ -31,6 +32,8 @@ import 'fa_session.dart';
 ///
 /// Authentication is cookie-based — the session cookie named "a" must be present.
 class OnlineFASession extends FASession {
+  static final _log = FALogger.loggerFor('OnlineFASession');
+
   @override
   final String username;
   @override
@@ -84,6 +87,8 @@ class OnlineFASession extends FASession {
       // Parse home page to get username
       final homePage = FAHomePage.parse(html, Uri.parse(FAURLs.homeUrl));
 
+      _log.info('User is logged in as ${homePage.username}');
+
       return OnlineFASession._(
         username: homePage.username,
         displayUsername: homePage.displayUsername,
@@ -110,7 +115,7 @@ class OnlineFASession extends FASession {
     final data = await _dataSource.httpData(
       url: url,
       cookies: _cookies,
-      method: HTTPMethod.post,
+      method: HTTPMethod.POST,
       parameters: params,
     );
     return utf8.decode(data);
@@ -153,18 +158,22 @@ class OnlineFASession extends FASession {
         : Uri.parse(FAURLs.submissionsNewUrl);
 
     final page = await _makePage(url, FASubmissionsPage.parse);
-    return page.submissions
+    final previews = page.submissions
         .whereType<FASubmissionsPageItem>()
-        .map<FASubmissionPreview>(FASubmissionPreview.fromPageItem)
+        .map(FASubmissionPreview.fromPageItem)
         .toList();
+    _log.info('Got ${page.submissions.length} submission previews (${previews.length} after filter)');
+    return previews;
   }
 
   @override
   Future<void> nukeSubmissions() async {
-    await _fetchHtmlPost(
+    final html = await _fetchHtmlPost(
       Uri.parse(FAURLs.submissionsNewUrl),
       {'messagecenter-action': 'nuke_notifications'},
     );
+    // Verify: parse the result page to confirm success
+    _checkForSystemPage(html, Uri.parse(FAURLs.submissionsNewUrl));
   }
 
   // ── Gallery ──
@@ -172,7 +181,9 @@ class OnlineFASession extends FASession {
   @override
   Future<FAUserGalleryLike> galleryLikeForUrl(Uri url) async {
     final page = await _makePage(url, FAUserGalleryLikePage.parse);
-    return FAUserGalleryLike.fromPage(page, url);
+    final gallery = FAUserGalleryLike.fromPage(page, url);
+    _log.info('Got ${page.previews.length} gallery previews (${gallery.previews.length} after filter)');
+    return gallery;
   }
 
   // ── Submission Detail ──
@@ -302,7 +313,14 @@ class OnlineFASession extends FASession {
     required String message,
   }) async {
     // First get the API key
-    final keyUrl = Uri.parse(FAURLs.newNoteUrl(toUsername));
+    final keyUrlStr = FAURLs.newNoteUrl(toUsername);
+    if (keyUrlStr == null) {
+      throw FASessionError.parsing(
+        sourceUrl: FAURLs.homeUrl,
+        underlyingError: 'Failed to build new note URL for user "$toUsername"',
+      );
+    }
+    final keyUrl = Uri.parse(keyUrlStr);
     final keyPage = await _makePage(keyUrl, FANewNotePage.parse);
 
     await sendNoteWithKey(
@@ -311,6 +329,7 @@ class OnlineFASession extends FASession {
       subject: subject,
       message: message,
     );
+    _log.info('Note sent to $toUsername');
   }
 
   @override
@@ -320,12 +339,14 @@ class OnlineFASession extends FASession {
     required String subject,
     required String message,
   }) async {
-    await _fetchHtmlPost(Uri.parse(FAURLs.sendNoteUrl), {
+    final url = Uri.parse(FAURLs.sendNoteUrl);
+    await _fetchHtmlPost(url, {
       'key': apiKey,
       'to': toUsername,
       'subject': subject,
       'message': message,
     });
+    _log.debug('Note successfully delivered to $toUsername');
   }
 
   @override
@@ -367,18 +388,43 @@ class OnlineFASession extends FASession {
   Future<FANotificationPreviews> notificationPreviews() async {
     final url = Uri.parse(FAURLs.notificationsUrl);
     final page = await _makePage(url, FANotificationsPage.parse);
-    return FANotificationPreviews.fromPage(page);
+    final result = FANotificationPreviews.fromPage(page);
+    final count = result.submissionComments.length +
+        result.journalComments.length +
+        result.shouts.length +
+        result.journals.length;
+    _log.info('Got $count notification previews');
+    return result;
   }
 
   @override
   Future<void> deleteSubmissionPreviews(List<FASubmissionPreview> previews) async {
+    final maxSid = previews.isEmpty
+        ? 0
+        : previews.map((p) => p.sid).reduce((a, b) => a > b ? a : b);
+    final url = Uri.parse(FAURLs.submissionsFromUrl(maxSid));
     final params = <String, String>{
       'messagecenter-action': 'remove_checked',
     };
-    for (final preview in previews) {
-      params['submissions[]'] = preview.sid.toString();
+    for (int i = 0; i < previews.length; i++) {
+      params['submissions[$i]'] = previews[i].sid.toString();
     }
-    await _fetchHtmlPost(Uri.parse(FAURLs.submissionsNewUrl), params);
+    final html = await _fetchHtmlPost(url, params);
+    // Verify: parse result and check previews were removed
+    _checkForSystemPage(html, url);
+    final page = FASubmissionsPage.parse(html, url);
+    final remainingSids = page.submissions
+        .whereType<FASubmissionsPageItem>()
+        .map((i) => i.sid)
+        .toSet();
+    for (final preview in previews) {
+      if (remainingSids.contains(preview.sid)) {
+        throw FASessionError.parsing(
+          sourceUrl: url.toString(),
+          underlyingError: 'Failed to delete submission ${preview.sid}',
+        );
+      }
+    }
   }
 
   @override
@@ -481,8 +527,43 @@ class OnlineFASession extends FASession {
   }
 
   @override
+  Future<FAWatchlist> watchlist({
+    required String username,
+    required int page,
+    required FAWatchDirection direction,
+  }) async {
+    final url = Uri.parse(FAURLs.watchlistUrl(username, page, direction));
+    final parsedPage = await _makePage(url, FAWatchlistPage.parse);
+    return FAWatchlist.fromPage(parsedPage);
+  }
+
+  @override
   Future<FAWatchlist> watchlistForUrl(Uri url) async {
-    final page = await _makePage(url, FAWatchlistPage.parse);
-    return FAWatchlist.fromPage(page);
+    final parsed = FAURLs.parseWatchlistUrl(url);
+    if (parsed == null) {
+      throw FASessionError.parsing(
+        sourceUrl: url.toString(),
+        underlyingError: 'Could not parse watchlist URL',
+      );
+    }
+    return watchlist(
+      username: parsed.username,
+      page: parsed.page,
+      direction: parsed.direction,
+    );
+  }
+
+  /// Check HTML response for system error/message pages and throw if found.
+  void _checkForSystemPage(String html, Uri url) {
+    final errorPage = FAPage.detectAndParse(html, url);
+    if (errorPage is FASystemErrorPage) {
+      throw FASessionError.parsing(
+        sourceUrl: url.toString(),
+        underlyingError: errorPage.message,
+      );
+    }
+    if (errorPage is FASystemMessagePage) {
+      throw FASessionError.systemMessage(errorPage.message);
+    }
   }
 }

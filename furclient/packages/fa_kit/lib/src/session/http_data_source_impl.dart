@@ -1,4 +1,4 @@
-import 'dart:io' show Cookie;
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'http_data_source.dart';
@@ -17,38 +17,36 @@ class HttpDataSourceImpl implements HTTPDataSource {
   Future<Uint8List> httpData({
     required Uri url,
     List<Cookie>? cookies,
-    HTTPMethod method = HTTPMethod.get,
+    HTTPMethod method = HTTPMethod.GET,
     Map<String, String>? parameters,
   }) async {
     final headers = <String, String>{
       'User-Agent': userAgent,
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'Referer': 'https://www.furaffinity.net',
     };
 
     if (cookies != null && cookies.isNotEmpty) {
-      headers['Cookie'] = cookies
-          .map((c) => '${c.name}=${c.value}')
-          .join('; ');
+      final cookieHeader = cookies.map((c) => '${c.name}=${c.value}').join('; ');
+      headers['Cookie'] = cookieHeader;
     }
 
     http.Response response;
 
-    if (method == HTTPMethod.post) {
-      headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=utf-8';
-      response = await _client.post(
-        url,
-        headers: headers,
-        body: parameters != null ? _encodeFormData(parameters) : '',
-      );
+    if (method == HTTPMethod.POST) {
+      final body = parameters != null
+          ? _encodeFormData(parameters)
+          : <String, String>{};
+      headers['Content-Type'] =
+          'application/x-www-form-urlencoded; charset=utf-8';
+      response = await _client.post(url, headers: headers, body: body);
     } else {
+      // For GET with parameters, append to URL
       Uri requestUrl = url;
       if (parameters != null && parameters.isNotEmpty) {
-        requestUrl = url.replace(queryParameters: {
+        final queryParams = <String, String>{
           ...url.queryParameters,
           ...parameters,
-        });
+        };
+        requestUrl = url.replace(queryParameters: queryParams);
       }
       response = await _client.get(requestUrl, headers: headers);
     }
@@ -65,18 +63,23 @@ class HttpDataSourceImpl implements HTTPDataSource {
 
   String _encodeFormData(Map<String, String> data) {
     return data.entries
-        .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+        .map((e) =>
+            '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
         .join('&');
   }
-
-  void close() => _client.close();
 
   @override
   Future<Uint8List> httpGet({
     required Uri url,
     List<Cookie>? cookies,
-  }) =>
-      httpData(url: url, cookies: cookies, method: HTTPMethod.get);
+  }) {
+    return httpData(url: url, cookies: cookies);
+  }
+
+  /// Close the underlying HTTP client.
+  void close() {
+    _client.close();
+  }
 }
 
 /// HTTP error with status code.
