@@ -174,6 +174,13 @@ class FAURLs {
     return match != null ? int.tryParse(match.group(1)!) : null;
   }
 
+  /// Search URL.
+  static String searchUrl(String query, {int page = 1}) {
+    final q = Uri.encodeComponent(query);
+    final p = page > 1 ? '&page=$page' : '';
+    return '$_baseUrl/search/?q=$q$p';
+  }
+
   // ── URL Type Checks ──
 
   /// Check if a URL is a user page URL.

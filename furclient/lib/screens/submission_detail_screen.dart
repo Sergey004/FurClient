@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
-import '../services/fa_client.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/platform_utils.dart';
@@ -11,14 +10,14 @@ import '../utils/fa_image_loader.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
 
-  final FAClient client;
-  final String submissionId;
+  final OnlineFASession session;
+  final FASubmissionPreview submission;
   final bool sfwMode;
 
   const SubmissionDetailScreen({
     super.key,
-    required this.client,
-    required this.submissionId,
+    required this.session,
+    required this.submission,
     this.sfwMode = false,
   });
 
@@ -27,10 +26,8 @@ class SubmissionDetailScreen extends StatefulWidget {
 }
 
 class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
-  Submission? _submission;
-  List<FAComment> _comments = [];
+  FASubmission? _submission;
   bool _isLoading = true;
-  bool _isLoadingComments = false;
   String? _error;
 
   @override
@@ -45,13 +42,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       _error = null;
     });
     try {
-      final submission = await widget.client.getSubmission(widget.submissionId);
+      final submission =
+          await widget.session.submissionForPreview(widget.submission);
       if (mounted) {
         setState(() {
           _submission = submission;
           _isLoading = false;
         });
-        _loadComments();
       }
     } catch (e) {
       if (mounted) {
@@ -63,31 +60,24 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     }
   }
 
-  Future<void> _loadComments() async {
-    setState(() => _isLoadingComments = true);
-    try {
-      final comments = await widget.client.getComments(widget.submissionId);
-      if (mounted) {
-        setState(() {
-          _comments = comments;
-          _isLoadingComments = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingComments = false);
-    }
-  }
-
   void _navigateToProfile(String username) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ProfileScreen(
-          client: widget.client,
-          session: widget.client.session!,
+          session: widget.session,
           targetUsername: username,
         ),
       ),
     );
+  }
+
+  List<FAComment> _flattenComments() {
+    final result = <FAComment>[];
+    if (_submission == null) return result;
+    for (final comment in _submission!.comments) {
+      comment.recursiveForEach(result.add);
+    }
+    return result;
   }
 
   @override
@@ -141,12 +131,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     return _buildMobileLayout(sub);
   }
 
-  // ── Desktop layout ────────────────────────────────────────────────────────
-
-  Widget _buildDesktopLayout(Submission sub) {
+  Widget _buildDesktopLayout(FASubmission sub) {
     return Column(
       children: [
-        // Кнопка назад — только на desktop где нет AppBar
         _buildDesktopTopBar(),
         Expanded(
           child: Row(
@@ -183,7 +170,6 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
         ),
       );
     }
-    // macOS / Linux desktop
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       child: Row(
@@ -198,9 +184,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     );
   }
 
-  // ── Mobile layout ─────────────────────────────────────────────────────────
-
-  Widget _buildMobileLayout(Submission sub) {
+  Widget _buildMobileLayout(FASubmission sub) {
     return CustomScrollView(
       slivers: [
         const SliverAppBar(
@@ -222,15 +206,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     );
   }
 
-  // ── Shared widgets ────────────────────────────────────────────────────────
-
-  Widget _buildImageSection(Submission sub) {
+  Widget _buildImageSection(FASubmission sub) {
+    final imageUrl = (sub.fullResolutionMediaUrl ?? sub.previewImageUrl).toString();
     return Container(
       color: AppColors.bgDeep,
-      child: sub.imageUrl.isNotEmpty
+      child: imageUrl.isNotEmpty
           ? FAImage(
-              url: sub.imageUrl,
-              client: widget.client,
+              url: imageUrl,
               fit: BoxFit.contain,
               mode: ExtendedImageMode.gesture,
               placeholder: Container(
@@ -260,9 +242,11 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     );
   }
 
-  Widget _buildDetailsPanel(Submission sub) {
+  Widget _buildDetailsPanel(FASubmission sub) {
     final isDesktop =
         MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
+    final author = sub.metadata.author;
+    final flatComments = _flattenComments();
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(isDesktop ? 24 : 16),
@@ -270,7 +254,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            sub.title,
+            sub.metadata.title,
             style: TextStyle(
               color: AppColors.text,
               fontSize: isDesktop ? 24 : 22,
@@ -280,8 +264,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           ),
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: sub.author.isNotEmpty
-                ? () => _navigateToProfile(sub.author)
+            onTap: author.isNotEmpty
+                ? () => _navigateToProfile(author)
                 : null,
             child: Row(
               children: [
@@ -289,8 +273,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   radius: 14,
                   backgroundColor: AppColors.bgInput,
                   child: Text(
-                    sub.author.isNotEmpty
-                        ? sub.author[0].toUpperCase()
+                    author.isNotEmpty
+                        ? author[0].toUpperCase()
                         : '?',
                     style: const TextStyle(
                       color: AppColors.fluentCyan,
@@ -301,7 +285,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  sub.author.isNotEmpty ? sub.author : 'Unknown',
+                  author.isNotEmpty ? author : 'Unknown',
                   style: const TextStyle(
                     color: AppColors.fluentCyan,
                     fontSize: 15,
@@ -314,17 +298,17 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
-              _statChip(Icons.visibility, '${sub.views}', 'Views',
+              _statChip(Icons.visibility, '${sub.metadata.viewCount}', 'Views',
                   AppColors.fluentCyan),
               const SizedBox(width: 8),
-              _statChip(Icons.favorite, '${sub.faves}', 'Faves',
+              _statChip(Icons.favorite, '${sub.metadata.favoriteCount}', 'Faves',
                   AppColors.notifFave),
               const SizedBox(width: 8),
-              _statChip(Icons.comment, '${sub.commentsCount}', 'Comments',
+              _statChip(Icons.comment, '${sub.metadata.commentCount}', 'Comments',
                   AppColors.materialGreen),
             ],
           ),
-          if (sub.description.isNotEmpty) ...[
+          if (sub.htmlDescription.isNotEmpty) ...[
             const SizedBox(height: 20),
             const Divider(color: AppColors.border),
             const SizedBox(height: 12),
@@ -346,7 +330,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 border: Border.all(color: AppColors.border),
               ),
               child: Text(
-                sub.description,
+                _stripHtml(sub.htmlDescription),
                 style: const TextStyle(
                   color: AppColors.textDim,
                   fontSize: 14,
@@ -355,7 +339,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               ),
             ),
           ],
-          if (sub.tags.isNotEmpty) ...[
+          if (sub.metadata.keywords.isNotEmpty) ...[
             const SizedBox(height: 20),
             const Divider(color: AppColors.border),
             const SizedBox(height: 12),
@@ -371,7 +355,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: sub.tags.map((tag) {
+              children: sub.metadata.keywords.map((tag) {
                 return Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -413,7 +397,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${_comments.length}',
+                  '${flatComments.length}',
                   style: const TextStyle(
                     color: AppColors.materialGreen,
                     fontSize: 11,
@@ -424,14 +408,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          if (_isLoadingComments)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: AdaptiveProgress(strokeWidth: 2),
-              ),
-            )
-          else if (_comments.isEmpty)
+          if (flatComments.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(
@@ -445,11 +422,23 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               ),
             )
           else
-            ..._comments.map((c) => _buildComment(c)),
+            ...flatComments.map((c) => _buildComment(c)),
           const SizedBox(height: 32),
         ],
       ),
     );
+  }
+
+  String _stripHtml(String html) {
+    return html
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&nbsp;', ' ')
+        .trim();
   }
 
   Widget _statChip(
@@ -488,34 +477,31 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   }
 
   Widget _buildComment(FAComment comment) {
+    final visible = comment is FAVisibleComment ? comment : null;
+    final author = visible?.author ?? 'Hidden';
+    final time = visible?.naturalDatetime ?? '';
+    final text = _stripHtml(comment.htmlMessage);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: AppColors.bgInput,
-              child: comment.avatarUrl.isNotEmpty
-                  ? FAImage(
-                      url: comment.avatarUrl,
-                      client: widget.client,
-                      width: 36,
-                      height: 36,
-                      fit: BoxFit.cover,
-                      errorWidget: const Icon(
-                        Icons.person,
-                        size: 18,
-                        color: AppColors.textMuted,
-                      ),
-                    )
-                  : const Icon(
-                      Icons.person,
-                      size: 18,
-                      color: AppColors.textMuted,
-                    ),
-            ),
-
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.bgInput,
+            child: visible != null
+                ? const Icon(
+                    Icons.person,
+                    size: 18,
+                    color: AppColors.textMuted,
+                  )
+                : const Icon(
+                    Icons.block,
+                    size: 18,
+                    color: AppColors.textMuted,
+                  ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -524,7 +510,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 Row(
                   children: [
                     Text(
-                      comment.author,
+                      author,
                       style: const TextStyle(
                         color: AppColors.text,
                         fontSize: 14,
@@ -533,7 +519,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      comment.time,
+                      time,
                       style: const TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 11,
@@ -543,7 +529,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  comment.text,
+                  text,
                   style: const TextStyle(
                     color: AppColors.textDim,
                     fontSize: 14,

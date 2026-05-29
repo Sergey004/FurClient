@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io' as io;
 import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
-import '../services/fa_urls.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/cookie_manager.dart';
 import '../main.dart' show webViewEnvironment;
@@ -31,7 +30,7 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isLoading = false;
   bool _showWebView = false;
   String? _errorMessage;
-  Completer<UserSession?>? _loginCompleter;
+  Completer<bool>? _loginCompleter;
   late AnimationController _glowController;
   bool _isProcessingNavigation = false;
   bool _showLoginOverlay = false;
@@ -81,15 +80,14 @@ class _LoginScreenState extends State<LoginScreen>
       _isLoading = true;
       _errorMessage = null;
       _showWebView = true;
-      _loginCompleter = Completer<UserSession?>();
+      _loginCompleter = Completer<bool>();
       _isProcessingNavigation = false;
     });
 
-    _loginCompleter!.future.then((session) async {
+    _loginCompleter!.future.then((success) async {
       if (!mounted) return;
-      debugPrint('=== Login future completed with session: $session');
 
-      if (session == null) {
+      if (!success) {
         setState(() {
           _showWebView = false;
           _isLoading = false;
@@ -98,18 +96,14 @@ class _LoginScreenState extends State<LoginScreen>
         return;
       }
 
-      // Показываем оверлей поверх WebView пока идёт onLogin
       setState(() {
         _showLoginOverlay = true;
         _isLoading = false;
       });
 
       try {
-        debugPrint('=== Starting onLogin() call');
         await widget.onLogin();
-        debugPrint('=== onLogin() returned successfully');
       } catch (e) {
-        debugPrint('=== Error in onLogin(): $e');
         if (mounted) {
           setState(() {
             _errorMessage = 'Error completing login: $e';
@@ -126,7 +120,6 @@ class _LoginScreenState extends State<LoginScreen>
       }
     }).catchError((e) {
       if (!mounted) return;
-      debugPrint('=== Login future error: $e');
       setState(() {
         _showWebView = false;
         _isLoading = false;
@@ -136,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _cancelLogin() {
-    _loginCompleter?.complete(null);
+    _loginCompleter?.complete(false);
     setState(() {
       _showWebView = false;
       _isLoading = false;
@@ -149,9 +142,6 @@ class _LoginScreenState extends State<LoginScreen>
   ) async {
     final cm = FAICookieManager.instance;
 
-    // cf_clearance может быть установлен на разных доменах:
-    // .furaffinity.net, www.furaffinity.net, furaffinity.net
-    // Также CF может установить его асинхронно — нужна задержка и retry
     final urls = [
       'https://www.furaffinity.net',
       'https://furaffinity.net',
@@ -170,7 +160,6 @@ class _LoginScreenState extends State<LoginScreen>
               .getCookies(url: WebUri(url))
               .timeout(const Duration(seconds: 3));
           if (cookies.isNotEmpty) {
-            debugPrint('=== $url cookies: ${cookies.length} (${cookies.map((c) => c.name).join(", ")})');
             _addCookiesToMap(cookies, cookieDataMap);
           }
         } catch (e) {
@@ -179,22 +168,15 @@ class _LoginScreenState extends State<LoginScreen>
       }
 
       if (cookieDataMap.containsKey('cf_clearance')) {
-        debugPrint('=== cf_clearance found on attempt ${attempt + 1}');
         break;
       }
     }
 
-    debugPrint(
-      '=== CookieManager total: ${cookieDataMap.length} cookies (${cookieDataMap.keys.join(", ")})',
-    );
-
-    // document.cookie — не-HttpOnly cookies как дополнение
     try {
       final rawCookies = await controller
           .evaluateJavascript(source: 'document.cookie')
           .timeout(const Duration(seconds: 5)) as String?;
       if (rawCookies != null && rawCookies.isNotEmpty) {
-        debugPrint('=== document.cookie: $rawCookies');
         for (final part in rawCookies.split(';')) {
           final idx = part.indexOf('=');
           if (idx < 0) continue;
@@ -230,17 +212,15 @@ class _LoginScreenState extends State<LoginScreen>
             ? value.substring(0, min(value.length, 10))
             : 'null';
         debugPrint(
-          '=== Cookie: ${c.name} | domain=${c.domain} | httpOnly=${c.isHttpOnly} | value=$displayValue...',
+          '=== Cookie: ${c.name} | domain=${c.domain} | isHttpOnly=${c.isHttpOnly} | value=$displayValue...',
         );
-        final expiresDate = c.expiresDate is int ? c.expiresDate as int : 0;
         cookieDataMap[c.name] = {
           'name': c.name,
           'value': value,
           'domain': c.domain ?? '.furaffinity.net',
           'path': c.path ?? '/',
-          'isHttpOnly': c.isHttpOnly ?? false,
-          'isSecure': c.isSecure ?? true,
-          'expiresDate': expiresDate,
+          'isHttpOnly': c.isHttpOnly,
+          'isSecure': c.isSecure,
         };
       }
     }
@@ -250,15 +230,8 @@ class _LoginScreenState extends State<LoginScreen>
     InAppWebViewController controller,
     Uri? url,
   ) async {
-    if (_loginCompleter?.isCompleted ?? false) {
-      debugPrint('=== Login already completed, ignoring navigation');
-      return;
-    }
-
-    if (_isProcessingNavigation) {
-      debugPrint('=== Already processing navigation, skipping');
-      return;
-    }
+    if (_loginCompleter?.isCompleted ?? false) return;
+    if (_isProcessingNavigation) return;
 
     _isProcessingNavigation = true;
     try {
@@ -273,27 +246,13 @@ class _LoginScreenState extends State<LoginScreen>
 
       final Map<String, Map<String, dynamic>> cookieDataMap = {};
 
-      // Извлекаем cookies тремя способами для надежности
-      // 1. CookieManager — может получить HttpOnly cookies (cf_clearance)
-      // 2. document.cookie — для не-HttpOnly cookies как дополнение
-
       await _extractCookies(controller, cookieDataMap);
 
-      debugPrint(
-        '=== Collected ${cookieDataMap.length} cookies: ${cookieDataMap.keys.join(", ")}',
-      );
-
-      // Если нет ни одного FA-специфичного cookie — рано, ждём
       final hasFACookie = cookieDataMap.containsKey('a') ||
           cookieDataMap.containsKey('b') ||
           cookieDataMap.containsKey('cf_clearance');
-      if (cookieDataMap.isEmpty || !hasFACookie) {
-        debugPrint('=== No FA cookies yet, waiting for next navigation event');
-        return;
-      }
+      if (cookieDataMap.isEmpty || !hasFACookie) return;
 
-      // Логируем найденные FA cookies
-      debugPrint('=== === Found FA Cookies === ===');
       for (final name in ['a', 'b', 'cf_clearance', 'sz']) {
         if (cookieDataMap.containsKey(name)) {
           final cookie = cookieDataMap[name];
@@ -304,9 +263,7 @@ class _LoginScreenState extends State<LoginScreen>
           debugPrint('$name: $displayValue...');
         }
       }
-      debugPrint('=== === === === === === === ===');
 
-      // Извлекаем username из URL или DOM
       String username = '';
       if (isUserPage) {
         final parts = path.split('/');
@@ -335,24 +292,28 @@ class _LoginScreenState extends State<LoginScreen>
       if (username.isEmpty) username = 'user';
 
       final cookieDataList = cookieDataMap.values.map((e) => e).toList();
-
-      final session = UserSession(
-        username: username,
-        avatarUrl: FAUrls.avatar(username),
-        isLoggedIn: true,
-        cookies: jsonEncode(cookieDataList),
-      );
+      final cookies = cookieDataList.map((map) {
+        final c = io.Cookie(
+          map['name'] as String? ?? '',
+          map['value'] as String? ?? '',
+        );
+        c.domain = map['domain'] as String? ?? '.furaffinity.net';
+        c.path = map['path'] as String? ?? '/';
+        c.secure = map['isSecure'] as bool? ?? true;
+        c.httpOnly = map['isHttpOnly'] as bool? ?? false;
+        return c;
+      }).toList();
 
       if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
-        debugPrint('=== Saving session for user: $username');
-        await widget.authService.saveSession(session).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () async {
-            debugPrint('=== Timeout saving session');
-          },
+        final session = await widget.authService.saveSessionFromCookies(
+          cookies,
+          validate: true,
         );
-        debugPrint('=== Session saved, completing login');
-        _loginCompleter!.complete(session);
+        if (session != null) {
+          _loginCompleter!.complete(true);
+        } else {
+          _loginCompleter!.complete(false);
+        }
       }
     } finally {
       _isProcessingNavigation = false;
@@ -422,7 +383,7 @@ class _LoginScreenState extends State<LoginScreen>
           allowUniversalAccessFromFileURLs: false,
         ),
                 initialUrlRequest: URLRequest(
-                  url: WebUri(FAUrls.login),
+                  url: WebUri(FAURLs.homeUrl),
                 ),
                 onLoadStart: (controller, url) {
                   debugPrint('onLoadStart: $url');

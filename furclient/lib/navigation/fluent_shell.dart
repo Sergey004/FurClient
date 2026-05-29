@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../models/models.dart';
-import '../services/fa_client.dart';
 import '../screens/gallery_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/notifications_screen.dart';
@@ -9,13 +8,11 @@ import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 
 class FluentShell extends StatefulWidget {
-  final FAClient client;
-  final UserSession session;
+  final OnlineFASession session;
   final VoidCallback onLogout;
 
   const FluentShell({
     super.key,
-    required this.client,
     required this.session,
     required this.onLogout,
   });
@@ -75,15 +72,13 @@ class _FluentShellState extends State<FluentShell> {
                 child: SizedBox(
                   width: 32,
                   height: 32,
-                  child: widget.session.avatarUrl.isNotEmpty
-                      ? Image.network(
-                          widget.session.avatarUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const fluent.Icon(
-                            fluent.FluentIcons.contact,
-                          ),
-                        )
-                      : const fluent.Icon(fluent.FluentIcons.contact),
+                  child: Image.network(
+                    'https://a.furaffinity.net/${widget.session.username}.gif',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const fluent.Icon(
+                      fluent.FluentIcons.contact,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -118,7 +113,7 @@ class _FluentShellState extends State<FluentShell> {
             icon: const fluent.Icon(fluent.FluentIcons.photo2),
             title: const fluent.Text('Gallery'),
             body: GalleryScreen(
-              client: widget.client,
+              session: widget.session,
               sfwMode: _sfwMode,
               onLogout: widget.onLogout,
             ),
@@ -127,7 +122,7 @@ class _FluentShellState extends State<FluentShell> {
             icon: const fluent.Icon(fluent.FluentIcons.search),
             title: const fluent.Text('Search'),
             body: SearchScreen(
-              client: widget.client,
+              session: widget.session,
               sfwMode: _sfwMode,
               onLogout: widget.onLogout,
             ),
@@ -136,7 +131,7 @@ class _FluentShellState extends State<FluentShell> {
             icon: const fluent.Icon(fluent.FluentIcons.ringer),
             title: const fluent.Text('Notifications'),
             body: NotificationsScreen(
-              client: widget.client,
+              session: widget.session,
               onLogout: widget.onLogout,
             ),
           ),
@@ -144,7 +139,6 @@ class _FluentShellState extends State<FluentShell> {
             icon: const fluent.Icon(fluent.FluentIcons.contact),
             title: const fluent.Text('Profile'),
             body: ProfileScreen(
-              client: widget.client,
               session: widget.session,
               onLogout: widget.onLogout,
             ),

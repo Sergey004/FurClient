@@ -11,22 +11,15 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  html: ^0.15.4
   http: ^1.2.0
   shared_preferences: ^2.2.0
 
   url_launcher: ^6.2.0
   cronet_http: ^1.8.0
   cupertino_http: ^3.0.1
-  cached_network_image: ^3.3.0
-  flutter_cache_manager: ^3.4.1
-  cookie_jar: ^4.0.0
-  dio: ^5.4.0
-  dio_cookie_manager: ^3.1.0
   path_provider: ^2.1.0
   flutter_inappwebview: ^6.0.0
   extended_image: ^8.0.0
-  shimmer: ^3.0.0
   dynamic_color: ^1.7.0
   fluent_ui: ^4.9.1
   system_theme: ^3.0.0

@@ -163,6 +163,9 @@ abstract class FASession {
   Future<FAUser> userForName(String username) =>
       userForUrl(Uri.parse(FAURLs.userUrl(username)));
 
+  /// Search for submissions.
+  Future<List<FASubmissionPreview>> search(String query, {int page = 1});
+
   /// Convenience: fetch favorites for a user.
   Future<FAUserGalleryLike> favoritesForUser(String username) =>
       galleryLikeForUrl(Uri.parse(FAURLs.favoritesUrl(username)));

@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
-import '../services/fa_client.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
-import '../utils/fa_image_loader.dart';
 import 'submission_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
-  final FAClient client;
+  final OnlineFASession session;
   final VoidCallback? onLogout;
 
-  const NotificationsScreen({super.key, required this.client, this.onLogout});
+  const NotificationsScreen({super.key, required this.session, this.onLogout});
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -20,7 +18,7 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen>
     with AutomaticKeepAliveClientMixin {
-  List<FANotification> _notifications = [];
+  FANotificationPreviews? _notifications;
   bool _isLoading = true;
   String? _error;
 
@@ -40,7 +38,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     });
 
     try {
-      final notifications = await widget.client.getNotifications();
+      final notifications = await widget.session.notificationPreviews();
       if (mounted) {
         setState(() {
           _notifications = notifications;
@@ -57,50 +55,60 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
   }
 
-  void _onNotificationTap(FANotification notification) {
-    if (notification.url.isNotEmpty) {
-      final viewMatch = RegExp(r'/view/(\d+)').firstMatch(notification.url);
-      if (viewMatch != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => SubmissionDetailScreen(
-              client: widget.client,
-              submissionId: viewMatch.group(1)!,
-            ),
+  void _onNotificationTap(FANotificationPreview notification) {
+    final viewMatch = RegExp(r'/view/(\d+)').firstMatch(notification.url.toString());
+    if (viewMatch != null) {
+      // Navigate to submission
+      final sid = int.parse(viewMatch.group(1)!);
+      final preview = FASubmissionPreview(
+        sid: sid,
+        url: notification.url,
+        thumbnailUrl: Uri.parse(''),
+        thumbnailWidthOnHeightRatio: 1.0,
+        title: notification.title,
+        author: notification.author,
+        displayAuthor: notification.displayAuthor,
+      );
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SubmissionDetailScreen(
+            session: widget.session,
+            submission: preview,
           ),
-        );
-      }
+        ),
+      );
     }
   }
 
-  Color _typeColor(String type) {
-    switch (type) {
-      case 'fave':
-        return AppColors.notifFave;
-      case 'comment':
-        return AppColors.notifComment;
-      case 'watch':
-        return AppColors.notifWatch;
-      case 'journal':
-        return AppColors.notifJournal;
-      default:
-        return AppColors.textDim;
-    }
-  }
+  List<_NotificationGroup> _buildGroups() {
+    final groups = <_NotificationGroup>[];
+    if (_notifications == null) return groups;
 
-  IconData _typeIcon(String type) {
-    switch (type) {
-      case 'fave':
-        return Icons.favorite;
-      case 'comment':
-        return Icons.comment;
-      case 'watch':
-        return Icons.visibility;
-      case 'journal':
-        return Icons.book;
-      default:
-        return Icons.notifications;
+    if (_notifications!.submissionComments.isNotEmpty) {
+      groups.add(_NotificationGroup(
+        label: 'Submission Comments',
+        notifications: _notifications!.submissionComments,
+      ));
     }
+    if (_notifications!.journalComments.isNotEmpty) {
+      groups.add(_NotificationGroup(
+        label: 'Journal Comments',
+        notifications: _notifications!.journalComments,
+      ));
+    }
+    if (_notifications!.shouts.isNotEmpty) {
+      groups.add(_NotificationGroup(
+        label: 'Shouts',
+        notifications: _notifications!.shouts,
+      ));
+    }
+    if (_notifications!.journals.isNotEmpty) {
+      groups.add(_NotificationGroup(
+        label: 'Journals',
+        notifications: _notifications!.journals,
+      ));
+    }
+    return groups;
   }
 
   @override
@@ -123,7 +131,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       return ErrorView(message: _error!, onRetry: _loadNotifications, onRelogin: widget.onLogout);
     }
 
-    if (_notifications.isEmpty) {
+    final groups = _buildGroups();
+    if (groups.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -145,21 +154,36 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       color: AppColors.cupertinoPurple,
       backgroundColor: AppColors.bgCard,
       onRefresh: _loadNotifications,
-      child: ListView.separated(
+      child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _notifications.length,
-        separatorBuilder: (_, __) =>
-            const Divider(height: 1, color: AppColors.border, indent: 62),
+        itemCount: groups.length,
         itemBuilder: (context, index) {
-          final notif = _notifications[index];
-          return _buildNotificationTile(notif);
+          final group = groups[index];
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Text(
+                  group.label,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              ...group.notifications.map((n) => _buildNotificationTile(n)),
+            ],
+          );
         },
       ),
     );
   }
 
-  Widget _buildNotificationTile(FANotification notif) {
-    final color = _typeColor(notif.type);
+  Widget _buildNotificationTile(FANotificationPreview notif) {
+    final color = AppColors.notifFave;
 
     return InkWell(
       onTap: () => _onNotificationTap(notif),
@@ -174,21 +198,11 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 border:
                     Border.all(color: color.withValues(alpha: 0.2), width: 1),
               ),
-               child: CircleAvatar(
-                 radius: 22,
-                 backgroundColor: Colors.transparent,
-                   child: notif.avatarUrl.isNotEmpty
-                       ? FAImage(
-                           url: notif.avatarUrl,
-                           client: widget.client,
-                           width: 44,
-                           height: 44,
-                           fit: BoxFit.cover,
-                           errorWidget: Icon(_typeIcon(notif.type), color: color, size: 22),
-                         )
-                       : Icon(_typeIcon(notif.type), color: color, size: 22),
-               ),
-
+              child: CircleAvatar(
+                radius: 22,
+                backgroundColor: Colors.transparent,
+                child: Icon(Icons.notifications, color: color, size: 22),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -203,7 +217,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                           color: AppColors.textDim, fontSize: 14, height: 1.4),
                       children: [
                         TextSpan(
-                          text: notif.author,
+                          text: notif.displayAuthor,
                           style: const TextStyle(
                               color: AppColors.text,
                               fontWeight: FontWeight.w600),
@@ -214,38 +228,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(_typeIcon(notif.type), color: color, size: 12),
-                            const SizedBox(width: 4),
-                            Text(
-                              notif.type.toUpperCase(),
-                              style: TextStyle(
-                                  color: color,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        notif.datetime,
-                        style: const TextStyle(
-                            color: AppColors.textMuted, fontSize: 12),
-                      ),
-                    ],
+                  Text(
+                    notif.naturalDatetime,
+                    style: const TextStyle(
+                        color: AppColors.textMuted, fontSize: 12),
                   ),
                 ],
               ),
@@ -255,4 +241,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       ),
     );
   }
+}
+
+class _NotificationGroup {
+  final String label;
+  final List<FANotificationPreview> notifications;
+
+  const _NotificationGroup({
+    required this.label,
+    required this.notifications,
+  });
 }

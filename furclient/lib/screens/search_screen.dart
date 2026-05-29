@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
-import '../services/fa_client.dart';
 import '../services/search_history.dart';
 import '../widgets/submission_card.dart';
 import '../widgets/loading_indicator.dart';
@@ -10,11 +9,11 @@ import '../widgets/adaptive/adaptive.dart';
 import 'submission_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
-  final FAClient client;
+  final OnlineFASession session;
   final bool sfwMode;
   final VoidCallback? onLogout;
 
-  const SearchScreen({super.key, required this.client, this.sfwMode = false, this.onLogout});
+  const SearchScreen({super.key, required this.session, this.sfwMode = false, this.onLogout});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -27,7 +26,7 @@ class _SearchScreenState extends State<SearchScreen>
   final FocusNode _searchFocusNode = FocusNode();
   final SearchHistory _searchHistory = SearchHistory();
 
-  List<Submission> _results = [];
+  List<FASubmissionPreview> _results = [];
   int _currentPage = 1;
   bool _isLoading = false;
   bool _isLoadingMore = false;
@@ -88,7 +87,7 @@ class _SearchScreenState extends State<SearchScreen>
     await _searchHistory.add(trimmed);
 
     try {
-      final results = await widget.client.search(trimmed, page: 1);
+      final results = await widget.session.search(trimmed, page: 1);
       if (mounted) {
         setState(() {
           _results = results;
@@ -112,7 +111,7 @@ class _SearchScreenState extends State<SearchScreen>
     _currentPage += 1;
 
     try {
-      final results = await widget.client.search(_query, page: _currentPage);
+      final results = await widget.session.search(_query, page: _currentPage);
       if (mounted) {
         setState(() {
           _results.addAll(results);
@@ -126,12 +125,12 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
-  void _navigateToDetail(Submission submission) {
+  void _navigateToDetail(FASubmissionPreview submission) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SubmissionDetailScreen(
-          client: widget.client,
-          submissionId: submission.id,
+          session: widget.session,
+          submission: submission,
           sfwMode: widget.sfwMode,
         ),
       ),
@@ -248,7 +247,7 @@ class _SearchScreenState extends State<SearchScreen>
             final sub = _results[index];
             return SubmissionCard(
               submission: sub,
-              client: widget.client,
+              session: widget.session,
               sfwMode: widget.sfwMode,
               onTap: () => _navigateToDetail(sub),
             );

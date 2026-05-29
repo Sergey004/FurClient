@@ -11,7 +11,6 @@ import 'package:cronet_http/cronet_http.dart';
 import 'package:cupertino_http/cupertino_http.dart';
 import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
-import 'services/fa_client.dart';
 import 'screens/login_screen.dart';
 import 'navigation/adaptive_shell.dart';
 import 'utils/platform_utils.dart';
@@ -73,7 +72,6 @@ class FurClientApp extends StatefulWidget {
 
 class _FurClientAppState extends State<FurClientApp> {
   final AuthService _authService = AuthService();
-  final FAClient _client = FAClient();
   bool _isLoggedIn = false;
   bool _isRestoringSession = true;
 
@@ -85,24 +83,17 @@ class _FurClientAppState extends State<FurClientApp> {
 
   Future<void> _initApp() async {
     try {
-      await _client.init();
       await _authService.loadSavedSession();
-      final session = _authService.currentSession;
+      final session = _authService.session;
 
-      if (session != null && session.isLoggedIn) {
-        await _client.setSession(session);
-        final valid = await _client.verifySession();
-        if (valid) {
-          if (mounted) {
-            setState(() {
-              _isLoggedIn = true;
-              _isRestoringSession = false;
-            });
-          }
-          return;
-        } else {
-          await _authService.logout();
+      if (session != null) {
+        if (mounted) {
+          setState(() {
+            _isLoggedIn = true;
+            _isRestoringSession = false;
+          });
         }
+        return;
       }
     } catch (e) {
       debugPrint('Init error: $e');
@@ -117,33 +108,13 @@ class _FurClientAppState extends State<FurClientApp> {
   }
 
   Future<void> _onLogin() async {
-    debugPrint('=== _onLogin() called');
-    final session = _authService.currentSession;
-    if (session != null) {
-      await _client.setSession(session);
-      // После установки сессии проверяем, не активен ли Cloudflare-челлендж.
-      // Если он активен, не делаем автоматический logout — позволим UI
-      // показать соответствующую ошибку и дать пользователю пройти челлендж.
-      final valid = await _client.verifySession();
-      if (!valid) {
-        debugPrint(
-            '=== Session appears invalid (Cloudflare challenge?) — continuing to app so user can complete challenge');
-      }
-    }
     if (mounted) {
       setState(() => _isLoggedIn = true);
     }
-    debugPrint('=== _onLogin() setState completed');
   }
 
   void _onLogout() async {
-    try {
-      await _client.clearCookies();
-      if (!Platform.isWindows) {
-        await CookieManager.instance().deleteAllCookies();
-      }
-      await _authService.logout();
-    } catch (_) {}
+    await _authService.logout();
     if (mounted) {
       setState(() => _isLoggedIn = false);
     }
@@ -251,10 +222,9 @@ class _FurClientAppState extends State<FurClientApp> {
     }
 
     if (_isLoggedIn) {
-      final session = _authService.currentSession;
+      final session = _authService.session;
       if (session != null) {
         return AdaptiveShell(
-          client: _client,
           session: session,
           onLogout: _onLogout,
         );

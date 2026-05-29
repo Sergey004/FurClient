@@ -1,15 +1,9 @@
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
-import '../services/fa_client.dart';
 
 /// FA-специфичный виджет для загрузки изображений.
-/// Аналог iOS Kingfisher — кэширование, Referer заголовок, состояния загрузки.
-///
-/// Использует extended_image с правильными FA CDN заголовками.
-/// На Windows cookies прокидываются через FAICookieManager автоматически.
 class FAImage extends StatelessWidget {
   final String url;
-  final FAClient? client;
   final double? width;
   final double? height;
   final BoxFit fit;
@@ -21,7 +15,6 @@ class FAImage extends StatelessWidget {
   const FAImage({
     super.key,
     required this.url,
-    this.client,
     this.width,
     this.height,
     this.fit = BoxFit.cover,
@@ -63,7 +56,7 @@ class FAImage extends StatelessWidget {
           case LoadState.failed:
             return errorWidget ?? _defaultError();
           case LoadState.completed:
-            return null; // рендерит сам
+            return null;
         }
       },
     );

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
-import '../services/fa_client.dart';
 import '../screens/gallery_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/notifications_screen.dart';
@@ -9,13 +8,11 @@ import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 
 class MaterialShell extends StatefulWidget {
-  final FAClient client;
-  final UserSession session;
+  final OnlineFASession session;
   final VoidCallback onLogout;
 
   const MaterialShell({
     super.key,
-    required this.client,
     required this.session,
     required this.onLogout,
   });
@@ -67,10 +64,10 @@ class _MaterialShellState extends State<MaterialShell> {
 
   List<Widget> _buildScreens() {
     return [
-      GalleryScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
-      SearchScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
-      NotificationsScreen(client: widget.client, onLogout: widget.onLogout),
-      ProfileScreen(client: widget.client, session: widget.session, onLogout: widget.onLogout),
+      GalleryScreen(session: widget.session, sfwMode: _sfwMode, onLogout: widget.onLogout),
+      SearchScreen(session: widget.session, sfwMode: _sfwMode, onLogout: widget.onLogout),
+      NotificationsScreen(session: widget.session, onLogout: widget.onLogout),
+      ProfileScreen(session: widget.session, onLogout: widget.onLogout),
       SettingsScreen(
         sfwMode: _sfwMode,
         onSfwModeChanged: _onSfwModeChanged,
