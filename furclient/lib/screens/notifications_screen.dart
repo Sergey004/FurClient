@@ -182,7 +182,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 backgroundColor: Colors.transparent,
                   backgroundImage: notif.avatarUrl.isNotEmpty
                       ? CachedNetworkImageProvider(notif.avatarUrl,
-                          httpHeaders: _imageHeaders)
+                          headers: _imageHeaders)
                       : null,
                 child: notif.avatarUrl.isEmpty
                     ? Icon(_typeIcon(notif.type), color: color, size: 22)

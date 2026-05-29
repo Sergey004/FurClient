@@ -414,7 +414,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             backgroundColor: AppColors.bgInput,
               backgroundImage: comment.avatarUrl.isNotEmpty
                   ? CachedNetworkImageProvider(comment.avatarUrl,
-                      httpHeaders: _imageHeaders)
+                      headers: _imageHeaders)
                   : null,
             child: comment.avatarUrl.isEmpty
                 ? const Icon(Icons.person, size: 18, color: AppColors.textMuted)

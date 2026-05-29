@@ -165,12 +165,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                           backgroundColor: AppColors.bgInput,
                           backgroundImage: p.avatarUrl.isNotEmpty
                               ? CachedNetworkImageProvider(p.avatarUrl,
-                                  httpHeaders: _imageHeaders)
+                                  headers: _imageHeaders)
                               : null,
-                    child: p.avatarUrl.isEmpty
-                        ? const Icon(Icons.person,
-                            color: AppColors.textMuted, size: 56)
-                        : null,
+                          child: p.avatarUrl.isEmpty
+                              ? const Icon(Icons.person,
+                                  color: AppColors.textMuted, size: 56)
+                              : null,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -267,7 +267,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     backgroundColor: AppColors.bgInput,
                     backgroundImage: p.avatarUrl.isNotEmpty
                         ? CachedNetworkImageProvider(p.avatarUrl,
-                            httpHeaders: _imageHeaders)
+                            headers: _imageHeaders)
                         : null,
                 child: p.avatarUrl.isEmpty
                     ? const Icon(Icons.person,
