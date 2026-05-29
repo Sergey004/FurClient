@@ -230,7 +230,6 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       child: sub.imageUrl.isNotEmpty
           ? FAImage(
               url: sub.imageUrl,
-              client: widget.client,
               fit: BoxFit.contain,
               mode: ExtendedImageMode.gesture,
               placeholder: Container(
@@ -499,7 +498,6 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               child: comment.avatarUrl.isNotEmpty
                   ? FAImage(
                       url: comment.avatarUrl,
-                      client: widget.client,
                       width: 36,
                       height: 36,
                       fit: BoxFit.cover,

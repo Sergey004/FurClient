@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:fa_kit/fa_kit.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../widgets/adaptive/adaptive.dart';
@@ -52,7 +53,9 @@ class SubmissionCard extends StatelessWidget {
           child: submission.imageUrl.isNotEmpty
               ? FAImage(
                   url: submission.imageUrl,
-                  client: client,
+                  dynamicThumbnail: DynamicThumbnail(
+                    Uri.parse(submission.imageUrl),
+                  ),
                   fit: BoxFit.cover,
                   placeholder: Container(
                     color: AppColors.bgInput,

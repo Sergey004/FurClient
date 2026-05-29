@@ -164,7 +164,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                     child: p.avatarUrl.isNotEmpty
                         ? FAImage(
                             url: p.avatarUrl,
-                            client: widget.client,
                             width: 112,
                             height: 112,
                             fit: BoxFit.cover,
@@ -230,7 +229,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: p.bannerUrl.isNotEmpty
           ? FAImage(
               url: p.bannerUrl,
-              client: widget.client,
               height: height,
               width: double.infinity,
               fit: BoxFit.cover,
@@ -276,7 +274,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                         child: p.avatarUrl.isNotEmpty
                             ? FAImage(
                                 url: p.avatarUrl,
-                                client: widget.client,
                                 width: 88,
                                 height: 88,
                                 fit: BoxFit.cover,

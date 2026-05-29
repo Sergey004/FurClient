@@ -178,14 +178,13 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                  radius: 22,
                  backgroundColor: Colors.transparent,
                    child: notif.avatarUrl.isNotEmpty
-                       ? FAImage(
-                           url: notif.avatarUrl,
-                           client: widget.client,
-                           width: 44,
-                           height: 44,
-                           fit: BoxFit.cover,
-                           errorWidget: Icon(_typeIcon(notif.type), color: color, size: 22),
-                         )
+                        ? FAImage(
+                            url: notif.avatarUrl,
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.cover,
+                            errorWidget: Icon(_typeIcon(notif.type), color: color, size: 22),
+                          )
                        : Icon(_typeIcon(notif.type), color: color, size: 22),
                ),
 

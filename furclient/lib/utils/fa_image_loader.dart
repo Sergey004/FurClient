@@ -1,15 +1,14 @@
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
-import '../services/fa_client.dart';
+import 'package:fa_kit/fa_kit.dart';
+
+import '../utils/cookie_store.dart';
 
 /// FA-специфичный виджет для загрузки изображений.
-/// Аналог iOS Kingfisher — кэширование, Referer заголовок, состояния загрузки.
-///
-/// Использует extended_image с правильными FA CDN заголовками.
-/// На Windows cookies прокидываются через FAICookieManager автоматически.
+/// Аналог iOS Kingfisher — кэширование, User-Agent, состояния загрузки.
 class FAImage extends StatelessWidget {
   final String url;
-  final FAClient? client;
+  final DynamicThumbnail? dynamicThumbnail;
   final double? width;
   final double? height;
   final BoxFit fit;
@@ -21,7 +20,7 @@ class FAImage extends StatelessWidget {
   const FAImage({
     super.key,
     required this.url,
-    this.client,
+    this.dynamicThumbnail,
     this.width,
     this.height,
     this.fit = BoxFit.cover,
@@ -31,23 +30,38 @@ class FAImage extends StatelessWidget {
     this.gestureConfig,
   });
 
-  static const Map<String, String> _faHeaders = {
-    'Referer': 'https://www.furaffinity.net',
-    'User-Agent': 'ceylo.FurAffinityApp/1.0',
-    'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-  };
+  String get _resolvedUrl {
+    if (dynamicThumbnail != null && width != null && height != null) {
+      return dynamicThumbnail!
+          .bestThumbnailUrl(width: width!, height: height!)
+          .toString();
+    }
+    return url;
+  }
+
+  Map<String, String> get _headers {
+    final headers = <String, String>{
+      'User-Agent': 'ceylo.FurAffinityApp/1.0',
+    };
+    final cookieHeader = CookieStore.instance.cookieHeader;
+    if (cookieHeader != null) {
+      headers['Cookie'] = cookieHeader;
+    }
+    return headers;
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (url.isEmpty) return _buildPlaceholder();
+    final imageUrl = _resolvedUrl;
+    if (imageUrl.isEmpty) return _buildPlaceholder();
 
     return ExtendedImage.network(
-      url,
+      imageUrl,
       width: width,
       height: height,
       fit: fit,
       cache: true,
-      headers: _faHeaders,
+      headers: _headers,
       mode: mode,
       initGestureConfigHandler: gestureConfig != null
           ? (_) => gestureConfig!
