@@ -32,6 +32,8 @@ dependencies:
   system_theme: ^3.0.0
   fa_kit:
       path: ./packages/fa_kit
+  crypto: ^3.0.7
+  encrypt: ^5.0.3
 
 dev_dependencies:
   flutter_test:

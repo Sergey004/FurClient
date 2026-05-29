@@ -12,6 +12,8 @@ import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 import '../utils/cookie_manager.dart';
 import '../utils/cookie_store.dart';
+import '../utils/cloudflare_bypass/cloudflare_bypass.dart';
+import '../utils/cloudflare_bypass/storage.dart';
 import 'fa_urls.dart';
 import '../main.dart' show webViewEnvironment;
 
@@ -34,7 +36,7 @@ class FAClient {
 
   bool _cfPassInProgress = false;
   DateTime? _lastCfPass;
-  static const Duration _cfPassCooldown = Duration(minutes: 5);
+  static Duration _cfPassCooldown = const Duration(minutes: 5);
 
   static const String _userAgent = 'ceylo.FurAffinityApp/1.0';
 
@@ -113,73 +115,27 @@ class FAClient {
 
     _cfPassInProgress = true;
     try {
-      debugPrint('=== CF pass: opening HeadlessWebView for ${FAUrls.home}');
-      final completer = Completer<bool>();
-      HeadlessInAppWebView? headless;
-
-      headless = HeadlessInAppWebView(
-        webViewEnvironment: webViewEnvironment,
-        initialSettings: InAppWebViewSettings(
-          javaScriptEnabled: true,
-          domStorageEnabled: true,
-          thirdPartyCookiesEnabled: true,
-        ),
-        onLoadStop: (controller, url) async {
-          final html = await controller.getHtml() ?? '';
-          if (_isCloudflarePage(html)) {
-            debugPrint('=== CF pass: challenge detected, waiting...');
-            // Дополнительная проверка через 2 секунды
-            await Future.delayed(const Duration(seconds: 2));
-            final finalHtml = await controller.getHtml() ?? '';
-            if (_isCloudflarePage(finalHtml)) {
-              debugPrint('=== CF pass: challenge still present, retrying...');
-              await Future.delayed(const Duration(seconds: 3));
-              final retryHtml = await controller.getHtml() ?? '';
-              if (_isCloudflarePage(retryHtml)) {
-                debugPrint('=== CF pass: challenge not resolved');
-                return;
-              }
-            }
-          }
-          debugPrint('=== CF pass: page loaded successfully');
-          await _syncCookiesFromWebView();
-          completer.complete(true);
-        },
-        onReceivedError: (controller, request, error) async {
-          if (!(request.isForMainFrame ?? false)) return;
-          debugPrint('=== CF pass: error — ${error.description}');
-          if (!completer.isCompleted) completer.complete(false);
-        },
-        onReceivedHttpError: (controller, request, response) async {
-          if (!(request.isForMainFrame ?? false)) return;
-          final status = response.statusCode ?? 0;
-          if (status == 403 || status == 503) {
-            debugPrint('=== CF pass: HTTP $status — challenge in progress');
-          }
-        },
+      debugPrint('=== CF pass: using cloudflare_bypass...');
+      
+      // Используем наш новый обходчик
+      final html = await cloudflareBypass(
+        url: FAUrls.home,
+        id: 'cf_clearance_${DateTime.now().millisecondsSinceEpoch}',
+        method: 'GET',
       );
-
-      await headless.run();
-      await headless.webViewController?.loadUrl(
-        urlRequest: URLRequest(url: WebUri(FAUrls.home)),
-      );
-
-      final success = await completer.future.timeout(
-        const Duration(seconds: 60),
-        onTimeout: () {
-          debugPrint('=== CF pass: timeout, syncing cookies anyway');
-          return false;
-        },
-      );
-
-      await headless.dispose();
-
-      if (!success) {
-        await _syncCookiesFromWebView();
+      
+      if (html == null || html.isEmpty) {
+        debugPrint('=== CF pass: bypass failed, no HTML returned');
+        return false;
       }
-
+      
+      debugPrint('=== CF pass: bypass completed, HTML length: ${html.length}');
+      
+      // Синхронизируем cookies после обхода
+      await _syncCookiesFromWebView();
+      
       _lastCfPass = DateTime.now();
-      debugPrint('=== CF pass: completed');
+      debugPrint('=== CF pass: completed successfully');
       return true;
     } catch (e) {
       debugPrint('=== CF pass error: $e');
@@ -187,6 +143,33 @@ class FAClient {
     } finally {
       _cfPassInProgress = false;
     }
+  }
+
+  /// Принудительный обход Cloudflare challenge с расширенным временем
+  Future<bool> forceCloudflarePass() async {
+    debugPrint('=== CF force: starting forced bypass...');
+    
+    // Сбрасываем кулдаун
+    _lastCfPass = null;
+    _cfPassInProgress = false;
+    
+    // Временно увеличиваем время ожидания
+    final originalCooldown = _cfPassCooldown;
+    _cfPassCooldown = const Duration(minutes: 1);
+    
+    try {
+      return await passCloudflareChallenge();
+    } finally {
+      // Восстанавливаем оригинальный кулдаун
+      _cfPassCooldown = originalCooldown;
+    }
+  }
+
+  /// Проверить наличие cf_clearance cookie
+  Future<bool> hasCfClearance() async {
+    final cookieMain = CookieMain();
+    final cfClearanceData = await cookieMain.getData('cf_clearance_${DateTime.now().millisecondsSinceEpoch}');
+    return cfClearanceData != null;
   }
 
   Future<void> _syncCookiesFromWebView() async {
@@ -228,14 +211,16 @@ class FAClient {
           return cookie;
         })
         .toList();
-    if (ioCookies.isNotEmpty) {
-      debugPrint('=== Syncing ${ioCookies.length} cookies to CookieStore from WebView');
-      for (final cookie in ioCookies) {
-        debugPrint('  - ${cookie.name}: ${cookie.value} (domain: ${cookie.domain})');
+      if (ioCookies.isNotEmpty) {
+        debugPrint('=== Syncing ${ioCookies.length} cookies to CookieStore from WebView');
+        for (final cookie in ioCookies) {
+          debugPrint('  - ${cookie.name}: ${cookie.value} (domain: ${cookie.domain})');
+        }
+        CookieStore.instance.setCookies(ioCookies);
+        debugPrint('=== CookieStore now has: ${CookieStore.instance.cookieHeader}');
+      } else {
+        debugPrint('=== No cookies synced from WebView');
       }
-      CookieStore.instance.setCookies(ioCookies);
-      debugPrint('=== CookieStore now has: ${CookieStore.instance.cookieHeader}');
-    }
   }
 
   Future<void> _saveWebViewCookiesToSession(List<Cookie> webViewCookies) async {
