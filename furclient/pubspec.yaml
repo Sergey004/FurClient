@@ -30,6 +30,8 @@ dependencies:
   dynamic_color: ^1.7.0
   fluent_ui: ^4.9.1
   system_theme: ^3.0.0
+  fa_kit:
+      path: ./packages/fa_kit
 
 dev_dependencies:
   flutter_test:
