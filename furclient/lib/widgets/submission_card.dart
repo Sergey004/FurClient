@@ -1,19 +1,21 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../widgets/adaptive/adaptive.dart';
+import '../services/fa_client.dart';
 import '../utils/fa_image_loader.dart';
 
 class SubmissionCard extends StatelessWidget {
-  final FASubmissionPreview submission;
-  final OnlineFASession session;
+  final Submission submission;
+  final FAClient client;
   final bool sfwMode;
   final VoidCallback onTap;
 
   const SubmissionCard({
     super.key,
     required this.submission,
-    required this.session,
+    required this.client,
     this.sfwMode = false,
     required this.onTap,
   });
@@ -47,21 +49,63 @@ class SubmissionCard extends StatelessWidget {
         ClipRRect(
           borderRadius:
               const BorderRadius.vertical(top: Radius.circular(11)),
-          child: FAImage(
-              url: submission.thumbnailUrl.toString(),
-              fit: BoxFit.cover,
-              placeholder: Container(
-                color: AppColors.bgInput,
-                child: const Center(
-                  child: AdaptiveProgress(strokeWidth: 2),
+          child: submission.imageUrl.isNotEmpty
+              ? FAImage(
+                  url: submission.imageUrl,
+                  client: client,
+                  fit: BoxFit.cover,
+                  placeholder: Container(
+                    color: AppColors.bgInput,
+                    child: const Center(
+                      child: AdaptiveProgress(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: Container(
+                    color: AppColors.bgInput,
+                    child: const Icon(
+                      Icons.broken_image,
+                      color: AppColors.textMuted,
+                      size: 32,
+                    ),
+                  ),
+                )
+              : Container(
+                  color: AppColors.bgInput,
+                  child: const Icon(
+                    Icons.image,
+                    color: AppColors.textMuted,
+                    size: 32,
+                  ),
                 ),
-              ),
-              errorWidget: Container(
-                color: AppColors.bgInput,
-                child: const Icon(
-                  Icons.broken_image,
-                  color: AppColors.textMuted,
-                  size: 32,
+        ),
+        if (submission.isNsfw && sfwMode)
+          ClipRRect(
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(11)),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                color: AppColors.bgCard.withValues(alpha: 0.7),
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.visibility_off,
+                        color: AppColors.textMuted,
+                        size: 28,
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'NSFW',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

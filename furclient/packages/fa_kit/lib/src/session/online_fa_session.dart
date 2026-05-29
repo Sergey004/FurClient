@@ -49,24 +49,6 @@ class OnlineFASession extends FASession {
   })  : _cookies = cookies,
         _dataSource = dataSource;
 
-  /// Create a session from existing cookies without network validation.
-  ///
-  /// Use this when restoring a session from local storage where the cookies
-  /// are already known to be valid. No home page fetch is performed.
-  factory OnlineFASession.restored({
-    required String username,
-    required String displayUsername,
-    required List<Cookie> cookies,
-    HTTPDataSource? dataSource,
-  }) {
-    return OnlineFASession._(
-      username: username,
-      displayUsername: displayUsername,
-      cookies: cookies,
-      dataSource: dataSource ?? HttpDataSourceImpl(),
-    );
-  }
-
   /// Create a session from existing cookies.
   ///
   /// Validates the session by fetching the home page.
@@ -569,18 +551,6 @@ class OnlineFASession extends FASession {
       page: parsed.page,
       direction: parsed.direction,
     );
-  }
-
-  // ── Search ──
-
-  @override
-  Future<List<FASubmissionPreview>> search(String query, {int page = 1}) async {
-    final url = Uri.parse(FAURLs.searchUrl(query, page: page));
-    final parsedPage = await _makePage(url, FASubmissionsPage.parse);
-    return parsedPage.submissions
-        .whereType<FASubmissionsPageItem>()
-        .map(FASubmissionPreview.fromPageItem)
-        .toList();
   }
 
   /// Check HTML response for system error/message pages and throw if found.

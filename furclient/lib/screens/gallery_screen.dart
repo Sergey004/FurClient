@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
+import '../services/fa_client.dart';
 import '../widgets/submission_card.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import 'submission_detail_screen.dart';
+import '../utils/platform_utils.dart';
 
 class GalleryScreen extends StatefulWidget {
-  final OnlineFASession session;
+  final FAClient client;
   final bool sfwMode;
   final VoidCallback? onLogout;
 
   const GalleryScreen(
-      {super.key, required this.session, this.sfwMode = false, this.onLogout});
+      {super.key, required this.client, this.sfwMode = false, this.onLogout});
 
   @override
   State<GalleryScreen> createState() => _GalleryScreenState();
@@ -23,11 +26,21 @@ class _GalleryScreenState extends State<GalleryScreen>
     with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
 
-  List<FASubmissionPreview> _submissions = [];
+  List<Submission> _submissions = [];
+  int _currentPage = 1;
   bool _isLoading = false;
   bool _isLoadingMore = false;
   bool _hasMore = true;
   String? _error;
+  String _selectedCategory = 'all';
+
+  static const _categories = ['all', 'digital', 'traditional', 'writing'];
+  static const _categoryLabels = {
+    'all': 'All',
+    'digital': 'Digital',
+    'traditional': 'Traditional',
+    'writing': 'Writing',
+  };
 
   @override
   bool get wantKeepAlive => true;
@@ -58,11 +71,12 @@ class _GalleryScreenState extends State<GalleryScreen>
       _isLoading = true;
       _error = null;
       _submissions = [];
+      _currentPage = 1;
       _hasMore = true;
     });
 
     try {
-      final results = await widget.session.submissionPreviews();
+      final results = await widget.client.getSubmissions(1, _selectedCategory);
       if (mounted) {
         setState(() {
           _submissions = results;
@@ -81,13 +95,13 @@ class _GalleryScreenState extends State<GalleryScreen>
   }
 
   Future<void> _loadMore() async {
-    if (_isLoadingMore || _isLoading || !_hasMore || _submissions.isEmpty) return;
+    if (_isLoadingMore || _isLoading || !_hasMore) return;
     setState(() => _isLoadingMore = true);
+    _currentPage += 1;
 
     try {
-      final lastSid = _submissions.last.sid;
       final results =
-          await widget.session.submissionPreviews(fromSid: lastSid);
+          await widget.client.getSubmissions(_currentPage, _selectedCategory);
       if (mounted) {
         setState(() {
           _submissions.addAll(results);
@@ -96,6 +110,7 @@ class _GalleryScreenState extends State<GalleryScreen>
         });
       }
     } catch (_) {
+      _currentPage -= 1;
       if (mounted) {
         setState(() => _isLoadingMore = false);
       }
@@ -106,12 +121,18 @@ class _GalleryScreenState extends State<GalleryScreen>
     await _loadSubmissions();
   }
 
-  void _navigateToDetail(FASubmissionPreview submission) {
+  void _onCategoryChanged(String category) {
+    if (category == _selectedCategory) return;
+    setState(() => _selectedCategory = category);
+    _loadSubmissions();
+  }
+
+  void _navigateToDetail(Submission submission) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SubmissionDetailScreen(
-          session: widget.session,
-          submission: submission,
+          client: widget.client,
+          submissionId: submission.id,
           sfwMode: widget.sfwMode,
         ),
       ),
@@ -131,10 +152,66 @@ class _GalleryScreenState extends State<GalleryScreen>
     super.build(context);
     return AdaptiveScaffold(
       appBar: AppBar(
-        title: const Text('Latest'),
+        title: const Text('Gallery'),
       ),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          _buildCategoryChips(),
+          const SizedBox(height: 8),
+          Expanded(child: _buildBody()),
+        ],
+      ),
     );
+  }
+
+  Widget _buildCategoryChips() {
+    if (isWindows) {
+      return SizedBox(
+        height: 40,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: _categories.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final cat = _categories[index];
+            final selected = cat == _selectedCategory;
+            return fluent.ToggleButton(
+              checked: selected,
+              onChanged: (_) => _onCategoryChanged(cat),
+              child: Text(_categoryLabels[cat] ?? cat),
+            );
+          },
+        ),
+      );
+    } else {
+      return Theme(
+        data: Theme.of(context),
+        child: Material(
+          color: Colors.transparent,
+          child: SizedBox(
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _categories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final cat = _categories[index];
+                final selected = cat == _selectedCategory;
+                return FilterChip(
+                  label: Text(_categoryLabels[cat] ?? cat),
+                  selected: selected,
+                  onSelected: (_) => _onCategoryChanged(cat),
+                  selectedColor: AppColors.materialLavenderBg,
+                  checkmarkColor: AppColors.materialLavender,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildBody() {
@@ -196,7 +273,7 @@ class _GalleryScreenState extends State<GalleryScreen>
               final sub = _submissions[index];
                return SubmissionCard(
                  submission: sub,
-                 session: widget.session,
+                 client: widget.client,
                  sfwMode: widget.sfwMode,
                  onTap: () => _navigateToDetail(sub),
                );

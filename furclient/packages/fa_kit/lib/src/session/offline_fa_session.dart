@@ -534,9 +534,4 @@ class OfflineFASession extends FASession {
   Future<FAWatchlist> watchlistForUrl(Uri url) async {
     return _demoWatchlist;
   }
-
-  @override
-  Future<List<FASubmissionPreview>> search(String query, {int page = 1}) async {
-    return List.from(_demoSubmissionPreviews);
-  }
 }
