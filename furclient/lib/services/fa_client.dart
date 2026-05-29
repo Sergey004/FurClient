@@ -118,21 +118,25 @@ class FAClient {
       debugPrint('=== CF pass: using cloudflare_bypass...');
       
       // Используем наш новый обходчик
-      final html = await cloudflareBypass(
+      final result = await cloudflareBypass(
         url: FAUrls.home,
         id: 'cf_clearance_${DateTime.now().millisecondsSinceEpoch}',
         method: 'GET',
       );
       
-      if (html == null || html.isEmpty) {
-        debugPrint('=== CF pass: bypass failed, no HTML returned');
+      if (result == null || result['html'] == null) {
+        debugPrint('=== CF pass: bypass failed, no result returned');
         return false;
       }
       
-      debugPrint('=== CF pass: bypass completed, HTML length: ${html.length}');
+      debugPrint('=== CF pass: bypass completed, HTML length: ${(result['html'] as String?)?.length ?? 0}');
+      debugPrint('=== CF pass: cf_clearance found: ${result['cf_clearance_found']}');
       
       // Синхронизируем cookies после обхода
       await _syncCookiesFromWebView();
+      
+      // Добавляем cf_clearance в сессию
+      await addCfClearanceToSession();
       
       _lastCfPass = DateTime.now();
       debugPrint('=== CF pass: completed successfully');
@@ -170,6 +174,58 @@ class FAClient {
     final cookieMain = CookieMain();
     final cfClearanceData = await cookieMain.getData('cf_clearance_${DateTime.now().millisecondsSinceEpoch}');
     return cfClearanceData != null;
+  }
+
+  /// Добавить cf_clearance cookie в сессию
+  Future<void> addCfClearanceToSession() async {
+    try {
+      final cookieMain = CookieMain();
+      final cfClearanceData = await cookieMain.getData('cf_clearance_${DateTime.now().millisecondsSinceEpoch}');
+      
+      if (cfClearanceData != null && _session?.cookies != null) {
+        debugPrint('=== Adding cf_clearance to session...');
+        
+        // Декодируем текущие cookies из сессии
+        final List<dynamic> raw = jsonDecode(_session!.cookies!);
+        final sessionCookies = <String, Map<String, dynamic>>{};
+        
+        for (final item in raw) {
+          if (item is Map<String, dynamic>) {
+            final name = item['name']?.toString() ?? '';
+            if (name.isNotEmpty) sessionCookies[name] = item;
+          }
+        }
+        
+        // Декодируем cf_clearance cookie
+        final cfClearanceMap = jsonDecode(cfClearanceData) as Map<String, dynamic>;
+        
+        // Добавляем в сессию
+        sessionCookies['cf_clearance'] = {
+          'name': 'cf_clearance',
+          'value': cfClearanceMap['value'],
+          'domain': cfClearanceMap['domain'] ?? '.furaffinity.net',
+          'path': cfClearanceMap['path'] ?? '/',
+          'isHttpOnly': cfClearanceMap['isHttpOnly'] ?? false,
+          'isSecure': cfClearanceMap['isSecure'] ?? true,
+          'expiresDate': cfClearanceMap['expires'],
+        };
+        
+        // Обновляем сессию
+        _session = UserSession(
+          username: _session!.username,
+          avatarUrl: _session!.avatarUrl,
+          isLoggedIn: _session!.isLoggedIn,
+          cookies: jsonEncode(sessionCookies.values.toList()),
+        );
+        
+        debugPrint('=== Session updated with cf_clearance');
+        
+        // Сохраняем сессию
+        // await _authService.saveSession(_session!); // TODO: Implement this
+      }
+    } catch (e) {
+      debugPrint('=== Error adding cf_clearance to session: $e');
+    }
   }
 
   Future<void> _syncCookiesFromWebView() async {

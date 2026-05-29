@@ -75,14 +75,16 @@ Future<String> httpRequest(String url, String id) async {
 
 Future<String> bypassCloudflare(String url, String id, String method) async {
   debugPrint('=== CF receiver: Starting bypass...');
-  final res = await cloudflareBypass(
+  final result = await cloudflareBypass(
     url: jsonDecode(url)["url"], 
     id: id, 
     method: method
   );
-  if (res == null) {
+  
+  if (result == null) {
     return "empty";
   }
-  debugPrint('=== CF receiver: Bypass completed, HTML length: ${res.length}');
-  return res;
+  
+  debugPrint('=== CF receiver: Bypass completed, HTML length: ${(result['html'] as String?)?.length ?? 0}');
+  return result['html'] as String? ?? "empty";
 }

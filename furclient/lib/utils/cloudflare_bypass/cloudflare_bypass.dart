@@ -5,7 +5,7 @@ import 'storage.dart';
 import 'useragents.dart';
 import '../../main.dart' show webViewEnvironment;
 
-Future<String?> cloudflareBypass({
+Future<Map<String, dynamic>?> cloudflareBypass({
   required String url,
   required String id,
   required String method,
@@ -91,7 +91,13 @@ Future<String?> cloudflareBypass({
     return true;
   });
 
-  return html;
+  // Возвращаем информацию о найденных cookies
+  final cfClearanceData = await CookieMain().getData(id);
+  return {
+    'html': html,
+    'cf_clearance_found': cfClearanceData != null,
+    'cf_clearance_data': cfClearanceData,
+  };
 }
 
 Future<Map<String, String>> getHeaders() async {
