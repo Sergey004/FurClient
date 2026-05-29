@@ -1,4 +1,3 @@
-import 'dart:io' as io;
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;

@@ -4,9 +4,6 @@ import '../models/models.dart';
 
 /// Абстрактный интерфейс для сессии с FurAffinity
 /// Аналогично iOS FASession протоколу
-///
-/// Отделяет логику работы с сессией от конкретной реализации
-@immutable
 abstract interface class FASession {
   String get username;
   String get displayUsername;

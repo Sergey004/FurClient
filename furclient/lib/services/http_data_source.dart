@@ -13,12 +13,6 @@ enum HttpMethod {
 /// Абстрактный интерфейс для HTTP запросов (аналог iOS HTTPDataSource)
 /// Позволяет отделить логику получения данных от реализации сети.
 abstract interface class HttpDataSource {
-  /// Выполняет HTTP запрос и возвращает данные
-  ///
-  /// [url] - URL для запроса
-  /// [method] - HTTP метод (GET/POST)
-  /// [parameters] - Query параметры или POST параметры
-  /// [cookies] - Cookies для запроса (опционально)
   Future<String> httpData({
     required Uri url,
     required HttpMethod method,
@@ -32,16 +26,6 @@ class DioHttpDataSource implements HttpDataSource {
   final Dio _dio;
 
   DioHttpDataSource(this._dio);
-
-  Future<String> getData({
-    required Uri url,
-    List<Cookie>? cookies,
-  }) =>
-      httpData(
-        url: url,
-        method: HttpMethod.get,
-        cookies: cookies,
-      );
 
   @override
   Future<String> httpData({
