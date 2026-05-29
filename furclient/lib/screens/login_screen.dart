@@ -592,14 +592,15 @@ class _LoginScreenState extends State<LoginScreen>
         '=== Collected ${cookieDataMap.length} cookies: ${cookieDataMap.keys.join(", ")}',
       );
 
-      // Если нет ни одного FA-специфичного cookie — рано, ждём
-      final hasFACookie = cookieDataMap.containsKey('a') ||
-          cookieDataMap.containsKey('b') ||
-          cookieDataMap.containsKey('cf_clearance');
-      if (cookieDataMap.isEmpty || !hasFACookie) {
-        debugPrint('=== No FA cookies yet, waiting for next navigation event');
+      // Use enhanced cookie validation
+      final validation = _validateCookies(cookieDataMap);
+      if (!validation.isValid) {
+        debugPrint('=== Cookie validation failed: ${validation.reason}');
+        debugPrint('=== Waiting for more cookies...');
         return;
       }
+
+      debugPrint('=== Cookie validation passed: ${validation.reason}');
 
       // Логируем найденные FA cookies
       debugPrint('=== === Found FA Cookies === ===');
@@ -642,6 +643,10 @@ class _LoginScreenState extends State<LoginScreen>
       }
 
       if (username.isEmpty) username = 'user';
+
+      // Use enhanced cookie saving
+      debugPrint('=== Saving cookies with enhanced method');
+      await _saveCookiesToCookieStore(cookieDataMap);
 
       final cookieDataList = cookieDataMap.values.map((e) => e).toList();
 
@@ -773,6 +778,8 @@ class _LoginScreenState extends State<LoginScreen>
                 },
                 onReceivedError: (controller, request, error) {
                   if (!(request.isForMainFrame ?? false)) return;
+                  
+                  // Handle Cloudflare challenge by checking for CF-related content
                   if (error.type == WebResourceErrorType.HOST_LOOKUP ||
                       error.type ==
                           WebResourceErrorType.CANNOT_CONNECT_TO_HOST) {

@@ -6,6 +6,7 @@ import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart' as dio_cookies;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -13,6 +14,7 @@ import '../models/models.dart';
 import '../utils/cookie_manager.dart';
 import '../utils/cookie_store.dart';
 import 'fa_urls.dart';
+import 'fa_enhanced_client.dart';
 import '../main.dart' show webViewEnvironment;
 
 class CloudflareError implements Exception {
@@ -31,6 +33,9 @@ class FAClient {
   late CookieJar _cookieJar;
   bool _initialized = false;
   Completer<void>? _initCompleter;
+
+  // Enhanced client for CDN and multi-strategy support
+  final FAEnhancedClient _enhancedClient = FAEnhancedClient.instance;
 
   // Using a realistic browser User-Agent to avoid Cloudflare blocks
   static const String _userAgent =
@@ -97,6 +102,7 @@ class FAClient {
 
   Future<void> init() async {
     await _ensureInitialized();
+    await _enhancedClient.initialize();
   }
 
   UserSession? get session => _session;
@@ -104,6 +110,7 @@ class FAClient {
   Future<void> setSession(UserSession? session) async {
     _session = session;
     await _restoreCookiesFromSession();
+    await _enhancedClient.syncCookies();
     await passCloudflareChallenge();
   }
 
@@ -130,6 +137,14 @@ class FAClient {
           Uri.parse(FAUrls.baseUrl),
           cookies,
         );
+        
+        // Also store in enhanced client
+        for (final cookie in cookies) {
+          // Use public method to set session data
+          _enhancedClient.setSessionData('cookie_${cookie.name}', 
+              '${cookie.name}=${cookie.value}; Domain=${cookie.domain}');
+        }
+        
         debugPrint('=== Restored ${cookies.length} cookies from session');
       }
     } catch (e) {
@@ -146,6 +161,21 @@ class FAClient {
 
   Future<String> _getHtml(String url) async {
     await _ensureInitialized();
+    
+    // Use enhanced client for CDN URLs
+    if (url.contains('t.furaffinity.net') || 
+        url.contains('d.furaffinity.net') || 
+        url.contains('a.furaffinity.net')) {
+      try {
+        final content = await _enhancedClient.fetchContent(url);
+        if (content != null) {
+          return utf8.decode(content);
+        }
+      } catch (e) {
+        debugPrint('=== Enhanced client failed for $url: $e');
+      }
+    }
+    
     try {
       final response = await _dio.get<String>(url);
       _checkCloudflare(response);
@@ -226,6 +256,53 @@ class FAClient {
     if (_initialized) {
       await _cookieJar.deleteAll();
     }
+    await _enhancedClient.clearData();
+  }
+
+  // Enhanced CDN support
+  Future<Uint8List?> loadCDNContent(String url) async {
+    return await _enhancedClient.fetchContent(url);
+  }
+
+  Future<Uint8List?> loadCDNImage(String url) async {
+    return await _enhancedClient.loadImage(url);
+  }
+
+  Widget getCDNImageWidget(
+    String url, {
+    Map<String, String>? headers,
+    Widget? placeholder,
+    Widget? errorWidget,
+    double? width,
+    double? height,
+    BoxFit fit = BoxFit.cover,
+  }) {
+    return _enhancedClient.getImageWidget(
+      url,
+      headers: headers,
+      placeholder: placeholder,
+      errorWidget: errorWidget,
+      width: width,
+      height: height,
+      fit: fit,
+    );
+  }
+
+
+
+  // Get enhanced client statistics
+  Map<String, dynamic> getEnhancedStats() {
+    return _enhancedClient.getSessionStats();
+  }
+
+  // Set WebView controller for cookie synchronization
+  void setWebViewController(InAppWebViewController controller) {
+    _enhancedClient.setWebViewController(controller);
+  }
+
+  // Clear all session data
+  Future<void> clearSessionData() async {
+    await _enhancedClient.clearData();
   }
 
   Future<List<Submission>> getSubmissions(int page, String category) async {
