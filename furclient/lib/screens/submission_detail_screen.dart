@@ -4,17 +4,13 @@ import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
-import '../services/fa_urls.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/platform_utils.dart';
-
-const Map<String, String> _imageHeaders = {
-  'Referer': FAUrls.baseUrl,
-  'User-Agent': 'ceylo.FurAffinityApp/1.0',
-};
+import '../utils/fa_image_loader.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
+
   final FAClient client;
   final String submissionId;
   final bool sfwMode;
@@ -232,41 +228,27 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     return Container(
       color: AppColors.bgDeep,
       child: sub.imageUrl.isNotEmpty
-          ? ExtendedImage.network(
-              sub.imageUrl,
+          ? FAImage(
+              url: sub.imageUrl,
+              client: widget.client,
               fit: BoxFit.contain,
-              cache: true,
-              headers: _imageHeaders,
               mode: ExtendedImageMode.gesture,
-              initGestureConfigHandler: (state) => GestureConfig(
-                minScale: 0.8,
-                maxScale: 4.0,
-                inPageView: false,
+              placeholder: Container(
+                height: 300,
+                color: AppColors.bgInput,
+                child: const Center(
+                  child: AdaptiveProgress(strokeWidth: 2),
+                ),
               ),
-              loadStateChanged: (state) {
-                switch (state.extendedImageLoadState) {
-                  case LoadState.loading:
-                    return Container(
-                      height: 300,
-                      color: AppColors.bgInput,
-                      child: const Center(
-                        child: AdaptiveProgress(strokeWidth: 2),
-                      ),
-                    );
-                  case LoadState.failed:
-                    return Container(
-                      height: 200,
-                      color: AppColors.bgInput,
-                      child: const Icon(
-                        Icons.broken_image,
-                        color: AppColors.textMuted,
-                        size: 48,
-                      ),
-                    );
-                  case LoadState.completed:
-                    return null; // рендерит сам
-                }
-              },
+              errorWidget: Container(
+                height: 200,
+                color: AppColors.bgInput,
+                child: const Icon(
+                  Icons.broken_image,
+                  color: AppColors.textMuted,
+                  size: 48,
+                ),
+              ),
             )
           : Container(
               height: 200,
@@ -511,37 +493,29 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.bgInput,
-            child: comment.avatarUrl.isNotEmpty
-                ? ClipOval(
-                    child: ExtendedImage.network(
-                      comment.avatarUrl,
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.bgInput,
+              child: comment.avatarUrl.isNotEmpty
+                  ? FAImage(
+                      url: comment.avatarUrl,
+                      client: widget.client,
                       width: 36,
                       height: 36,
                       fit: BoxFit.cover,
-                      cache: true,
-                      headers: _imageHeaders,
-                      loadStateChanged: (state) {
-                        if (state.extendedImageLoadState ==
-                            LoadState.failed) {
-                          return const Icon(
-                            Icons.person,
-                            size: 18,
-                            color: AppColors.textMuted,
-                          );
-                        }
-                        return null;
-                      },
+                      errorWidget: const Icon(
+                        Icons.person,
+                        size: 18,
+                        color: AppColors.textMuted,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.person,
+                      size: 18,
+                      color: AppColors.textMuted,
                     ),
-                  )
-                : const Icon(
-                    Icons.person,
-                    size: 18,
-                    color: AppColors.textMuted,
-                  ),
-          ),
+            ),
+
           const SizedBox(width: 12),
           Expanded(
             child: Column(

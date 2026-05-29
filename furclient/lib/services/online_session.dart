@@ -49,8 +49,8 @@ class OnlineSession implements FASession {
     }
   }
 
-  Future<String> _fetch(String url) => _dataSource.httpData(
-        url: Uri.parse(url),
+  Future<String> _fetch(Uri url) => _dataSource.httpData(
+        url: url,
         method: HttpMethod.get,
         cookies: _cookies,
       );
@@ -77,7 +77,7 @@ class OnlineSession implements FASession {
       _cachedRequest(
         'submission_$url',
         () async {
-          final html = await _fetch(url);
+          final html = await _fetch(Uri.parse(url));
           final document = html_parser.parse(html);
           return parseSubmissionFull(document, url);
         },
@@ -100,7 +100,7 @@ class OnlineSession implements FASession {
       _cachedRequest(
         'comments_$url',
         () async {
-          final html = await _fetch(url);
+          final html = await _fetch(Uri.parse(url));
           final document = html_parser.parse(html);
           return parseComments(document);
         },

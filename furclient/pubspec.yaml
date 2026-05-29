@@ -16,6 +16,8 @@ dependencies:
   shared_preferences: ^2.2.0
 
   url_launcher: ^6.2.0
+  cronet_http: ^1.8.0
+  cupertino_http: ^3.0.1
   cached_network_image: ^3.3.0
   cookie_jar: ^4.0.0
   dio: ^5.4.0

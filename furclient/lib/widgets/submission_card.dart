@@ -1,25 +1,21 @@
 import 'dart:ui';
-import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../widgets/adaptive/adaptive.dart';
-
-// Referer нужен для FA CDN (t.furaffinity.net, d.furaffinity.net).
-// Аналог iOS: URLSession автоматически ставит Referer через конфигурацию.
-const Map<String, String> _faImageHeaders = {
-  'Referer': 'https://www.furaffinity.net',
-  'User-Agent': 'ceylo.FurAffinityApp/1.0',
-};
+import '../services/fa_client.dart';
+import '../utils/fa_image_loader.dart';
 
 class SubmissionCard extends StatelessWidget {
   final Submission submission;
+  final FAClient client;
   final bool sfwMode;
   final VoidCallback onTap;
 
   const SubmissionCard({
     super.key,
     required this.submission,
+    required this.client,
     this.sfwMode = false,
     required this.onTap,
   });
@@ -54,36 +50,24 @@ class SubmissionCard extends StatelessWidget {
           borderRadius:
               const BorderRadius.vertical(top: Radius.circular(11)),
           child: submission.imageUrl.isNotEmpty
-              ? ExtendedImage.network(
-                  submission.imageUrl,
+              ? FAImage(
+                  url: submission.imageUrl,
+                  client: client,
                   fit: BoxFit.cover,
-                  cache: true,
-                  headers: _faImageHeaders,
-                  loadStateChanged: (state) {
-                    switch (state.extendedImageLoadState) {
-                      case LoadState.loading:
-                        return Container(
-                          color: AppColors.bgInput,
-                          child: const Center(
-                            child: AdaptiveProgress(strokeWidth: 2),
-                          ),
-                        );
-                      case LoadState.failed:
-                        return Container(
-                          color: AppColors.bgInput,
-                          child: const Icon(
-                            Icons.broken_image,
-                            color: AppColors.textMuted,
-                            size: 32,
-                          ),
-                        );
-                      case LoadState.completed:
-                        return ExtendedRawImage(
-                          image: state.extendedImageInfo?.image,
-                          fit: BoxFit.cover,
-                        );
-                    }
-                  },
+                  placeholder: Container(
+                    color: AppColors.bgInput,
+                    child: const Center(
+                      child: AdaptiveProgress(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: Container(
+                    color: AppColors.bgInput,
+                    child: const Icon(
+                      Icons.broken_image,
+                      color: AppColors.textMuted,
+                      size: 32,
+                    ),
+                  ),
                 )
               : Container(
                   color: AppColors.bgInput,

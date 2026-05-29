@@ -248,6 +248,7 @@ class _SearchScreenState extends State<SearchScreen>
             final sub = _results[index];
             return SubmissionCard(
               submission: sub,
+              client: widget.client,
               sfwMode: widget.sfwMode,
               onTap: () => _navigateToDetail(sub),
             );

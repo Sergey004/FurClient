@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -7,8 +6,7 @@ import '../services/fa_urls.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
-
-const _imageHeaders = {'Referer': FAUrls.baseUrl};
+import '../utils/fa_image_loader.dart';
 
 class ProfileScreen extends StatefulWidget {
   final FAClient client;
@@ -160,20 +158,28 @@ class _ProfileScreenState extends State<ProfileScreen>
                     shape: BoxShape.circle,
                     border: Border.all(color: AppColors.bg, width: 4),
                   ),
-                        child: CircleAvatar(
-                          radius: 56,
-                          backgroundColor: AppColors.bgInput,
-                          backgroundImage: p.avatarUrl.isNotEmpty
-                              ? CachedNetworkImageProvider(p.avatarUrl,
-                                  headers: _imageHeaders)
-                              : null,
-                          child: p.avatarUrl.isEmpty
-                              ? const Icon(Icons.person,
-                                  color: AppColors.textMuted, size: 56)
-                              : null,
+                  child: CircleAvatar(
+                    radius: 56,
+                    backgroundColor: AppColors.bgInput,
+                    child: p.avatarUrl.isNotEmpty
+                        ? FAImage(
+                            url: p.avatarUrl,
+                            client: widget.client,
+                            width: 112,
+                            height: 112,
+                            fit: BoxFit.cover,
+                            errorWidget: const Icon(
+                              Icons.person,
+                              color: AppColors.textMuted,
+                              size: 56,
+                            ),
+                          )
+                        : const Icon(Icons.person,
+                            color: AppColors.textMuted, size: 56),
                   ),
-                ),
-                const SizedBox(height: 12),
+                 ),
+                 const SizedBox(height: 12),
+
                 Text(
                   p.displayName,
                   style: const TextStyle(
@@ -222,13 +228,14 @@ class _ProfileScreenState extends State<ProfileScreen>
       height: height,
       width: double.infinity,
       child: p.bannerUrl.isNotEmpty
-      ? CachedNetworkImage(
-        imageUrl: p.bannerUrl,
-        httpHeaders: _imageHeaders,
-        fit: BoxFit.cover,
-              placeholder: (context, url) =>
-                  Container(color: AppColors.bgInput),
-              errorWidget: (context, url, error) => Container(
+          ? FAImage(
+              url: p.bannerUrl,
+              client: widget.client,
+              height: height,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              placeholder: Container(color: AppColors.bgInput),
+              errorWidget: Container(
                 color: AppColors.bgInput,
                 child: const Icon(Icons.image,
                     color: AppColors.textMuted, size: 48),
@@ -249,6 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+
   Widget _buildHeader(FAUser p) {
     return Transform.translate(
       offset: const Offset(0, -40),
@@ -257,24 +265,32 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.bg, width: 4),
-              ),
-                  child: CircleAvatar(
-                    radius: 44,
-                    backgroundColor: AppColors.bgInput,
-                    backgroundImage: p.avatarUrl.isNotEmpty
-                        ? CachedNetworkImageProvider(p.avatarUrl,
-                            headers: _imageHeaders)
-                        : null,
-                child: p.avatarUrl.isEmpty
-                    ? const Icon(Icons.person,
-                        color: AppColors.textMuted, size: 44)
-                    : null,
-              ),
-            ),
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.bg, width: 4),
+                      ),
+                      child: CircleAvatar(
+                        radius: 44,
+                        backgroundColor: AppColors.bgInput,
+                        child: p.avatarUrl.isNotEmpty
+                            ? FAImage(
+                                url: p.avatarUrl,
+                                client: widget.client,
+                                width: 88,
+                                height: 88,
+                                fit: BoxFit.cover,
+                                errorWidget: const Icon(
+                                  Icons.person,
+                                  color: AppColors.textMuted,
+                                  size: 44,
+                                ),
+                              )
+                            : const Icon(Icons.person,
+                                color: AppColors.textMuted, size: 44),
+                      ),
+                    ),
+
             const SizedBox(width: 16),
             Expanded(
               child: Column(

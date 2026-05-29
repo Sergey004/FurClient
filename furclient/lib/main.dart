@@ -1,10 +1,14 @@
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, HttpClient;
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:system_theme/system_theme.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
+import 'package:cronet_http/cronet_http.dart';
+import 'package:cupertino_http/cupertino_http.dart';
 import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'services/fa_client.dart';
@@ -23,7 +27,6 @@ void main() {
       await InAppWebViewController.setWebContentsDebuggingEnabled(true);
     }
 
-    // ← добавить сюда:
     if (Platform.isWindows) {
       final availableVersion = await WebViewEnvironment.getAvailableVersion();
       assert(availableVersion != null, 'WebView2 Runtime not found.');
@@ -44,7 +47,18 @@ void main() {
     }
 
     AppTheme.setSystemOverlay();
-    runApp(const FurClientApp());
+
+    await http.runWithClient(() async {
+      runApp(const FurClientApp());
+    }, () {
+      if (Platform.isAndroid) {
+        return CronetClient.defaultCronetEngine();
+      } else if (Platform.isIOS || Platform.isMacOS) {
+        return CupertinoClient.defaultSessionConfiguration();
+      } else {
+        return IOClient(HttpClient());
+      }
+    });
   }, (error, stack) {
     debugPrint('Unhandled error: $error\n$stack');
   });
