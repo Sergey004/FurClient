@@ -32,6 +32,34 @@ class _FluentShellState extends State<FluentShell> {
     setState(() => _sfwMode = value);
   }
 
+  Future<void> _confirmLogout() async {
+    final confirmed = await fluent.showDialog<bool>(
+      context: context,
+      builder: (ctx) => fluent.ContentDialog(
+        title: const fluent.Text('Sign out'),
+        content: fluent.Text(
+          'Sign out of ${widget.session.username}?',
+        ),
+        actions: [
+          fluent.Button(
+            child: const fluent.Text('Cancel'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+          ),
+          fluent.FilledButton(
+            style: fluent.ButtonStyle(
+              backgroundColor: fluent.WidgetStateProperty.all(
+                fluent.Colors.errorPrimaryColor,
+              ),
+            ),
+            child: const fluent.Text('Sign out'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) widget.onLogout();
+  }
+
   @override
   Widget build(BuildContext context) {
     return fluent.NavigationView(
@@ -39,26 +67,85 @@ class _FluentShellState extends State<FluentShell> {
         selected: _currentIndex,
         onChanged: (index) => setState(() => _currentIndex = index),
         displayMode: fluent.PaneDisplayMode.auto,
+        header: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              fluent.SmallThumbnail(
+                child: widget.session.avatarUrl.isNotEmpty
+                    ? Image.network(
+                        widget.session.avatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const fluent.Icon(
+                          fluent.FluentIcons.contact,
+                        ),
+                      )
+                    : const fluent.Icon(fluent.FluentIcons.contact),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    fluent.Text(
+                      widget.session.username,
+                      style: fluent.FluentTheme.of(context)
+                          .typography
+                          .bodyStrong,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    fluent.Text(
+                      'FurAffinity',
+                      style: fluent.FluentTheme.of(context)
+                          .typography
+                          .caption
+                          ?.copyWith(
+                            color: fluent.FluentTheme.of(context)
+                                .inactiveColor,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         items: [
           fluent.PaneItem(
             icon: const fluent.Icon(fluent.FluentIcons.photo2),
             title: const fluent.Text('Gallery'),
-      body: GalleryScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
-        ),
-        fluent.PaneItem(
-          icon: const fluent.Icon(fluent.FluentIcons.search),
-          title: const fluent.Text('Search'),
-          body: SearchScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
-        ),
-        fluent.PaneItem(
-          icon: const fluent.Icon(fluent.FluentIcons.ringer),
-          title: const fluent.Text('Notifications'),
-          body: NotificationsScreen(client: widget.client, onLogout: widget.onLogout),
-        ),
-        fluent.PaneItem(
-          icon: const fluent.Icon(fluent.FluentIcons.contact),
-          title: const fluent.Text('Profile'),
-          body: ProfileScreen(client: widget.client, session: widget.session, onLogout: widget.onLogout),
+            body: GalleryScreen(
+              client: widget.client,
+              sfwMode: _sfwMode,
+              onLogout: widget.onLogout,
+            ),
+          ),
+          fluent.PaneItem(
+            icon: const fluent.Icon(fluent.FluentIcons.search),
+            title: const fluent.Text('Search'),
+            body: SearchScreen(
+              client: widget.client,
+              sfwMode: _sfwMode,
+              onLogout: widget.onLogout,
+            ),
+          ),
+          fluent.PaneItem(
+            icon: const fluent.Icon(fluent.FluentIcons.ringer),
+            title: const fluent.Text('Notifications'),
+            body: NotificationsScreen(
+              client: widget.client,
+              onLogout: widget.onLogout,
+            ),
+          ),
+          fluent.PaneItem(
+            icon: const fluent.Icon(fluent.FluentIcons.contact),
+            title: const fluent.Text('Profile'),
+            body: ProfileScreen(
+              client: widget.client,
+              session: widget.session,
+              onLogout: widget.onLogout,
+            ),
           ),
           fluent.PaneItem(
             icon: const fluent.Icon(fluent.FluentIcons.settings),
@@ -68,6 +155,15 @@ class _FluentShellState extends State<FluentShell> {
               onSfwModeChanged: _onSfwModeChanged,
               onLogout: widget.onLogout,
             ),
+          ),
+        ],
+        footerItems: [
+          fluent.PaneItemSeparator(),
+          fluent.PaneItem(
+            icon: const fluent.Icon(fluent.FluentIcons.sign_out),
+            title: const fluent.Text('Sign out'),
+            body: const SizedBox.shrink(),
+            onTap: _confirmLogout,
           ),
         ],
       ),
