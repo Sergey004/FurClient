@@ -71,16 +71,20 @@ class _FluentShellState extends State<FluentShell> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
-              fluent.SmallThumbnail(
-                child: widget.session.avatarUrl.isNotEmpty
-                    ? Image.network(
-                        widget.session.avatarUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const fluent.Icon(
-                          fluent.FluentIcons.contact,
-                        ),
-                      )
-                    : const fluent.Icon(fluent.FluentIcons.contact),
+              ClipOval(
+                child: SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: widget.session.avatarUrl.isNotEmpty
+                      ? Image.network(
+                          widget.session.avatarUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const fluent.Icon(
+                            fluent.FluentIcons.contact,
+                          ),
+                        )
+                      : const fluent.Icon(fluent.FluentIcons.contact),
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -90,9 +94,8 @@ class _FluentShellState extends State<FluentShell> {
                   children: [
                     fluent.Text(
                       widget.session.username,
-                      style: fluent.FluentTheme.of(context)
-                          .typography
-                          .bodyStrong,
+                      style:
+                          fluent.FluentTheme.of(context).typography.bodyStrong,
                       overflow: TextOverflow.ellipsis,
                     ),
                     fluent.Text(
@@ -101,8 +104,7 @@ class _FluentShellState extends State<FluentShell> {
                           .typography
                           .caption
                           ?.copyWith(
-                            color: fluent.FluentTheme.of(context)
-                                .inactiveColor,
+                            color: fluent.FluentTheme.of(context).inactiveColor,
                           ),
                     ),
                   ],

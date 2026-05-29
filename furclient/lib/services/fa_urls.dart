@@ -2,11 +2,21 @@ class FAUrls {
   static const String baseUrl = 'https://www.furaffinity.net';
 
   static String get home => baseUrl;
+  static Uri get homeUrl => Uri.parse(baseUrl);
+
   static String get login => '$baseUrl/login';
+  static Uri get loginUrl => Uri.parse(login);
+
   static String get register => '$baseUrl/register';
+  static Uri get registerUrl => Uri.parse(register);
+
   static String get submissions => '$baseUrl/msg/submissions/new@72';
+  static Uri get latest72SubmissionsUrl => Uri.parse(submissions);
+
   static String submissionsFrom(int sid) =>
       '$baseUrl/msg/submissions/new~$sid@72';
+
+  static Uri submissionsUrl(int sid) => Uri.parse(submissionsFrom(sid));
 
   static String browse({String filter = 'all', int? page}) {
     final params = <String>[];
@@ -32,20 +42,25 @@ class FAUrls {
   static String avatar(String username) =>
       'https://a.furaffinity.net/$username.gif';
   static String gallery(String username) => '$baseUrl/gallery/$username/';
-  static String favorites(String username) =>
-      '$baseUrl/favorites/$username/';
+  static Uri userGalleryUrl(String username) => Uri.parse(gallery(username));
+
+  static String favorites(String username) => '$baseUrl/favorites/$username/';
+  static Uri userFavoritesUrl(String username) =>
+      Uri.parse(favorites(username));
+
   static String journals(String username) => '$baseUrl/journals/$username/';
+  static Uri userJournalsUrl(String username) => Uri.parse(journals(username));
+
   static String journal(String id) => '$baseUrl/journal/$id/';
+  static Uri journalUrl(String id) => Uri.parse(journal(id));
 
   static String watchlist(String username, String direction, {int? page}) {
     final p = (page != null && page > 1) ? '?page=$page' : '';
     return '$baseUrl/watchlist/$direction/$username/$p';
   }
 
-  static String get notesInbox =>
-      '$baseUrl/controls/switchbox/inbox/';
-  static String get notesSent =>
-      '$baseUrl/controls/switchbox/sent/';
+  static String get notesInbox => '$baseUrl/controls/switchbox/inbox/';
+  static String get notesSent => '$baseUrl/controls/switchbox/sent/';
   static String newNote(String username) => '$baseUrl/newpm/$username/';
 
   static const Map<String, String> filterMap = {
