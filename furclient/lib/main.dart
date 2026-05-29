@@ -21,34 +21,34 @@ WebViewEnvironment? webViewEnvironment;
 
 void main() {
   runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-
-    if (Platform.isAndroid) {
-      await InAppWebViewController.setWebContentsDebuggingEnabled(true);
-    }
-
-    if (Platform.isWindows) {
-      final availableVersion = await WebViewEnvironment.getAvailableVersion();
-      assert(availableVersion != null, 'WebView2 Runtime not found.');
-      final dir = await getApplicationSupportDirectory();
-      webViewEnvironment = await WebViewEnvironment.create(
-        settings: WebViewEnvironmentSettings(
-          userDataFolder: '${dir.path}\\webview2_data',
-          additionalBrowserArguments: '--disable-gpu --use-gl=swiftshader',
-        ),
-      );
-    }
-
-    if (isDesktop) {
-      try {
-        SystemTheme.fallbackColor = AppColors.fluentCyanDark;
-        await SystemTheme.accentColor.load();
-      } catch (_) {}
-    }
-
-    AppTheme.setSystemOverlay();
-
     await http.runWithClient(() async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      if (Platform.isAndroid) {
+        await InAppWebViewController.setWebContentsDebuggingEnabled(true);
+      }
+
+      if (Platform.isWindows) {
+        final availableVersion = await WebViewEnvironment.getAvailableVersion();
+        assert(availableVersion != null, 'WebView2 Runtime not found.');
+        final dir = await getApplicationSupportDirectory();
+        webViewEnvironment = await WebViewEnvironment.create(
+          settings: WebViewEnvironmentSettings(
+            userDataFolder: '${dir.path}\\webview2_data',
+            additionalBrowserArguments: '--disable-gpu --use-gl=swiftshader',
+          ),
+        );
+      }
+
+      if (isDesktop) {
+        try {
+          SystemTheme.fallbackColor = AppColors.fluentCyanDark;
+          await SystemTheme.accentColor.load();
+        } catch (_) {}
+      }
+
+      AppTheme.setSystemOverlay();
+
       runApp(const FurClientApp());
     }, () {
       if (Platform.isAndroid) {
