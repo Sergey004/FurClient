@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/models.dart';
 import '../utils/cookie_manager.dart';
+import '../utils/cookie_store.dart';
 import 'fa_urls.dart';
 import '../main.dart' show webViewEnvironment;
 
@@ -205,6 +206,20 @@ class FAClient {
 
     await _saveWebViewCookiesToSession(allCookies);
     await _saveWebViewCookiesToCookieJar(allCookies);
+
+    final ioCookies = allCookies
+        .where((c) => (c.value as String? ?? '').isNotEmpty)
+        .map((c) {
+          final cookie = io.Cookie(c.name, c.value as String? ?? '');
+          cookie.domain = c.domain ?? '.furaffinity.net';
+          cookie.path = c.path ?? '/';
+          cookie.secure = c.isSecure ?? true;
+          return cookie;
+        })
+        .toList();
+    if (ioCookies.isNotEmpty) {
+      CookieStore.instance.setCookies(ioCookies);
+    }
   }
 
   Future<void> _saveWebViewCookiesToSession(List<Cookie> webViewCookies) async {
@@ -346,6 +361,7 @@ class FAClient {
       }
       if (cookies.isNotEmpty) {
         await _cookieJar.saveFromResponse(Uri.parse(FAUrls.baseUrl), cookies);
+        CookieStore.instance.setCookies(cookies);
         debugPrint('=== Restored ${cookies.length} cookies from session');
       }
     } catch (e) {
