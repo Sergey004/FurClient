@@ -1,12 +1,13 @@
-import 'package:extended_image/extended_image.dart';
+import 'dart:async';
+import 'dart:io' as io;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:fa_kit/fa_kit.dart';
 
 import '../utils/cookie_store.dart';
 
 /// FA-специфичный виджет для загрузки изображений.
-/// Аналог iOS Kingfisher — кэширование, User-Agent, состояния загрузки.
-class FAImage extends StatelessWidget {
+class FAImage extends StatefulWidget {
   final String url;
   final DynamicThumbnail? dynamicThumbnail;
   final double? width;
@@ -14,8 +15,6 @@ class FAImage extends StatelessWidget {
   final BoxFit fit;
   final Widget? placeholder;
   final Widget? errorWidget;
-  final ExtendedImageMode mode;
-  final GestureConfig? gestureConfig;
 
   const FAImage({
     super.key,
@@ -26,22 +25,33 @@ class FAImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.placeholder,
     this.errorWidget,
-    this.mode = ExtendedImageMode.none,
-    this.gestureConfig,
   });
 
+  @override
+  State<FAImage> createState() => _FAImageState();
+}
+
+class _FAImageState extends State<FAImage> {
+  Uint8List? _bytes;
+  bool _isLoading = true;
+  bool _hasError = false;
+
   String get _resolvedUrl {
-    if (dynamicThumbnail != null && width != null && height != null) {
-      return dynamicThumbnail!
-          .bestThumbnailUrl(width: width!, height: height!)
+    if (widget.dynamicThumbnail != null &&
+        widget.width != null &&
+        widget.height != null) {
+      return widget.dynamicThumbnail!
+          .bestThumbnailUrl(width: widget.width!, height: widget.height!)
           .toString();
     }
-    return url;
+    return widget.url;
   }
 
-  Map<String, String> get _headers {
+  Map<String, String> get _requestHeaders {
     final headers = <String, String>{
-      'User-Agent': 'ceylo.FurAffinityApp/1.0',
+      'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://www.furaffinity.net',
     };
     final cookieHeader = CookieStore.instance.cookieHeader;
     if (cookieHeader != null) {
@@ -51,43 +61,92 @@ class FAImage extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final imageUrl = _resolvedUrl;
-    if (imageUrl.isEmpty) return _buildPlaceholder();
-
-    return ExtendedImage.network(
-      imageUrl,
-      width: width,
-      height: height,
-      fit: fit,
-      cache: true,
-      headers: _headers,
-      mode: mode,
-      initGestureConfigHandler: gestureConfig != null
-          ? (_) => gestureConfig!
-          : (state) => GestureConfig(
-                minScale: 0.8,
-                maxScale: 4.0,
-                inPageView: false,
-              ),
-      loadStateChanged: (state) {
-        switch (state.extendedImageLoadState) {
-          case LoadState.loading:
-            return placeholder ?? _defaultPlaceholder();
-          case LoadState.failed:
-            return errorWidget ?? _defaultError();
-          case LoadState.completed:
-            return null; // рендерит сам
-        }
-      },
-    );
+  void initState() {
+    super.initState();
+    _loadImage();
   }
 
-  Widget _buildPlaceholder() {
-    return SizedBox(
-      width: width,
-      height: height,
-      child: placeholder ?? _defaultPlaceholder(),
+  @override
+  void didUpdateWidget(FAImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _loadImage();
+    }
+  }
+
+  Future<void> _loadImage() async {
+    final imageUrl = _resolvedUrl;
+    if (imageUrl.isEmpty) {
+      setState(() { _isLoading = false; _hasError = true; });
+      return;
+    }
+
+    setState(() { _isLoading = true; _hasError = false; _bytes = null; });
+
+    try {
+      final client = io.HttpClient()
+        ..connectionTimeout = const Duration(seconds: 30);
+      final request = await client.getUrl(Uri.parse(imageUrl));
+      _requestHeaders.forEach((k, v) => request.headers.set(k, v));
+      final response = await request.close();
+
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+
+      final completer = Completer<Uint8List>();
+      final chunks = <int>[];
+      response.listen(
+        (chunk) => chunks.addAll(chunk),
+        onDone: () => completer.complete(Uint8List.fromList(chunks)),
+        onError: (e) => completer.completeError(e),
+      );
+      final bytes = await completer.future;
+      client.close();
+
+      if (mounted) {
+        setState(() {
+          _bytes = bytes;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('FAImage error: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return widget.placeholder ?? _defaultPlaceholder();
+    }
+
+    if (_hasError || _bytes == null) {
+      return widget.errorWidget ?? _defaultError();
+    }
+
+    if (widget.fit == BoxFit.contain) {
+      return InteractiveViewer(
+        child: Image.memory(
+          _bytes!,
+          width: widget.width,
+          height: widget.height,
+          fit: widget.fit,
+        ),
+      );
+    }
+
+    return Image.memory(
+      _bytes!,
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
     );
   }
 

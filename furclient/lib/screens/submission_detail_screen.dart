@@ -1,4 +1,3 @@
-import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
@@ -231,7 +230,6 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           ? FAImage(
               url: sub.imageUrl,
               fit: BoxFit.contain,
-              mode: ExtendedImageMode.gesture,
               placeholder: Container(
                 height: 300,
                 color: AppColors.bgInput,
