@@ -218,7 +218,12 @@ class FAClient {
         })
         .toList();
     if (ioCookies.isNotEmpty) {
+      debugPrint('=== Syncing ${ioCookies.length} cookies to CookieStore from WebView');
+      for (final cookie in ioCookies) {
+        debugPrint('  - ${cookie.name}: ${cookie.value} (domain: ${cookie.domain})');
+      }
       CookieStore.instance.setCookies(ioCookies);
+      debugPrint('=== CookieStore now has: ${CookieStore.instance.cookieHeader}');
     }
   }
 
@@ -361,7 +366,12 @@ class FAClient {
       }
       if (cookies.isNotEmpty) {
         await _cookieJar.saveFromResponse(Uri.parse(FAUrls.baseUrl), cookies);
+        debugPrint('=== Restoring ${cookies.length} cookies from session to CookieStore');
+        for (final cookie in cookies) {
+          debugPrint('  - ${cookie.name}: ${cookie.value}');
+        }
         CookieStore.instance.setCookies(cookies);
+        debugPrint('=== CookieStore after restore: ${CookieStore.instance.cookieHeader}');
         debugPrint('=== Restored ${cookies.length} cookies from session');
       }
     } catch (e) {

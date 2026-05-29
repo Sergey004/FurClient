@@ -54,6 +54,7 @@ class _FAImageState extends State<FAImage> {
       'Referer': 'https://www.furaffinity.net',
     };
     final cookieHeader = CookieStore.instance.cookieHeader;
+    debugPrint('=== FAImage CookieStore header: $cookieHeader');
     if (cookieHeader != null) {
       headers['Cookie'] = cookieHeader;
     }
@@ -87,8 +88,9 @@ class _FAImageState extends State<FAImage> {
       try {
         final client = io.HttpClient()
           ..connectionTimeout = const Duration(seconds: 30);
-        final request = await client.getUrl(Uri.parse(imageUrl));
-        _requestHeaders.forEach((k, v) => request.headers.set(k, v));
+      final request = await client.getUrl(Uri.parse(imageUrl));
+      debugPrint('=== FAImage request to: $imageUrl');
+      _requestHeaders.forEach((k, v) => request.headers.set(k, v));
         final response = await request.close();
 
         if (response.statusCode == 403 && attempt < 2) {
