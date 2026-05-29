@@ -128,7 +128,18 @@ class FAClient {
           final html = await controller.getHtml() ?? '';
           if (_isCloudflarePage(html)) {
             debugPrint('=== CF pass: challenge detected, waiting...');
-            return;
+            // Дополнительная проверка через 2 секунды
+            await Future.delayed(const Duration(seconds: 2));
+            final finalHtml = await controller.getHtml() ?? '';
+            if (_isCloudflarePage(finalHtml)) {
+              debugPrint('=== CF pass: challenge still present, retrying...');
+              await Future.delayed(const Duration(seconds: 3));
+              final retryHtml = await controller.getHtml() ?? '';
+              if (_isCloudflarePage(retryHtml)) {
+                debugPrint('=== CF pass: challenge not resolved');
+                return;
+              }
+            }
           }
           debugPrint('=== CF pass: page loaded successfully');
           await _syncCookiesFromWebView();
@@ -154,9 +165,9 @@ class FAClient {
       );
 
       final success = await completer.future.timeout(
-        const Duration(seconds: 45),
+        const Duration(seconds: 60),
         onTimeout: () {
-          debugPrint('=== CF pass: timeout, trying to sync cookies anyway');
+          debugPrint('=== CF pass: timeout, syncing cookies anyway');
           return false;
         },
       );
