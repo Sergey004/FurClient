@@ -1,13 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:fa_kit/fa_kit.dart';
-import 'package:http/http.dart' as http;
 
 import '../utils/cookie_store.dart';
-import '../utils/cloudflare_bypass/datareceiver.dart';
+
 
 /// FA-специфичный виджет для загрузки изображений.
 class FAImage extends StatefulWidget {
@@ -89,33 +87,7 @@ class _FAImageState extends State<FAImage> {
 
     for (int attempt = 0; attempt < 3; attempt++) {
       try {
-        // Пробуем сначала с cloudflare_bypass
-        if (attempt == 0) {
-          debugPrint('=== FAImage: trying cloudflare_bypass for $imageUrl');
-          
-          final requestData = jsonEncode({
-            'url': imageUrl,
-            'headers': _requestHeaders,
-            'isCloudflare': 'yes',
-            'method': 'GET',
-          });
-          
-          final result = await httpRequest(requestData, 'image_${DateTime.now().millisecondsSinceEpoch}');
-          
-          if (result != 'error' && result != 'empty') {
-            final bytes = http.Response(result, 200).bodyBytes;
-            if (mounted) {
-              setState(() {
-                _bytes = bytes;
-                _isLoading = false;
-              });
-            }
-            return;
-          }
-        }
-        
-        // Если cloudflare_bypass не сработал, пробуем напрямую
-        debugPrint('=== FAImage: trying direct HTTP for $imageUrl');
+        debugPrint('=== FAImage: trying HTTP for $imageUrl (attempt $attempt)');
         final client = io.HttpClient()
           ..connectionTimeout = const Duration(seconds: 30);
         final request = await client.getUrl(Uri.parse(imageUrl));

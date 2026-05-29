@@ -12,8 +12,6 @@ import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 import '../utils/cookie_manager.dart';
 import '../utils/cookie_store.dart';
-import '../utils/cloudflare_bypass/cloudflare_bypass.dart';
-import '../utils/cloudflare_bypass/storage.dart';
 import 'fa_urls.dart';
 import '../main.dart' show webViewEnvironment;
 
@@ -36,7 +34,7 @@ class FAClient {
 
   bool _cfPassInProgress = false;
   DateTime? _lastCfPass;
-  static Duration _cfPassCooldown = const Duration(minutes: 5);
+  static final Duration _cfPassCooldown = const Duration(minutes: 5);
 
   static const String _userAgent = 'ceylo.FurAffinityApp/1.0';
 
@@ -115,116 +113,77 @@ class FAClient {
 
     _cfPassInProgress = true;
     try {
-      debugPrint('=== CF pass: using cloudflare_bypass...');
-      
-      // Используем наш новый обходчик
-      final result = await cloudflareBypass(
-        url: FAUrls.home,
-        id: 'cf_clearance_${DateTime.now().millisecondsSinceEpoch}',
-        method: 'GET',
+      debugPrint('=== CF pass: opening HeadlessWebView for ${FAUrls.home}');
+      final completer = Completer<bool>();
+      HeadlessInAppWebView? headless;
+
+      headless = HeadlessInAppWebView(
+        webViewEnvironment: webViewEnvironment,
+        initialSettings: InAppWebViewSettings(
+          javaScriptEnabled: true,
+        ),
+        onLoadStop: (controller, url) async {
+          final html = await controller.getHtml() ?? '';
+          debugPrint('=== CF pass: HTML length: ${html.length}');
+
+          if (_isCloudflarePage(html)) {
+            debugPrint('=== CF pass: challenge detected, waiting...');
+            // Ждем 10 секунд для решения challenge
+            await Future.delayed(const Duration(seconds: 10));
+            final retryHtml = await controller.getHtml() ?? '';
+            debugPrint('=== CF pass: retry HTML length: ${retryHtml.length}');
+
+            if (_isCloudflarePage(retryHtml)) {
+              debugPrint('=== CF pass: challenge NOT resolved');
+              return;
+            }
+          }
+
+          debugPrint(
+              '=== CF pass: page loaded successfully, syncing cookies...');
+          await _syncCookiesFromWebView();
+          completer.complete(true);
+        },
+        onReceivedHttpError: (controller, request, response) async {
+          if (!(request.isForMainFrame ?? false)) return;
+          final status = response.statusCode ?? 0;
+          if (status == 403 || status == 503) {
+            debugPrint('=== CF pass: HTTP $status — challenge in progress');
+          }
+        },
+        onReceivedError: (controller, request, error) async {
+          if (!(request.isForMainFrame ?? false)) return;
+          debugPrint('=== CF pass: error — ${error.description}');
+        },
+        initialUrlRequest: URLRequest(
+          url: WebUri(FAUrls.home),
+        ),
       );
-      
-      if (result == null || result['html'] == null) {
-        debugPrint('=== CF pass: bypass failed, no result returned');
-        return false;
+
+      await headless.run();
+
+      final success = await completer.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint('=== CF pass: timeout, syncing cookies anyway');
+          return false;
+        },
+      );
+
+      await headless.dispose();
+
+      if (!success) {
+        await _syncCookiesFromWebView();
       }
-      
-      debugPrint('=== CF pass: bypass completed, HTML length: ${(result['html'] as String?)?.length ?? 0}');
-      debugPrint('=== CF pass: cf_clearance found: ${result['cf_clearance_found']}');
-      
-      // Синхронизируем cookies после обхода
-      await _syncCookiesFromWebView();
-      
-      // Добавляем cf_clearance в сессию
-      await addCfClearanceToSession();
-      
+
       _lastCfPass = DateTime.now();
-      debugPrint('=== CF pass: completed successfully');
+      debugPrint('=== CF pass: completed');
       return true;
     } catch (e) {
       debugPrint('=== CF pass error: $e');
       return false;
     } finally {
       _cfPassInProgress = false;
-    }
-  }
-
-  /// Принудительный обход Cloudflare challenge с расширенным временем
-  Future<bool> forceCloudflarePass() async {
-    debugPrint('=== CF force: starting forced bypass...');
-    
-    // Сбрасываем кулдаун
-    _lastCfPass = null;
-    _cfPassInProgress = false;
-    
-    // Временно увеличиваем время ожидания
-    final originalCooldown = _cfPassCooldown;
-    _cfPassCooldown = const Duration(minutes: 1);
-    
-    try {
-      return await passCloudflareChallenge();
-    } finally {
-      // Восстанавливаем оригинальный кулдаун
-      _cfPassCooldown = originalCooldown;
-    }
-  }
-
-  /// Проверить наличие cf_clearance cookie
-  Future<bool> hasCfClearance() async {
-    final cookieMain = CookieMain();
-    final cfClearanceData = await cookieMain.getData('cf_clearance_${DateTime.now().millisecondsSinceEpoch}');
-    return cfClearanceData != null;
-  }
-
-  /// Добавить cf_clearance cookie в сессию
-  Future<void> addCfClearanceToSession() async {
-    try {
-      final cookieMain = CookieMain();
-      final cfClearanceData = await cookieMain.getData('cf_clearance_${DateTime.now().millisecondsSinceEpoch}');
-      
-      if (cfClearanceData != null && _session?.cookies != null) {
-        debugPrint('=== Adding cf_clearance to session...');
-        
-        // Декодируем текущие cookies из сессии
-        final List<dynamic> raw = jsonDecode(_session!.cookies!);
-        final sessionCookies = <String, Map<String, dynamic>>{};
-        
-        for (final item in raw) {
-          if (item is Map<String, dynamic>) {
-            final name = item['name']?.toString() ?? '';
-            if (name.isNotEmpty) sessionCookies[name] = item;
-          }
-        }
-        
-        // Декодируем cf_clearance cookie
-        final cfClearanceMap = jsonDecode(cfClearanceData) as Map<String, dynamic>;
-        
-        // Добавляем в сессию
-        sessionCookies['cf_clearance'] = {
-          'name': 'cf_clearance',
-          'value': cfClearanceMap['value'],
-          'domain': cfClearanceMap['domain'] ?? '.furaffinity.net',
-          'path': cfClearanceMap['path'] ?? '/',
-          'isHttpOnly': cfClearanceMap['isHttpOnly'] ?? false,
-          'isSecure': cfClearanceMap['isSecure'] ?? true,
-          'expiresDate': cfClearanceMap['expires'],
-        };
-        
-        // Обновляем сессию
-        _session = UserSession(
-          username: _session!.username,
-          avatarUrl: _session!.avatarUrl,
-          isLoggedIn: _session!.isLoggedIn,
-          cookies: jsonEncode(sessionCookies.values.toList()),
-        );
-        
-        debugPrint('=== Session updated with cf_clearance');
-        
-        // Сохраняем сессию
-        // await _authService.saveSession(_session!); // TODO: Implement this
-      }
-    } catch (e) {
-      debugPrint('=== Error adding cf_clearance to session: $e');
     }
   }
 
@@ -257,26 +216,27 @@ class FAClient {
     await _saveWebViewCookiesToSession(allCookies);
     await _saveWebViewCookiesToCookieJar(allCookies);
 
-    final ioCookies = allCookies
-        .where((c) => (c.value as String? ?? '').isNotEmpty)
-        .map((c) {
-          final cookie = io.Cookie(c.name, c.value as String? ?? '');
-          cookie.domain = c.domain ?? '.furaffinity.net';
-          cookie.path = c.path ?? '/';
-          cookie.secure = c.isSecure ?? true;
-          return cookie;
-        })
-        .toList();
-      if (ioCookies.isNotEmpty) {
-        debugPrint('=== Syncing ${ioCookies.length} cookies to CookieStore from WebView');
-        for (final cookie in ioCookies) {
-          debugPrint('  - ${cookie.name}: ${cookie.value} (domain: ${cookie.domain})');
-        }
-        CookieStore.instance.setCookies(ioCookies);
-        debugPrint('=== CookieStore now has: ${CookieStore.instance.cookieHeader}');
-      } else {
-        debugPrint('=== No cookies synced from WebView');
+    final ioCookies =
+        allCookies.where((c) => (c.value as String? ?? '').isNotEmpty).map((c) {
+      final cookie = io.Cookie(c.name, c.value as String? ?? '');
+      cookie.domain = c.domain ?? '.furaffinity.net';
+      cookie.path = c.path ?? '/';
+      cookie.secure = c.isSecure ?? true;
+      return cookie;
+    }).toList();
+    if (ioCookies.isNotEmpty) {
+      debugPrint(
+          '=== Syncing ${ioCookies.length} cookies to CookieStore from WebView');
+      for (final cookie in ioCookies) {
+        debugPrint(
+            '  - ${cookie.name}: ${cookie.value} (domain: ${cookie.domain})');
       }
+      CookieStore.instance.setCookies(ioCookies);
+      debugPrint(
+          '=== CookieStore now has: ${CookieStore.instance.cookieHeader}');
+    } else {
+      debugPrint('=== No cookies synced from WebView');
+    }
   }
 
   Future<void> _saveWebViewCookiesToSession(List<Cookie> webViewCookies) async {
@@ -318,7 +278,8 @@ class FAClient {
     }
   }
 
-  Future<void> _saveWebViewCookiesToCookieJar(List<Cookie> webViewCookies) async {
+  Future<void> _saveWebViewCookiesToCookieJar(
+      List<Cookie> webViewCookies) async {
     if (!io.Platform.isWindows) {
       await _ensureInitialized();
     }
@@ -335,6 +296,10 @@ class FAClient {
     if (cookies.isNotEmpty && !io.Platform.isWindows) {
       await _cookieJar.saveFromResponse(Uri.parse(FAUrls.baseUrl), cookies);
       debugPrint('=== CookieJar updated with ${cookies.length} cookies');
+
+      // Обновляем CookieStore для использования в FAImage
+      CookieStore.instance.setCookies(cookies);
+      debugPrint('=== CookieStore updated with ${cookies.length} cookies');
     }
   }
 
@@ -418,12 +383,14 @@ class FAClient {
       }
       if (cookies.isNotEmpty) {
         await _cookieJar.saveFromResponse(Uri.parse(FAUrls.baseUrl), cookies);
-        debugPrint('=== Restoring ${cookies.length} cookies from session to CookieStore');
+        debugPrint(
+            '=== Restoring ${cookies.length} cookies from session to CookieStore');
         for (final cookie in cookies) {
           debugPrint('  - ${cookie.name}: ${cookie.value}');
         }
         CookieStore.instance.setCookies(cookies);
-        debugPrint('=== CookieStore after restore: ${CookieStore.instance.cookieHeader}');
+        debugPrint(
+            '=== CookieStore after restore: ${CookieStore.instance.cookieHeader}');
         debugPrint('=== Restored ${cookies.length} cookies from session');
       }
     } catch (e) {
@@ -588,8 +555,7 @@ class FAClient {
       final options = cookieHeader != null
           ? Options(headers: {'Cookie': cookieHeader})
           : null;
-      final response =
-          await _dio.get<String>(FAUrls.home, options: options);
+      final response = await _dio.get<String>(FAUrls.home, options: options);
       try {
         _checkCloudflare(response);
       } on CloudflareError {
@@ -651,8 +617,7 @@ class FAClient {
   }
 
   Future<List<Submission>> getGallery(String username, {int page = 1}) async {
-    final html =
-        await _getHtml('${FAUrls.gallery(username)}?page=$page');
+    final html = await _getHtml('${FAUrls.gallery(username)}?page=$page');
     return Submission.parseSubmissionsPage(html);
   }
 
