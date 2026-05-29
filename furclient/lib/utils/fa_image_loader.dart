@@ -83,41 +83,55 @@ class _FAImageState extends State<FAImage> {
 
     setState(() { _isLoading = true; _hasError = false; _bytes = null; });
 
-    try {
-      final client = io.HttpClient()
-        ..connectionTimeout = const Duration(seconds: 30);
-      final request = await client.getUrl(Uri.parse(imageUrl));
-      _requestHeaders.forEach((k, v) => request.headers.set(k, v));
-      final response = await request.close();
+    for (int attempt = 0; attempt < 3; attempt++) {
+      try {
+        final client = io.HttpClient()
+          ..connectionTimeout = const Duration(seconds: 30);
+        final request = await client.getUrl(Uri.parse(imageUrl));
+        _requestHeaders.forEach((k, v) => request.headers.set(k, v));
+        final response = await request.close();
 
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}');
-      }
+        if (response.statusCode == 403 && attempt < 2) {
+          client.close();
+          debugPrint('FAImage retry $attempt after 403');
+          await Future.delayed(Duration(seconds: 2 + attempt * 3));
+          continue;
+        }
 
-      final completer = Completer<Uint8List>();
-      final chunks = <int>[];
-      response.listen(
-        (chunk) => chunks.addAll(chunk),
-        onDone: () => completer.complete(Uint8List.fromList(chunks)),
-        onError: (e) => completer.completeError(e),
-      );
-      final bytes = await completer.future;
-      client.close();
+        if (response.statusCode != 200) {
+          throw Exception('HTTP ${response.statusCode}');
+        }
 
-      if (mounted) {
-        setState(() {
-          _bytes = bytes;
-          _isLoading = false;
-        });
+        final completer = Completer<Uint8List>();
+        final chunks = <int>[];
+        response.listen(
+          (chunk) => chunks.addAll(chunk),
+          onDone: () => completer.complete(Uint8List.fromList(chunks)),
+          onError: (e) => completer.completeError(e),
+        );
+        final bytes = await completer.future;
+        client.close();
+
+        if (mounted) {
+          setState(() {
+            _bytes = bytes;
+            _isLoading = false;
+          });
+        }
+        return;
+      } catch (e) {
+        debugPrint('FAImage error (attempt $attempt): $e');
+        if (attempt < 2) {
+          await Future.delayed(Duration(seconds: 2 + attempt * 3));
+        }
       }
-    } catch (e) {
-      debugPrint('FAImage error: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
     }
   }
 
