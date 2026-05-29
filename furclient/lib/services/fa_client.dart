@@ -17,12 +17,12 @@ import '../main.dart' show webViewEnvironment;
 
 class CloudflareError implements Exception {
   final String message;
-  CloudflareError([String? customMessage])
-      : message = customMessage ??
-            'Cloudflare protection is active. Please re-login to pass the challenge.';
+  CloudflareError()
+      : message =
+            'FA is currently protected by Cloudflare challenge. Please try again later.';
 
   @override
-  String toString() => message;
+  String toString() => 'CloudflareError: $message';
 }
 
 class FAClient {
@@ -32,13 +32,16 @@ class FAClient {
   bool _initialized = false;
   Completer<void>? _initCompleter;
 
+  // Using a realistic browser User-Agent to avoid Cloudflare blocks
+  static const String _userAgent =
+      'Mozilla/5.0 (Linux; Android 13; SM-A325F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+
+  // Cloudflare bypass state
   bool _cfPassInProgress = false;
   DateTime? _lastCfPass;
-  static final Duration _cfPassCooldown = const Duration(minutes: 5);
+  static const Duration _cfPassCooldown = Duration(minutes: 5);
 
-  static const String _userAgent = 'ceylo.FurAffinityApp/1.0';
-
-  static const _cfCookieUrls = [
+  static const List<String> _cfCookieUrls = [
     'https://www.furaffinity.net',
     'https://furaffinity.net',
     'https://www.furaffinity.net/',
@@ -49,9 +52,15 @@ class FAClient {
       headers: {
         'User-Agent': _userAgent,
         'Accept':
-            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
-        'Referer': FAUrls.baseUrl,
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0',
       },
       validateStatus: (status) => status != null && status < 600,
       followRedirects: true,
@@ -67,15 +76,15 @@ class FAClient {
     }
     _initCompleter = Completer<void>();
     try {
-      final appDocDir = io.Directory.systemTemp.path != ''
-          ? await getApplicationSupportDirectory()
-          : null;
-      final cookiePath = '${appDocDir?.path ?? '/tmp'}/.cookies';
+      final appDocDir = await getApplicationSupportDirectory();
+      final cookiePath = '${appDocDir.path}/.cookies';
       final cookieDir = io.Directory(cookiePath);
       if (!cookieDir.existsSync()) {
         cookieDir.createSync(recursive: true);
       }
-      _cookieJar = PersistCookieJar(storage: FileStorage(cookiePath));
+      _cookieJar = PersistCookieJar(
+        storage: FileStorage(cookiePath),
+      );
       _dio.interceptors.add(dio_cookies.CookieManager(_cookieJar));
       _initialized = true;
       _initCompleter!.complete();
@@ -86,16 +95,196 @@ class FAClient {
     }
   }
 
-  Future<void> init() async => _ensureInitialized();
+  Future<void> init() async {
+    await _ensureInitialized();
+  }
 
   UserSession? get session => _session;
 
   Future<void> setSession(UserSession? session) async {
     _session = session;
-    if (!io.Platform.isWindows) {
-      await _restoreCookiesFromSession();
-    }
+    await _restoreCookiesFromSession();
     await passCloudflareChallenge();
+  }
+
+  Future<void> _restoreCookiesFromSession() async {
+    if (_session?.cookies == null) return;
+    await _ensureInitialized();
+    try {
+      final List<dynamic> cookiePairs = jsonDecode(_session!.cookies!);
+      final cookies = <io.Cookie>[];
+      for (final pair in cookiePairs) {
+        if (pair is List && pair.length >= 2) {
+          final name = pair[0].toString();
+          final value = pair[1].toString();
+          if (name.isNotEmpty && value.isNotEmpty) {
+            final cookie = io.Cookie(name, value)
+              ..domain = '.furaffinity.net'
+              ..path = '/';
+            cookies.add(cookie);
+          }
+        }
+      }
+      if (cookies.isNotEmpty) {
+        await _cookieJar.saveFromResponse(
+          Uri.parse(FAUrls.baseUrl),
+          cookies,
+        );
+        debugPrint('=== Restored ${cookies.length} cookies from session');
+      }
+    } catch (e) {
+      debugPrint('=== Error restoring cookies from session: $e');
+    }
+  }
+
+  void _checkCloudflare(Response response) {
+    final cfMitigated = response.headers.value('cf-mitigated');
+    if (cfMitigated == 'challenge' || (response.statusCode == 403)) {
+      throw CloudflareError();
+    }
+  }
+
+  Future<String> _getHtml(String url) async {
+    await _ensureInitialized();
+    try {
+      final response = await _dio.get<String>(url);
+      _checkCloudflare(response);
+      if (response.statusCode == null ||
+          response.statusCode! < 200 ||
+          response.statusCode! >= 300) {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          type: DioExceptionType.badResponse,
+          message: 'HTTP ${response.statusCode}',
+        );
+      }
+      return response.data ?? '';
+    } on CloudflareError {
+      debugPrint('=== CF detected on Dio request, attempting CF pass...');
+      final passed = await passCloudflareChallenge();
+      if (passed) {
+        try {
+          final retryHeader = io.Platform.isWindows
+              ? (await _buildCookieHeaderFromWebView() ?? _buildCookieHeader())
+              : _buildCookieHeader();
+          final retryOptions = retryHeader != null
+              ? Options(headers: {'Cookie': retryHeader})
+              : null;
+          final retryResponse = await _dio.get<String>(url,
+              options: retryOptions ?? Options());
+          _checkCloudflare(retryResponse);
+          if (retryResponse.statusCode == null ||
+              retryResponse.statusCode! < 200 ||
+              retryResponse.statusCode! >= 300) {
+            throw DioException(
+              requestOptions: retryResponse.requestOptions,
+              response: retryResponse,
+              type: DioExceptionType.badResponse,
+              message: 'HTTP ${retryResponse.statusCode}',
+            );
+          }
+          return retryResponse.data ?? '';
+        } catch (e) {
+          debugPrint('=== Dio retry after CF pass failed: $e');
+          rethrow;
+        }
+      } else {
+        debugPrint('=== CF pass failed, throwing original error');
+        rethrow;
+      }
+    }
+  }
+
+  Future<bool> verifySession() async {
+    if (_session?.cookies == null) return false;
+    try {
+      await _ensureInitialized();
+      final response = await _dio.get<String>(FAUrls.home);
+      // Detect Cloudflare mitigation if present in headers
+      try {
+        _checkCloudflare(response);
+      } on CloudflareError {
+        return false;
+      }
+
+      final status = response.statusCode ?? 0;
+      if (status == 401 || status == 403) return false;
+      if (status >= 500) return true;
+      if (status >= 200 && status < 300) return true;
+      return false;
+    } on CloudflareError {
+      return false;
+    } catch (e) {
+      // Network or parsing errors — treat as invalid session so UI can let WebView finish challenge
+      debugPrint('verifySession error: $e');
+      return false;
+    }
+  }
+
+  Future<void> clearCookies() async {
+    if (_initialized) {
+      await _cookieJar.deleteAll();
+    }
+  }
+
+  Future<List<Submission>> getSubmissions(int page, String category) async {
+    final url = FAUrls.browse(filter: category, page: page);
+    final html = await _getHtml(url);
+    return Submission.parseSubmissionsPage(html);
+  }
+
+  Future<List<Submission>> getGallery(String username, {int page = 1}) async {
+    final url = '${FAUrls.gallery(username)}?page=$page';
+    final html = await _getHtml(url);
+    return Submission.parseSubmissionsPage(html);
+  }
+
+  Future<Submission?> getSubmission(String id) async {
+    final url = FAUrls.viewSubmission(id);
+    final html = await _getHtml(url);
+    return Submission.parseSubmissionDetails(html, id);
+  }
+
+  Future<List<FAComment>> getComments(String id) async {
+    final url = FAUrls.viewSubmission(id);
+    final html = await _getHtml(url);
+    return FAComment.parseComments(html);
+  }
+
+  Future<List<Submission>> search(String query, {int page = 1}) async {
+    final url = FAUrls.search(query, page: page);
+    final html = await _getHtml(url);
+    return Submission.parseSearchResults(html);
+  }
+
+  Future<List<FANotification>> getNotifications() async {
+    final html = await _getHtml(FAUrls.notifications);
+    return FANotification.parseNotifications(html);
+  }
+
+  Future<FAUser?> getUser(String username) async {
+    final url = FAUrls.user(username);
+    final html = await _getHtml(url);
+    return FAUser.parseUserPage(html, username);
+  }
+
+  Future<FAUser?> getUserProfile(String username) async {
+    if (username == 'me') {
+      if (_session?.username != null && _session!.username != 'user') {
+        return getUser(_session!.username);
+      }
+      return null;
+    }
+    return getUser(username);
+  }
+
+  Future<bool> toggleWatch(String username, bool currentlyWatching) async {
+    final action = currentlyWatching ? 'unwatch' : 'watch';
+    final url = '${FAUrls.baseUrl}/$action/$username/';
+    await _ensureInitialized();
+    await _dio.post<String>(url);
+    return !currentlyWatching;
   }
 
   // ── CF Challenge Pass ────────────────────────────────────────────────
@@ -113,7 +302,7 @@ class FAClient {
 
     _cfPassInProgress = true;
     try {
-      debugPrint('=== CF pass: opening HeadlessWebView for ${FAUrls.home}');
+      debugPrint('=== CF pass: opening HeadlessWebView for ${FAUrls.baseUrl}');
       final completer = Completer<bool>();
       HeadlessInAppWebView? headless;
 
@@ -125,22 +314,21 @@ class FAClient {
         onLoadStop: (controller, url) async {
           final html = await controller.getHtml() ?? '';
           debugPrint('=== CF pass: HTML length: ${html.length}');
-
+          
           if (_isCloudflarePage(html)) {
             debugPrint('=== CF pass: challenge detected, waiting...');
-            // Ждем 10 секунд для решения challenge
-            await Future.delayed(const Duration(seconds: 10));
+            // Ждем 20 секунд для решения challenge
+            await Future.delayed(const Duration(seconds: 20));
             final retryHtml = await controller.getHtml() ?? '';
             debugPrint('=== CF pass: retry HTML length: ${retryHtml.length}');
-
+            
             if (_isCloudflarePage(retryHtml)) {
-              debugPrint('=== CF pass: challenge NOT resolved');
+              debugPrint('=== CF pass: challenge NOT resolved after 20s');
               return;
             }
           }
-
-          debugPrint(
-              '=== CF pass: page loaded successfully, syncing cookies...');
+          
+          debugPrint('=== CF pass: page loaded successfully, syncing cookies...');
           await _syncCookiesFromWebView();
           completer.complete(true);
         },
@@ -156,7 +344,7 @@ class FAClient {
           debugPrint('=== CF pass: error — ${error.description}');
         },
         initialUrlRequest: URLRequest(
-          url: WebUri(FAUrls.home),
+          url: WebUri(FAUrls.baseUrl),
         ),
       );
 
@@ -187,6 +375,13 @@ class FAClient {
     }
   }
 
+  bool _isCloudflarePage(String html) {
+    return html.contains('Just a moment') || 
+           html.contains('checking your browser') ||
+           html.contains('cloudflare') ||
+           html.contains('cf_chl_page');
+  }
+
   Future<void> _syncCookiesFromWebView() async {
     final seen = <String>{};
     final allCookies = <Cookie>[];
@@ -196,7 +391,25 @@ class FAClient {
         final cookies = await FAICookieManager.getCookies(url);
         for (final c in cookies) {
           if (seen.add(c.name)) {
-            allCookies.add(c);
+            // Конвертируем flutter_inappwebview.Cookie в dart:io.Cookie
+            final ioCookie = io.Cookie(c.name, c.value);
+            ioCookie.domain = c.domain ?? '.furaffinity.net';
+            ioCookie.path = c.path ?? '/';
+            ioCookie.secure = c.isSecure ?? true;
+            ioCookie.httpOnly = c.isHttpOnly ?? false;
+            if (c.expiresDate != null) {
+              ioCookie.expires = DateTime.fromMillisecondsSinceEpoch(c.expiresDate!);
+            }
+            // Преобразуем io.Cookie в flutter_inappwebview.Cookie
+            allCookies.add(Cookie(
+              name: ioCookie.name,
+              value: ioCookie.value,
+              domain: ioCookie.domain,
+              path: ioCookie.path,
+              isHttpOnly: ioCookie.httpOnly,
+              isSecure: ioCookie.secure,
+              expiresDate: ioCookie.expires?.millisecondsSinceEpoch,
+            ));
           }
         }
       } catch (e) {
@@ -214,29 +427,22 @@ class FAClient {
     }
 
     await _saveWebViewCookiesToSession(allCookies);
-    await _saveWebViewCookiesToCookieJar(allCookies);
-
-    final ioCookies =
-        allCookies.where((c) => (c.value as String? ?? '').isNotEmpty).map((c) {
-      final cookie = io.Cookie(c.name, c.value as String? ?? '');
-      cookie.domain = c.domain ?? '.furaffinity.net';
-      cookie.path = c.path ?? '/';
-      cookie.secure = c.isSecure ?? true;
-      return cookie;
-    }).toList();
-    if (ioCookies.isNotEmpty) {
-      debugPrint(
-          '=== Syncing ${ioCookies.length} cookies to CookieStore from WebView');
-      for (final cookie in ioCookies) {
-        debugPrint(
-            '  - ${cookie.name}: ${cookie.value} (domain: ${cookie.domain})');
-      }
-      CookieStore.instance.setCookies(ioCookies);
-      debugPrint(
-          '=== CookieStore now has: ${CookieStore.instance.cookieHeader}');
-    } else {
-      debugPrint('=== No cookies synced from WebView');
-    }
+    // Преобразуем flutter_inappwebview.Cookie в io.Cookie
+    final ioCookies = allCookies.map((c) => io.Cookie(c.name, c.value)
+      ..domain = c.domain ?? '.furaffinity.net'
+      ..path = c.path ?? '/'
+      ..secure = c.isSecure ?? false).toList();
+    // Преобразуем io.Cookie в flutter_inappwebview.Cookie
+    final flutterCookies = ioCookies.map((c) => Cookie(
+      name: c.name,
+      value: c.value,
+      domain: c.domain,
+      path: c.path,
+      isHttpOnly: c.httpOnly,
+      isSecure: c.secure,
+      expiresDate: c.expires?.millisecondsSinceEpoch,
+    )).toList();
+    await _saveWebViewCookiesToCookieJar(flutterCookies);
   }
 
   Future<void> _saveWebViewCookiesToSession(List<Cookie> webViewCookies) async {
@@ -252,16 +458,16 @@ class FAClient {
       }
 
       for (final c in webViewCookies) {
-        final value = c.value as String? ?? '';
+        final value = c.value;
         if (value.isEmpty) continue;
-        final expiresDate = c.expiresDate is int ? c.expiresDate as int : 0;
+        final expiresDate = c.expiresDate ?? 0;
         sessionCookies[c.name] = {
           'name': c.name,
           'value': value,
           'domain': c.domain ?? '.furaffinity.net',
           'path': c.path ?? '/',
-          'isHttpOnly': c.isHttpOnly ?? false,
-          'isSecure': c.isSecure ?? true,
+          'isHttpOnly': c.isHttpOnly,
+          'isSecure': c.isSecure,
           'expiresDate': expiresDate,
         };
       }
@@ -272,38 +478,57 @@ class FAClient {
         isLoggedIn: _session!.isLoggedIn,
         cookies: jsonEncode(sessionCookies.values.toList()),
       );
-      debugPrint('=== Session updated with ${sessionCookies.length} cookies');
+
+      debugPrint('=== Session updated with ${webViewCookies.length} cookies');
     } catch (e) {
-      debugPrint('=== Error saving WebView cookies to session: $e');
+      debugPrint('=== CF sync: error saving to session: $e');
     }
   }
 
-  Future<void> _saveWebViewCookiesToCookieJar(
-      List<Cookie> webViewCookies) async {
-    if (!io.Platform.isWindows) {
+  Future<void> _saveWebViewCookiesToCookieJar(List<Cookie> webViewCookies) async {
+    if (io.Platform.isWindows != true) {
       await _ensureInitialized();
     }
     final cookies = <io.Cookie>[];
     for (final c in webViewCookies) {
-      final value = c.value as String? ?? '';
+      final value = c.value;
       if (value.isEmpty) continue;
       final cookie = io.Cookie(c.name, value);
       cookie.domain = c.domain ?? '.furaffinity.net';
       cookie.path = c.path ?? '/';
-      cookie.secure = c.isSecure ?? true;
+      cookie.secure = c.isSecure ?? false;
       cookies.add(cookie);
     }
-    if (cookies.isNotEmpty && !io.Platform.isWindows) {
+    if (cookies.isNotEmpty && io.Platform.isWindows != true) {
       await _cookieJar.saveFromResponse(Uri.parse(FAUrls.baseUrl), cookies);
       debugPrint('=== CookieJar updated with ${cookies.length} cookies');
-
+      
       // Обновляем CookieStore для использования в FAImage
       CookieStore.instance.setCookies(cookies);
       debugPrint('=== CookieStore updated with ${cookies.length} cookies');
     }
   }
 
-  // ── Cookie Header Builders ────────────────────────────────────────────
+  String? _buildCookieHeader() {
+    if (_session?.cookies == null) return null;
+    try {
+      final List<dynamic> raw = jsonDecode(_session!.cookies!);
+      final parts = <String>[];
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          final name = item['name']?.toString() ?? '';
+          final value = item['value']?.toString() ?? '';
+          if (name.isNotEmpty && value.isNotEmpty) {
+            parts.add('$name=$value');
+          }
+        }
+      }
+      return parts.join('; ');
+    } catch (e) {
+      debugPrint('=== Error building cookie header: $e');
+      return null;
+    }
+  }
 
   Future<String?> _buildCookieHeaderFromWebView() async {
     try {
@@ -317,356 +542,10 @@ class FAClient {
           }
         }
       }
-      if (parts.isEmpty) return null;
-      debugPrint('=== Live cookies for request: ${seen.join(", ")}');
       return parts.join('; ');
     } catch (e) {
-      debugPrint('=== Error reading live cookies: $e');
+      debugPrint('=== Error building cookie header from WebView: $e');
       return null;
     }
-  }
-
-  String? _buildCookieHeader() {
-    if (_session?.cookies == null) return null;
-    try {
-      final List<dynamic> raw = jsonDecode(_session!.cookies!);
-      final parts = <String>[];
-      for (final item in raw) {
-        if (item is Map<String, dynamic>) {
-          final name = item['name']?.toString() ?? '';
-          final value = item['value']?.toString() ?? '';
-          if (name.isNotEmpty && value.isNotEmpty) parts.add('$name=$value');
-        } else if (item is List && item.length >= 2) {
-          final name = item[0].toString();
-          final value = item[1].toString();
-          if (name.isNotEmpty && value.isNotEmpty) parts.add('$name=$value');
-        }
-      }
-      return parts.isEmpty ? null : parts.join('; ');
-    } catch (e) {
-      debugPrint('=== Error building cookie header: $e');
-      return null;
-    }
-  }
-
-  Future<void> _restoreCookiesFromSession() async {
-    if (_session?.cookies == null) return;
-    await _ensureInitialized();
-    try {
-      final List<dynamic> raw = jsonDecode(_session!.cookies!);
-      final cookies = <io.Cookie>[];
-      for (final item in raw) {
-        if (item is Map<String, dynamic>) {
-          final name = item['name']?.toString() ?? '';
-          final value = item['value']?.toString() ?? '';
-          final domain = item['domain']?.toString() ?? '.furaffinity.net';
-          final path = item['path']?.toString() ?? '/';
-          final isSecure = item['isSecure'] as bool? ?? true;
-          if (name.isNotEmpty && value.isNotEmpty) {
-            final c = io.Cookie(name, value);
-            c.domain = domain;
-            c.path = path;
-            c.secure = isSecure;
-            cookies.add(c);
-          }
-        } else if (item is List && item.length >= 2) {
-          final name = item[0].toString();
-          final value = item[1].toString();
-          if (name.isNotEmpty && value.isNotEmpty) {
-            final c = io.Cookie(name, value);
-            c.domain = '.furaffinity.net';
-            c.path = '/';
-            c.secure = true;
-            cookies.add(c);
-          }
-        }
-      }
-      if (cookies.isNotEmpty) {
-        await _cookieJar.saveFromResponse(Uri.parse(FAUrls.baseUrl), cookies);
-        debugPrint(
-            '=== Restoring ${cookies.length} cookies from session to CookieStore');
-        for (final cookie in cookies) {
-          debugPrint('  - ${cookie.name}: ${cookie.value}');
-        }
-        CookieStore.instance.setCookies(cookies);
-        debugPrint(
-            '=== CookieStore after restore: ${CookieStore.instance.cookieHeader}');
-        debugPrint('=== Restored ${cookies.length} cookies from session');
-      }
-    } catch (e) {
-      debugPrint('=== Error restoring cookies from session: $e');
-    }
-  }
-
-  // ── CF Detection ─────────────────────────────────────────────────────
-
-  void _checkCloudflare(Response response) {
-    final cfMitigated = response.headers.value('cf-mitigated');
-    if (cfMitigated == 'challenge') throw CloudflareError();
-    final status = response.statusCode ?? 0;
-    if (status == 403 || status == 503) {
-      final body = response.data?.toString() ?? '';
-      if (_isCloudflarePage(body)) throw CloudflareError();
-    }
-  }
-
-  static bool _isCloudflarePage(String body) {
-    return body.contains('DDoS protection by') ||
-        body.contains('/cdn-cgi/styles/challenges.css') ||
-        body.contains('/cdn-cgi/challenge-platform') ||
-        body.contains('cf-browser-verification') ||
-        body.contains('cf_chl_opt') ||
-        body.contains('cf-challenge-running') ||
-        body.contains('Just a moment...');
-  }
-
-  // ── HTML Fetching ─────────────────────────────────────────────────────
-  // 1. Пытаемся Dio с cookies (быстро, нативно)
-  // 2. Если CF-ошибка — пробуем пройти CF через HeadlessWebView
-  // 3. Если после CF pass Dio всё равно не работает — фоллбэк на HeadlessWebView
-
-  Future<String> _getHtml(String url) async {
-    await _ensureInitialized();
-
-    final cookieHeader = io.Platform.isWindows
-        ? (await _buildCookieHeaderFromWebView() ?? _buildCookieHeader())
-        : _buildCookieHeader();
-
-    final options = cookieHeader != null
-        ? Options(headers: {'Cookie': cookieHeader})
-        : null;
-
-    try {
-      final response = await _dio.get<String>(url, options: options);
-      _checkCloudflare(response);
-      if (response.statusCode == null ||
-          response.statusCode! < 200 ||
-          response.statusCode! >= 300) {
-        throw DioException(
-          requestOptions: response.requestOptions,
-          response: response,
-          type: DioExceptionType.badResponse,
-          message: 'HTTP ${response.statusCode}',
-        );
-      }
-      return response.data ?? '';
-    } on CloudflareError {
-      debugPrint('=== CF detected on Dio request, attempting CF pass...');
-      final passed = await passCloudflareChallenge();
-      if (passed) {
-        try {
-          final retryHeader = io.Platform.isWindows
-              ? (await _buildCookieHeaderFromWebView() ?? _buildCookieHeader())
-              : _buildCookieHeader();
-          final retryOptions = retryHeader != null
-              ? Options(headers: {'Cookie': retryHeader})
-              : null;
-          final retryResponse =
-              await _dio.get<String>(url, options: retryOptions);
-          _checkCloudflare(retryResponse);
-          if (retryResponse.statusCode != null &&
-              retryResponse.statusCode! >= 200 &&
-              retryResponse.statusCode! < 300) {
-            return retryResponse.data ?? '';
-          }
-        } catch (e) {
-          debugPrint('=== Dio retry after CF pass failed: $e');
-        }
-      }
-
-      debugPrint('=== Falling back to HeadlessWebView for: $url');
-      return _getHtmlViaWebView(url);
-    }
-  }
-
-  Future<String> _getHtmlViaWebView(String url) async {
-    final completer = Completer<String>();
-    HeadlessInAppWebView? headless;
-
-    headless = HeadlessInAppWebView(
-      webViewEnvironment: webViewEnvironment,
-      initialSettings: InAppWebViewSettings(
-        javaScriptEnabled: true,
-        domStorageEnabled: true,
-        thirdPartyCookiesEnabled: true,
-      ),
-      onLoadStop: (controller, loadedUrl) async {
-        try {
-          final html = await controller.getHtml() ?? '';
-          if (_isCloudflarePage(html)) {
-            debugPrint('=== WebView: CF challenge page, waiting...');
-            return;
-          }
-          if (!completer.isCompleted) completer.complete(html);
-        } catch (e) {
-          if (!completer.isCompleted) completer.completeError(e);
-        } finally {
-          await headless?.dispose();
-        }
-      },
-      onReceivedError: (controller, request, error) async {
-        if (!(request.isForMainFrame ?? false)) return;
-        if (!completer.isCompleted) {
-          completer.completeError(
-            Exception('WebView error: ${error.description}'),
-          );
-        }
-        await headless?.dispose();
-      },
-      onReceivedHttpError: (controller, request, response) async {
-        if (!(request.isForMainFrame ?? false)) return;
-        final status = response.statusCode ?? 0;
-        if (status == 403 || status == 503) {
-          debugPrint('=== WebView: HTTP $status — CF challenge in progress');
-        }
-      },
-    );
-
-    await headless.run();
-    await headless.webViewController?.loadUrl(
-      urlRequest: URLRequest(url: WebUri(url)),
-    );
-
-    return completer.future.timeout(
-      const Duration(seconds: 45),
-      onTimeout: () {
-        headless?.dispose();
-        throw Exception('Request timeout: $url');
-      },
-    );
-  }
-
-  // ── Session Verification ─────────────────────────────────────────────
-
-  Future<bool> verifySession() async {
-    if (_session?.cookies == null) return false;
-    try {
-      if (io.Platform.isWindows) {
-        final List<dynamic> raw = jsonDecode(_session!.cookies!);
-        final hasCookieA = raw.any((item) {
-          if (item is Map<String, dynamic>) return item['name'] == 'a';
-          if (item is List && item.length >= 2) return item[0] == 'a';
-          return false;
-        });
-        return hasCookieA;
-      }
-      await _ensureInitialized();
-      final cookieHeader = _buildCookieHeader();
-      final options = cookieHeader != null
-          ? Options(headers: {'Cookie': cookieHeader})
-          : null;
-      final response = await _dio.get<String>(FAUrls.home, options: options);
-      try {
-        _checkCloudflare(response);
-      } on CloudflareError {
-        return false;
-      }
-      final status = response.statusCode ?? 0;
-      if (status == 401 || status == 403) return false;
-      return status >= 200 && status < 300;
-    } catch (e) {
-      debugPrint('verifySession error: $e');
-      return false;
-    }
-  }
-
-  Future<void> clearCookies() async {
-    if (_initialized) await _cookieJar.deleteAll();
-  }
-
-  Future<void> handleCloudflareBreach() async {
-    debugPrint('=== Cloudflare breach detected — clearing all cookies');
-    await _clearAllCookies();
-  }
-
-  Future<void> _clearAllCookies() async {
-    if (_initialized) {
-      try {
-        await _cookieJar.deleteAll();
-        debugPrint('=== Cleared all cookies from CookieJar');
-      } catch (e) {
-        debugPrint('=== Error clearing cookies: $e');
-      }
-    }
-    try {
-      if (!io.Platform.isWindows) {
-        await CookieManager.instance().deleteAllCookies();
-        debugPrint('=== Cleared all WebView cookies');
-      }
-    } catch (e) {
-      debugPrint('=== Error clearing WebView cookies: $e');
-    }
-  }
-
-  // ── Image Headers ────────────────────────────────────────────────────
-
-  Map<String, String> getImageHeaders() {
-    final cookie = _buildCookieHeader();
-    return {
-      if (cookie != null) 'Cookie': cookie,
-      'User-Agent': _userAgent,
-      'Referer': FAUrls.baseUrl,
-    };
-  }
-
-  // ── Data Access Methods ──────────────────────────────────────────────
-
-  Future<List<Submission>> getSubmissions(int page, String category) async {
-    final html = await _getHtml(FAUrls.browse(filter: category, page: page));
-    return Submission.parseSubmissionsPage(html);
-  }
-
-  Future<List<Submission>> getGallery(String username, {int page = 1}) async {
-    final html = await _getHtml('${FAUrls.gallery(username)}?page=$page');
-    return Submission.parseSubmissionsPage(html);
-  }
-
-  Future<Submission?> getSubmission(String id) async {
-    final html = await _getHtml(FAUrls.viewSubmission(id));
-    return Submission.parseSubmissionDetails(html, id);
-  }
-
-  Future<List<FAComment>> getComments(String id) async {
-    final html = await _getHtml(FAUrls.viewSubmission(id));
-    return FAComment.parseComments(html);
-  }
-
-  Future<List<Submission>> search(String query, {int page = 1}) async {
-    final html = await _getHtml(FAUrls.search(query, page: page));
-    return Submission.parseSearchResults(html);
-  }
-
-  Future<List<FANotification>> getNotifications() async {
-    final html = await _getHtml(FAUrls.notifications);
-    return FANotification.parseNotifications(html);
-  }
-
-  Future<FAUser?> getUser(String username) async {
-    final html = await _getHtml(FAUrls.user(username));
-    return FAUser.parseUserPage(html, username);
-  }
-
-  Future<FAUser?> getUserProfile(String username) async {
-    if (username == 'me') {
-      if (_session?.username != null && _session!.username != 'user') {
-        return getUser(_session!.username);
-      }
-      return null;
-    }
-    return getUser(username);
-  }
-
-  Future<bool> toggleWatch(String username, bool currentlyWatching) async {
-    final action = currentlyWatching ? 'unwatch' : 'watch';
-    final url = '${FAUrls.baseUrl}/$action/$username/';
-    await _ensureInitialized();
-    final cookieHeader = io.Platform.isWindows
-        ? (await _buildCookieHeaderFromWebView() ?? _buildCookieHeader())
-        : _buildCookieHeader();
-    final options = cookieHeader != null
-        ? Options(headers: {'Cookie': cookieHeader})
-        : null;
-    await _dio.post<String>(url, options: options);
-    return !currentlyWatching;
   }
 }

@@ -12,6 +12,9 @@ import '../widgets/adaptive/adaptive.dart';
 import '../utils/cookie_manager.dart';
 import '../main.dart' show webViewEnvironment;
 
+// Типы для работы с куки из разных источников
+typedef WebCookie = Map<String, dynamic>;
+
 class LoginScreen extends StatefulWidget {
   final AuthService authService;
   final Future<void> Function() onLogin;
@@ -147,102 +150,408 @@ class _LoginScreenState extends State<LoginScreen>
     InAppWebViewController controller,
     Map<String, Map<String, dynamic>> cookieDataMap,
   ) async {
-    final cm = FAICookieManager.instance;
+    debugPrint('=== Starting enhanced cookie extraction with multiple strategies');
+    
+    // Strategy 1: CookieManager (can get HttpOnly cookies)
+    try {
+      final cm = FAICookieManager.instance;
+      final urls = [
+        'https://www.furaffinity.net',
+        'https://furaffinity.net',
+        'https://www.furaffinity.net/',
+      ];
 
-    // cf_clearance может быть установлен на разных доменах:
-    // .furaffinity.net, www.furaffinity.net, furaffinity.net
-    // Также CF может установить его асинхронно — нужна задержка и retry
-    final urls = [
-      'https://www.furaffinity.net',
-      'https://furaffinity.net',
-      'https://www.furaffinity.net/',
-    ];
+      for (var attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          debugPrint('=== CookieManager retry attempt ${attempt + 1}...');
+          await Future.delayed(const Duration(seconds: 1));
+        }
 
-    for (var attempt = 0; attempt < 3; attempt++) {
-      if (attempt > 0) {
-        debugPrint('=== Cookie retry attempt ${attempt + 1}...');
-        await Future.delayed(const Duration(seconds: 1));
-      }
-
-      for (final url in urls) {
-        try {
-          final cookies = await cm
-              .getCookies(url: WebUri(url))
-              .timeout(const Duration(seconds: 3));
-          if (cookies.isNotEmpty) {
-            debugPrint('=== $url cookies: ${cookies.length} (${cookies.map((c) => c.name).join(", ")})');
-            _addCookiesToMap(cookies, cookieDataMap);
+        for (final url in urls) {
+          try {
+            final cookies = await cm
+                .getCookies(url: WebUri(url))
+                .timeout(const Duration(seconds: 3));
+            if (cookies.isNotEmpty) {
+              debugPrint('=== $url cookies: ${cookies.length} (${cookies.map((c) => c.name).join(", ")})');
+              _addCookiesToMap(cookies, cookieDataMap);
+            }
+          } catch (e) {
+            debugPrint('=== CookieManager error for $url: $e');
           }
-        } catch (e) {
-          debugPrint('=== CookieManager error for $url: $e');
+        }
+
+        if (cookieDataMap.containsKey('cf_clearance')) {
+          debugPrint('=== cf_clearance found on attempt ${attempt + 1}');
+          break;
         }
       }
 
-      if (cookieDataMap.containsKey('cf_clearance')) {
-        debugPrint('=== cf_clearance found on attempt ${attempt + 1}');
-        break;
-      }
+      debugPrint(
+        '=== CookieManager total: ${cookieDataMap.length} cookies (${cookieDataMap.keys.join(", ")})',
+      );
+    } catch (e) {
+      debugPrint('=== Error in CookieManager extraction: $e');
     }
 
-    debugPrint(
-      '=== CookieManager total: ${cookieDataMap.length} cookies (${cookieDataMap.keys.join(", ")})',
-    );
+    // Strategy 2: document.cookie with exponential backoff
+    final backoffDelays = [const Duration(milliseconds: 500), const Duration(seconds: 1), const Duration(seconds: 2)];
+    
+    for (int attempt = 0; attempt < backoffDelays.length; attempt++) {
+      try {
+        final delay = backoffDelays[attempt];
+        debugPrint('=== Attempt ${attempt + 1}: Waiting $delay before document.cookie extraction');
+        await Future.delayed(delay);
+        
+        final result = await controller.evaluateJavascript(
+          source: "document.cookie",
+        ).timeout(const Duration(seconds: 5));
+        
+        if (result != null && result is String && result.isNotEmpty) {
+          debugPrint('=== document.cookie found: ${result.substring(0, min(result.length, 100))}...');
+          final documentCookies = _parseDocumentCookieString(result);
+          _addCookiesToMap(documentCookies, cookieDataMap);
+        }
+        
+        // Check if we have the essential cookies we need
+        final hasEssentialCookies = cookieDataMap.containsKey('a') || 
+                                 cookieDataMap.containsKey('b') || 
+                                 cookieDataMap.containsKey('cf_clearance');
+        
+        if (hasEssentialCookies) {
+          debugPrint('=== Found essential cookies, stopping extraction');
+          break;
+        }
+        
+      } catch (e) {
+        debugPrint('=== Error in document.cookie attempt ${attempt + 1}: $e');
+      }
+    }
+    
+    debugPrint('=== Cookie extraction completed. Total cookies: ${cookieDataMap.length}');
+  }
 
-    // document.cookie — не-HttpOnly cookies как дополнение
+  void _addCookiesToMap(
+    List<dynamic> cookies,
+    Map<String, Map<String, dynamic>> cookieDataMap,
+  ) {
+    int addedCount = 0;
+    for (final c in cookies) {
+      String name;
+      String value;
+      String domain;
+      String path;
+      bool isHttpOnly;
+      bool isSecure;
+      int expiresDate;
+      
+      if (c is Cookie) {
+        // Handle flutter_inappwebview.Cookie type
+        name = c.name;
+        value = c.value as String? ?? '';
+        domain = c.domain ?? '.furaffinity.net';
+        path = c.path ?? '/';
+        isHttpOnly = c.isHttpOnly ?? false;
+        isSecure = c.isSecure ?? true;
+        expiresDate = c.expiresDate is int ? c.expiresDate as int : 0;
+      } else if (c is Map<String, dynamic>) {
+        // Handle WebCookie type
+        name = c['name'] as String? ?? '';
+        value = c['value'] as String? ?? '';
+        domain = c['domain'] as String? ?? '.furaffinity.net';
+        path = c['path'] as String? ?? '/';
+        isHttpOnly = c['isHttpOnly'] as bool? ?? false;
+        isSecure = c['isSecure'] as bool? ?? true;
+        expiresDate = c['expiresDate'] as int? ?? 0;
+      } else {
+        continue;
+      }
+      
+      if (name.isNotEmpty && value.isNotEmpty && !cookieDataMap.containsKey(name)) {
+        final displayValue = value.substring(0, min(value.length, 10));
+        debugPrint(
+          '=== Cookie: $name | domain=$domain | httpOnly=$isHttpOnly | value=$displayValue...',
+        );
+        cookieDataMap[name] = {
+          'name': name,
+          'value': value,
+          'domain': domain,
+          'path': path,
+          'isHttpOnly': isHttpOnly,
+          'isSecure': isSecure,
+          'expiresDate': expiresDate,
+        };
+        addedCount++;
+      }
+    }
+    if (addedCount > 0) {
+      debugPrint('=== Added $addedCount new cookies to map, total: ${cookieDataMap.length}');
+    }
+  }
+
+  ({bool isValid, String reason}) _validateCookies(
+    Map<String, Map<String, dynamic>> cookieDataMap,
+  ) {
+    debugPrint('=== Starting cookie validation');
+    
+    // Check for essential cookies
+    final hasSessionCookie = cookieDataMap.containsKey('a');
+    final hasBackupCookie = cookieDataMap.containsKey('b');
+    final hasCloudflareClearance = cookieDataMap.containsKey('cf_clearance');
+    
+    if (!hasSessionCookie && !hasBackupCookie) {
+      debugPrint('=== Missing both session cookies (a and b)');
+      return (isValid: false, reason: 'Missing session cookies');
+    }
+    
+    // Validate Cloudflare clearance if present
+    if (hasCloudflareClearance) {
+      final cfCookie = cookieDataMap['cf_clearance'];
+      if (cfCookie == null || cfCookie['value'] == null || cfCookie['value'].toString().isEmpty) {
+        debugPrint('=== Invalid cf_clearance cookie');
+        return (isValid: false, reason: 'Invalid Cloudflare clearance cookie');
+      }
+      debugPrint('=== Cloudflare clearance cookie is valid');
+    }
+    
+    // Validate session cookie if present
+    if (hasSessionCookie) {
+      final sessionCookie = cookieDataMap['a'];
+      if (sessionCookie == null || sessionCookie['value'] == null || sessionCookie['value'].toString().isEmpty) {
+        debugPrint('=== Invalid session cookie (a)');
+        return (isValid: false, reason: 'Invalid session cookie');
+      }
+      debugPrint('=== Session cookie (a) is valid');
+    }
+    
+    // Validate backup cookie if present
+    if (hasBackupCookie) {
+      final backupCookie = cookieDataMap['b'];
+      if (backupCookie == null || backupCookie['value'] == null || backupCookie['value'].toString().isEmpty) {
+        debugPrint('=== Invalid backup cookie (b)');
+        return (isValid: false, reason: 'Invalid backup cookie');
+      }
+      debugPrint('=== Backup cookie (b) is valid');
+    }
+    
+    // Check cookie age (not expired)
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final cookie in cookieDataMap.values) {
+      final expiresDate = cookie['expiresDate'] as int? ?? 0;
+      if (expiresDate > 0 && expiresDate < now) {
+        debugPrint('=== Cookie ${cookie['name']} is expired');
+        return (isValid: false, reason: 'Expired cookie found');
+      }
+    }
+    
+    debugPrint('=== Cookie validation passed');
+    return (isValid: true, reason: 'Valid');
+  }
+
+  List<WebCookie> _parseDocumentCookieString(String cookieString) {
+    final cookies = <WebCookie>[];
+    if (cookieString.isEmpty) return cookies;
+    
     try {
-      final rawCookies = await controller
-          .evaluateJavascript(source: 'document.cookie')
-          .timeout(const Duration(seconds: 5)) as String?;
-      if (rawCookies != null && rawCookies.isNotEmpty) {
-        debugPrint('=== document.cookie: $rawCookies');
-        for (final part in rawCookies.split(';')) {
-          final idx = part.indexOf('=');
-          if (idx < 0) continue;
-          final name = part.substring(0, idx).trim();
-          final value = part.substring(idx + 1).trim();
-          if (name.isNotEmpty &&
-              value.isNotEmpty &&
-              !cookieDataMap.containsKey(name)) {
-            cookieDataMap[name] = {
+      final cookiePairs = cookieString.split(';');
+      debugPrint('=== Parsing ${cookiePairs.length} cookie pairs');
+      
+      for (final pair in cookiePairs) {
+        final trimmed = pair.trim();
+        if (trimmed.isEmpty) continue;
+        
+        final parts = trimmed.split('=');
+        if (parts.length >= 2) {
+          final name = parts[0].trim();
+          final value = parts.sublist(1).join('=').trim();
+          
+          // Include FA-specific cookies and other potentially useful cookies
+          if (name.startsWith('a') || 
+              name.startsWith('b') || 
+              name.startsWith('cf_') || 
+              name.startsWith('sz') ||
+              name.startsWith('b_') ||
+              name.startsWith('c_') ||
+              name.startsWith('session') ||
+              name.startsWith('user') ||
+              name.startsWith('auth')) {
+            
+            // Parse additional attributes if present
+            final cookie = <String, dynamic>{
               'name': name,
               'value': value,
               'domain': '.furaffinity.net',
               'path': '/',
               'isHttpOnly': false,
               'isSecure': true,
+              'expiresDate': 0,
             };
+            
+            // Try to extract additional attributes from the cookie string
+            if (parts.length > 2) {
+              final attributes = parts.sublist(2).join('=');
+              if (attributes.contains('HttpOnly')) {
+                cookie['isHttpOnly'] = true;
+              }
+              if (attributes.contains('Secure')) {
+                cookie['isSecure'] = true;
+              }
+              if (attributes.contains('Expires=')) {
+                try {
+                  final expiresMatch = RegExp(r'Expires=([^;]+)').firstMatch(attributes);
+                  if (expiresMatch != null) {
+                    final expiresStr = expiresMatch.group(1)!.trim();
+                    final expiresDate = DateTime.parse(expiresStr);
+                    cookie['expiresDate'] = expiresDate.millisecondsSinceEpoch;
+                  }
+                } catch (e) {
+                  debugPrint('=== Error parsing expires date: $e');
+                }
+              }
+            }
+            
+            cookies.add(cookie);
+            debugPrint('=== Parsed cookie: $name=${value.substring(0, min(value.length, 10))}...');
           }
         }
       }
+      
+      debugPrint('=== Successfully parsed ${cookies.length} cookies');
     } catch (e) {
-      debugPrint('=== document.cookie error: $e');
+      debugPrint('=== Error parsing cookie string: $e');
+    }
+    
+    return cookies;
+  }
+
+  Future<void> _solveCloudflareChallenge(InAppWebViewController controller) async {
+    debugPrint('=== Attempting to solve Cloudflare challenge');
+    
+    try {
+      // Try to click the Cloudflare challenge button if it exists
+      final result = await controller.evaluateJavascript(
+        source: '''
+          // Look for Cloudflare challenge elements and attempt to solve them
+          const challengeSelectors = [
+            '.cf-browser-verification',
+            '.cf-challenge',
+            '#challenge-form',
+            'input[type="submit"]',
+            'button[type="submit"]'
+          ];
+          
+          let elementClicked = false;
+          
+          for (const selector of challengeSelectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+              console.log('Found Cloudflare challenge element:', selector);
+              element.click();
+              elementClicked = true;
+              
+              // Wait a bit for the click to take effect
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              break;
+            }
+          }
+          
+          // If no specific challenge element found, try general click on page
+          if (!elementClicked) {
+            console.log('No specific Cloudflare challenge element found, trying general click');
+            // Try to click on the page body to simulate user interaction
+            document.body.click();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+          // Return success status
+          return { success: true, clicked: elementClicked };
+        ''',
+      ).timeout(const Duration(seconds: 5));
+      
+      if (result != null && result is Map) {
+        final success = result['success'] as bool? ?? false;
+        final clicked = result['clicked'] as bool? ?? false;
+        debugPrint('=== Cloudflare challenge result: success=$success, clicked=$clicked');
+      } else {
+        debugPrint('=== Cloudflare challenge result: $result');
+      }
+      
+    } catch (e) {
+      debugPrint('=== Error solving Cloudflare challenge: $e');
     }
   }
 
-  void _addCookiesToMap(
-    List<Cookie> cookies,
+  Future<void> _saveCookiesToCookieStore(
     Map<String, Map<String, dynamic>> cookieDataMap,
-  ) {
-    for (final c in cookies) {
-      if (!cookieDataMap.containsKey(c.name)) {
-        final String value = c.value as String? ?? '';
-        final displayValue = value.isNotEmpty
-            ? value.substring(0, min(value.length, 10))
-            : 'null';
-        debugPrint(
-          '=== Cookie: ${c.name} | domain=${c.domain} | httpOnly=${c.isHttpOnly} | value=$displayValue...',
-        );
-        final expiresDate = c.expiresDate is int ? c.expiresDate as int : 0;
-        cookieDataMap[c.name] = {
-          'name': c.name,
-          'value': value,
-          'domain': c.domain ?? '.furaffinity.net',
-          'path': c.path ?? '/',
-          'isHttpOnly': c.isHttpOnly ?? false,
-          'isSecure': c.isSecure ?? true,
-          'expiresDate': expiresDate,
-        };
+  ) async {
+    debugPrint('=== Starting enhanced cookie saving with validation');
+
+    final validCookies = <Cookie>[];
+    final invalidCookies = <String>[];
+    
+    // First validate the cookies
+    final validation = _validateCookies(cookieDataMap);
+    if (!validation.isValid) {
+      debugPrint('=== Cookie validation failed: ${validation.reason}');
+      return;
+    }
+
+    for (final cookieData in cookieDataMap.values) {
+      final name = cookieData['name'] as String?;
+      final value = cookieData['value'] as String?;
+      final domain = cookieData['domain'] as String?;
+      final path = cookieData['path'] as String?;
+      final isHttpOnly = cookieData['isHttpOnly'] as bool?;
+      final isSecure = cookieData['isSecure'] as bool?;
+      final expiresDate = cookieData['expiresDate'] as int?;
+
+      if (name == null || value == null || value.isEmpty || domain == null || path == null) {
+        invalidCookies.add(name ?? 'null');
+        debugPrint('=== Invalid cookie: $name=$value');
+        continue;
       }
+
+      // Prioritize essential cookies
+      final isEssential = name == 'a' || name == 'b' || name == 'cf_clearance';
+      final cookie = Cookie(
+        name: name,
+        value: value,
+        domain: domain,
+        path: path,
+        isHttpOnly: isHttpOnly ?? false,
+        isSecure: isSecure ?? true,
+        expiresDate: expiresDate,
+      );
+      
+      validCookies.add(cookie);
+      debugPrint('=== Valid cookie: $name=$value${isEssential ? ' (ESSENTIAL)' : ''}');
+    }
+
+    if (validCookies.isEmpty) {
+      debugPrint('=== No valid cookies to save');
+      return;
+    }
+
+    try {
+      // Save cookies to CookieManager using the static method
+      for (final cookie in validCookies) {
+        await FAICookieManager.setCookie(
+          url: 'https://www.furaffinity.net',
+          name: cookie.name,
+          value: cookie.value,
+          domain: cookie.domain ?? '.furaffinity.net',
+          path: cookie.path ?? '/',
+          isHttpOnly: cookie.isHttpOnly ?? false,
+          isSecure: cookie.isSecure ?? true,
+          expiresDate: cookie.expiresDate,
+        );
+      }
+      debugPrint('=== Successfully saved ${validCookies.length} cookies to CookieManager');
+
+      debugPrint('=== Enhanced cookie saving completed: ${validCookies.length} cookies saved');
+      
+    } catch (e) {
+      debugPrint('=== Error in enhanced cookie saving: $e');
     }
   }
 
