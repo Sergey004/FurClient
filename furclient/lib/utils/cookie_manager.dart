@@ -26,8 +26,14 @@ class FAICookieManager {
 
   static CookieManager get instance {
     if (io.Platform.isWindows) {
-      return CookieManager.instance(webViewEnvironment: webViewEnvironment);
+      if (webViewEnvironment == null) {
+        debugPrint('=== FAICookieManager WARNING: webViewEnvironment is null on Windows!');
+      }
+      final cm = CookieManager.instance(webViewEnvironment: webViewEnvironment);
+      debugPrint('=== FAICookieManager: Created CookieManager for Windows with webViewEnvironment: ${webViewEnvironment != null}');
+      return cm;
     }
+    debugPrint('=== FAICookieManager: Created CookieManager for non-Windows platform');
     return CookieManager.instance();
   }
 
@@ -160,24 +166,32 @@ class FAICookieManager {
   static Future<void> syncFromWebView(InAppWebViewController controller) async {
     try {
       final webViewManager = instance;
+      debugPrint('=== FAICookieManager: Starting WebView sync');
+
       final cookies = await webViewManager.getCookies(
         url: WebUri('https://www.furaffinity.net'),
       );
 
+      debugPrint('=== FAICookieManager: Got ${cookies.length} cookies from WebViewManager');
       for (final cookie in cookies) {
+        debugPrint('=== FAICookieManager:   - ${cookie.name} (domain: ${cookie.domain}, path: ${cookie.path}, httpOnly: ${cookie.isHttpOnly}, secure: ${cookie.isSecure}, expires: ${cookie.expiresDate})');
+
+        // expiresDate from flutter_inappwebview is int?
+        expiresDate = cookie.expiresDate;
+
         _cookies[cookie.name] = _CookieEntry(
           name: cookie.name,
           value: cookie.value ?? '',
           domain: cookie.domain ?? '.furaffinity.net',
           path: cookie.path ?? '/',
-          expiresDate: cookie.expiresDate,
+          expiresDate: expiresDate,
           isHttpOnly: cookie.isHttpOnly ?? false,
           isSecure: cookie.isSecure ?? true,
         );
       }
 
       _saveCookies();
-      debugPrint('=== FAICookieManager: Synced ${cookies.length} cookies from WebView');
+      debugPrint('=== FAICookieManager: Synced ${cookies.length} cookies to internal storage, total ${_cookies.length} cookies');
     } catch (e) {
       debugPrint('=== FAICookieManager: WebView sync failed: $e');
     }
@@ -268,7 +282,14 @@ class FAICookieManager {
 
   /// Получить конкретный cookie по имени.
   static Future<Cookie?> getCookie(String url, String name) async {
-    return instance.getCookie(url: WebUri(url), name: name);
+    debugPrint('=== FAICookieManager: Getting cookie $name from $url');
+    final cookie = await instance.getCookie(url: WebUri(url), name: name);
+    if (cookie != null) {
+      debugPrint('=== FAICookieManager: Got cookie: $name | httpOnly=${cookie.isHttpOnly} | value=${cookie.value?.substring(0, min(cookie.value?.length ?? 0, 10) ?? 0)}...');
+    } else {
+      debugPrint('=== FAICookieManager: Cookie $name not found');
+    }
+    return cookie;
   }
 
   /// Установить cookie.
@@ -315,7 +336,14 @@ class FAICookieManager {
 
   /// Получить все FA cookies (включая cf_clearance, a, b).
   static Future<Map<String, Cookie>> getFACookies() async {
+    debugPrint('=== FAICookieManager: Getting all cookies from WebViewManager');
+    debugPrint('=== FAICookieManager: Current time: ${DateTime.now().toIso8601String()}');
+
     final cookies = await getCookies('https://www.furaffinity.net');
+    debugPrint('=== FAICookieManager: Got ${cookies.length} cookies total: ${cookies.map((c) => c.name).join(", ")}');
+    for (final cookie in cookies) {
+      debugPrint('=== FAICookieManager:   - ${cookie.name} (domain: ${cookie.domain}, path: ${cookie.path}, httpOnly: ${cookie.isHttpOnly}, secure: ${cookie.isSecure}, expires: ${cookie.expiresDate})');
+    }
     return {for (final c in cookies) c.name: c};
   }
 

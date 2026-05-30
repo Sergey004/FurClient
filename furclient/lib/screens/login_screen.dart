@@ -243,8 +243,8 @@ class _LoginScreenState extends State<LoginScreen>
       String path;
       bool isHttpOnly;
       bool isSecure;
-      int expiresDate;
-      
+      int? expiresDate;
+
       if (c is Cookie) {
         // Handle flutter_inappwebview.Cookie type
         name = c.name;
@@ -253,12 +253,9 @@ class _LoginScreenState extends State<LoginScreen>
         path = c.path ?? '/';
         isHttpOnly = c.isHttpOnly ?? false;
         isSecure = c.isSecure ?? true;
-        // expiresDate from flutter_inappwebview is DateTime?, convert to milliseconds
-        if (c.expiresDate != null) {
-          expiresDate = (c.expiresDate as DateTime).millisecondsSinceEpoch;
-        } else {
-          expiresDate = 0;
-        }
+        // expiresDate from flutter_inappwebview is int? (millisecondsSinceEpoch)
+        expiresDate = c.expiresDate ?? 0;
+        debugPrint('=== _addCookiesToMap: Cookie: $name | httpOnly=$isHttpOnly | secure=$isSecure | expires=$expiresDate');
       } else if (c is Map<String, dynamic>) {
         // Handle WebCookie type
         name = c['name'] as String? ?? '';
@@ -268,10 +265,12 @@ class _LoginScreenState extends State<LoginScreen>
         isHttpOnly = c['isHttpOnly'] as bool? ?? false;
         isSecure = c['isSecure'] as bool? ?? true;
         expiresDate = c['expiresDate'] as int? ?? 0;
+        debugPrint('=== _addCookiesToMap: Map cookie: $name | httpOnly=$isHttpOnly | secure=$isSecure | expires=$expiresDate');
       } else {
+        debugPrint('=== _addCookiesToMap: Unknown cookie type: $c');
         continue;
       }
-      
+
       if (name.isNotEmpty && value.isNotEmpty && !cookieDataMap.containsKey(name)) {
         final displayValue = value.substring(0, min(value.length, 10));
         debugPrint(

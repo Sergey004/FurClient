@@ -33,12 +33,14 @@ void main() {
         final availableVersion = await WebViewEnvironment.getAvailableVersion();
         assert(availableVersion != null, 'WebView2 Runtime not found.');
         final dir = await getApplicationSupportDirectory();
+        debugPrint('=== Creating WebViewEnvironment with webview2_data profile at: ${dir.path}\\webview2_data');
         webViewEnvironment = await WebViewEnvironment.create(
           settings: WebViewEnvironmentSettings(
             userDataFolder: '${dir.path}\\webview2_data',
             additionalBrowserArguments: '--disable-gpu --use-gl=swiftshader',
           ),
         );
+        debugPrint('=== WebViewEnvironment created successfully, version: $availableVersion');
         // Запускаем прокси для FA CDN — читает cookies из webview2_data профиля
         await FAImageProxy().start();
       }
@@ -88,13 +90,18 @@ class _FurClientAppState extends State<FurClientApp> {
 
   Future<void> _initApp() async {
     try {
+      debugPrint('=== _initApp: Starting application initialization');
       await _client.init();
+      debugPrint('=== _initApp: FAClient initialized');
       await _authService.loadSavedSession();
+      debugPrint('=== _initApp: Session loaded: ${_authService.currentSession != null}');
       final session = _authService.currentSession;
 
       if (session != null && session.isLoggedIn) {
+        debugPrint('=== _initApp: Restoring session for user: ${session.username}');
         await _client.setSession(session);
         final valid = await _client.verifySession();
+        debugPrint('=== _initApp: Session verification result: $valid');
         if (valid) {
           if (mounted) {
             setState(() {
@@ -104,8 +111,11 @@ class _FurClientAppState extends State<FurClientApp> {
           }
           return;
         } else {
+          debugPrint('=== _initApp: Session invalid, logging out');
           await _authService.logout();
         }
+      } else {
+        debugPrint('=== _initApp: No valid session to restore');
       }
     } catch (e) {
       debugPrint('Init error: $e');
