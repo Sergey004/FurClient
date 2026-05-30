@@ -34,6 +34,8 @@ class _SearchScreenState extends State<SearchScreen>
   bool _hasMore = true;
   String? _error;
   String _query = '';
+  String _sortBy = 'relevancyt';
+  String _sortDirection = 'desc';
   bool _hasSearched = false;
   bool _historyLoaded = false;
 
@@ -88,7 +90,12 @@ class _SearchScreenState extends State<SearchScreen>
     await _searchHistory.add(trimmed);
 
     try {
-      final results = await widget.client.search(trimmed, page: 1);
+      final results = await widget.client.search(
+        trimmed,
+        page: 1,
+        sortBy: _sortBy,
+        sortDirection: _sortDirection,
+      );
       if (mounted) {
         setState(() {
           _results = results;
@@ -112,7 +119,12 @@ class _SearchScreenState extends State<SearchScreen>
     _currentPage += 1;
 
     try {
-      final results = await widget.client.search(_query, page: _currentPage);
+      final results = await widget.client.search(
+        _query,
+        page: _currentPage,
+        sortBy: _sortBy,
+        sortDirection: _sortDirection,
+      );
       if (mounted) {
         setState(() {
           _results.addAll(results);
@@ -188,11 +200,98 @@ class _SearchScreenState extends State<SearchScreen>
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          _buildSortBar(),
           Expanded(child: _buildBody(isDesktop)),
         ],
       ),
     );
+  }
+
+  Widget _buildSortBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Row(
+        children: [
+          const Icon(Icons.sort, size: 18, color: AppColors.textMuted),
+          const SizedBox(width: 6),
+          Text('Sort:', style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          const SizedBox(width: 8),
+          _sortChip('Relevance', 'relevancyt'),
+          const SizedBox(width: 6),
+          _sortChip('Newest', 'datet'),
+          const SizedBox(width: 6),
+          _sortChip('Popular', 'popularityt'),
+          const Spacer(),
+          if (_sortBy != 'relevancyt')
+            GestureDetector(
+              onTap: () => _toggleSortDirection(),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _sortDirection == 'desc'
+                          ? Icons.arrow_downward
+                          : Icons.arrow_upward,
+                      size: 14,
+                      color: AppColors.textDim,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _sortDirection == 'desc' ? 'Desc' : 'Asc',
+                      style: const TextStyle(color: AppColors.textDim, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sortChip(String label, String sortKey) {
+    final active = _sortBy == sortKey;
+    return GestureDetector(
+      onTap: () {
+        if (_sortBy == sortKey) return;
+        setState(() => _sortBy = sortKey);
+        if (_query.isNotEmpty) _search(_query);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: active
+              ? AppColors.materialGreen.withValues(alpha: 0.15)
+              : AppColors.bgCard,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: active ? AppColors.materialGreen : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? AppColors.materialGreen : AppColors.textDim,
+            fontSize: 11,
+            fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _toggleSortDirection() {
+    setState(() {
+      _sortDirection = _sortDirection == 'desc' ? 'asc' : 'desc';
+    });
+    if (_query.isNotEmpty) _search(_query);
   }
 
   Widget _buildBody(bool isDesktop) {

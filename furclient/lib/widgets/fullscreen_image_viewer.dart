@@ -1,10 +1,17 @@
-import 'dart:typed_data';
+import 'dart:async';
+import 'dart:io' as io;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:extended_image/extended_image.dart';
 import '../utils/webview_image_fetcher.dart';
+import '../utils/cookie_store.dart';
 
 /// Fullscreen image viewer powered by extended_image.
 /// Zoom, pan, double-tap, slide-to-dismiss.
+///
+/// Platform-aware image loading:
+/// - Windows: WebViewImageFetcher (CF won't block WebView2 TLS fingerprint)
+/// - Android/other: Direct HTTP with cookies and retry
 ///
 /// Usage:
 ///   ```dart
@@ -51,6 +58,70 @@ class FullscreenImageViewer extends StatelessWidget {
     );
   }
 
+  /// Load image bytes — platform-aware.
+  /// WebView fetcher first (browser TLS fingerprint bypasses CF),
+  /// HTTP fallback if WebView fails.
+  static Future<Uint8List?> loadImageBytes(String url) async {
+    // WebView fetcher on all platforms (browser TLS → CF passes).
+    try {
+      final bytes = await WebViewImageFetcher.instance.fetchImage(url);
+      if (bytes != null && bytes.isNotEmpty) return bytes;
+    } catch (e) {
+      debugPrint('=== FullscreenImageViewer: WebView fetch error: $e');
+    }
+
+    // HTTP fallback with cookies + retry
+    for (int attempt = 0; attempt < 3; attempt++) {
+      try {
+        final client = io.HttpClient()
+          ..connectionTimeout = const Duration(seconds: 30);
+        final request = await client.getUrl(Uri.parse(url));
+
+        final headers = <String, String>{
+          'User-Agent': 'ceylo.FurAffinityApp/1.0',
+          'Referer': 'https://www.furaffinity.net',
+        };
+        final cookieHeader = CookieStore.instance.cookieHeader;
+        if (cookieHeader != null) headers['Cookie'] = cookieHeader;
+        headers.forEach((k, v) => request.headers.set(k, v));
+
+        final response = await request.close();
+
+        if (response.statusCode == 403 && attempt < 2) {
+          client.close();
+          if (attempt == 0) {
+            await Future.delayed(const Duration(seconds: 3));
+          } else {
+            await Future.delayed(Duration(seconds: 2 + attempt * 3));
+          }
+          continue;
+        }
+
+        if (response.statusCode != 200) {
+          client.close();
+          throw Exception('HTTP ${response.statusCode}');
+        }
+
+        final completer = Completer<Uint8List>();
+        final chunks = <int>[];
+        response.listen(
+          (chunk) => chunks.addAll(chunk),
+          onDone: () => completer.complete(Uint8List.fromList(chunks)),
+          onError: (e) => completer.completeError(e),
+        );
+        final bytes = await completer.future;
+        client.close();
+        return bytes;
+      } catch (e) {
+        debugPrint('=== FullscreenImageViewer: HTTP error (attempt $attempt): $e');
+        if (attempt < 2) {
+          await Future.delayed(Duration(seconds: 2 + attempt * 3));
+        }
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return ExtendedImageSlidePage(
@@ -78,8 +149,7 @@ class FullscreenImageViewer extends StatelessWidget {
             // Image with zoom/pan
             Center(
               child: FutureBuilder<Uint8List?>(
-                future:
-                    WebViewImageFetcher.instance.fetchImage(imageUrl),
+                future: loadImageBytes(imageUrl),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(

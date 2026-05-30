@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../main.dart' show webViewEnvironment;
+import 'cookie_store.dart';
 
 /// Fetches images via a SINGLE persistent HeadlessInAppWebView.
 ///
@@ -52,8 +53,13 @@ class WebViewImageFetcher {
   /// Set before loadUrl(), completed by the JS handler or error callbacks.
   Completer<String?>? _currentImageCompleter;
 
+  /// Consecutive failure counter — if >= 3, auto-reset the WebView.
+  int _consecutiveFailures = 0;
+
   Future<Uint8List?> fetchImage(String url) async {
-    if (!io.Platform.isWindows || webViewEnvironment == null) return null;
+    // webViewEnvironment is only needed on Windows (WebView2).
+    // On Android, HeadlessInAppWebView works without it.
+    if (io.Platform.isWindows && webViewEnvironment == null) return null;
 
     final cached = _cache[url];
     if (cached != null) {
@@ -76,7 +82,10 @@ class WebViewImageFetcher {
       try {
         await _ensureReady();
         if (_controller == null || !_ready) {
+          debugPrint('=== WebViewImageFetcher: WebView not ready, skipping');
           if (!request.completer.isCompleted) request.completer.complete(null);
+          _consecutiveFailures++;
+          _maybeAutoReset();
           continue;
         }
         final data = await _fetchSingleImage(request.url);
@@ -84,10 +93,24 @@ class WebViewImageFetcher {
       } catch (e) {
         debugPrint('=== WebViewImageFetcher: Queue error: $e');
         if (!request.completer.isCompleted) request.completer.complete(null);
+        _consecutiveFailures++;
+        _maybeAutoReset();
       }
     }
 
     _processing = false;
+  }
+
+  /// Auto-reset if too many consecutive failures (dead WebView).
+  void _maybeAutoReset() {
+    if (_consecutiveFailures >= 3) {
+      debugPrint('=== WebViewImageFetcher: $_consecutiveFailures consecutive failures, auto-resetting');
+      _consecutiveFailures = 0;
+      // Schedule async reset (don't block current queue processing)
+      Future.microtask(() async {
+        await reset();
+      });
+    }
   }
 
   /// Create the persistent HeadlessInAppWebView (once).
@@ -183,6 +206,7 @@ class WebViewImageFetcher {
         onReceivedHttpError: (controller, request, response) {
           if (!(request.isForMainFrame ?? false)) return;
           final status = response.statusCode ?? 0;
+          debugPrint('=== WebViewImageFetcher: HTTP error $status for ${request.url}');
           if (status == 403 || status == 503) {
             final completer = _currentImageCompleter;
             if (completer != null && !completer.isCompleted) {
@@ -192,6 +216,7 @@ class WebViewImageFetcher {
         },
         onReceivedError: (controller, request, error) {
           if (!(request.isForMainFrame ?? false)) return;
+          debugPrint('=== WebViewImageFetcher: WebView error: ${error.description}');
           final completer = _currentImageCompleter;
           if (completer != null && !completer.isCompleted) {
             completer.complete(null);
@@ -203,13 +228,22 @@ class WebViewImageFetcher {
       await _headless!.run();
 
       // Wait for about:blank to load (onLoadStop fires).
-      await initCompleter.future.timeout(
+      final initResult = await initCompleter.future.timeout(
         Duration(seconds: 5),
-        onTimeout: () {},
+        onTimeout: () {
+          debugPrint('=== WebViewImageFetcher: Init timeout — WebView may be dead');
+          return false;
+        },
       );
 
-      _ready = true;
-      debugPrint('=== WebViewImageFetcher: Persistent WebView ready');
+      if (initResult == false) {
+        // about:blank never loaded — WebView is broken
+        _ready = false;
+        debugPrint('=== WebViewImageFetcher: Init failed (timeout), marking as not ready');
+      } else {
+        _ready = true;
+        debugPrint('=== WebViewImageFetcher: Persistent WebView ready');
+      }
     } catch (e) {
       debugPrint('=== WebViewImageFetcher: Init error: $e');
       _ready = false;
@@ -225,6 +259,14 @@ class WebViewImageFetcher {
     _currentImageCompleter = Completer<String?>();
 
     try {
+      // On Android, HeadlessInAppWebView has its own cookie jar.
+      // The login WebView's cookies are in CookieStore but NOT shared with
+      // this HeadlessInAppWebView. Inject them via CookieManager.
+      if (!io.Platform.isWindows) {
+        await _injectCookies(url);
+      }
+
+      debugPrint('=== WebViewImageFetcher: Loading URL: $url');
       await _controller!.loadUrl(
         urlRequest: URLRequest(url: WebUri(url)),
       );
@@ -238,12 +280,18 @@ class WebViewImageFetcher {
         },
       );
 
-      if (dataUrl == null || dataUrl.isEmpty) return null;
+      if (dataUrl == null || dataUrl.isEmpty) {
+        _consecutiveFailures++;
+        debugPrint('=== WebViewImageFetcher: No data for $url (failures: $_consecutiveFailures)');
+        _maybeAutoReset();
+        return null;
+      }
 
       final b64 = dataUrl.substring(dataUrl.indexOf(',') + 1);
       final data = base64Decode(b64);
 
       // Cache
+      _consecutiveFailures = 0; // Reset on success
       if (_cache.length >= _maxCacheSize) _cache.remove(_cache.keys.first);
       _cache[url] = data;
 
@@ -251,10 +299,55 @@ class WebViewImageFetcher {
       return data;
     } catch (e) {
       debugPrint('=== WebViewImageFetcher: Error for $url: $e');
+      _consecutiveFailures++;
+      _maybeAutoReset();
       return null;
     } finally {
       _currentImageCompleter = null;
     }
+  }
+
+  /// Inject cookies from CookieStore into the HeadlessInAppWebView's cookie jar.
+  /// Required on Android where each WebView instance has its own cookie store.
+  /// On Windows, cookies are shared via webViewEnvironment.
+  Future<void> _injectCookies(String url) async {
+    final cookieHeader = CookieStore.instance.cookieHeader;
+    if (cookieHeader == null || cookieHeader.isEmpty) {
+      debugPrint('=== WebViewImageFetcher: No cookies in CookieStore');
+      return;
+    }
+
+    final cm = CookieManager.instance();
+    final uri = Uri.parse(url);
+    final cookies = cookieHeader.split('; ');
+
+    // Inject cookies for the target domain AND the base domain (.furaffinity.net)
+    // to cover cf_clearance which is set on .furaffinity.net.
+    final domains = <String>{uri.host};
+    if (uri.host.contains('.furaffinity.net')) {
+      domains.add('.furaffinity.net');
+    }
+
+    for (final domain in domains) {
+      for (final cookie in cookies) {
+        final eqIdx = cookie.indexOf('=');
+        if (eqIdx < 0) continue;
+        final name = cookie.substring(0, eqIdx).trim();
+        final value = cookie.substring(eqIdx + 1).trim();
+        try {
+          await cm.setCookie(
+            url: WebUri('${uri.scheme}://$domain'),
+            name: name,
+            value: value,
+            domain: domain,
+            path: '/',
+          );
+        } catch (e) {
+          debugPrint('=== WebViewImageFetcher: Cookie inject error: $e');
+        }
+      }
+    }
+    debugPrint('=== WebViewImageFetcher: Injected ${cookies.length} cookies for $domains');
   }
 
   /// Clear the image cache.
@@ -262,16 +355,25 @@ class WebViewImageFetcher {
     _cache.clear();
   }
 
-  /// Dispose the persistent WebView and clear everything.
-  Future<void> dispose() async {
+  /// Quick reset — disposes the dead WebView so next fetchImage() reinitializes.
+  Future<void> reset() async {
     _queue.clear();
     _cache.clear();
+    _currentImageCompleter?.complete(null);
     _currentImageCompleter = null;
     _processing = false;
     _ready = false;
+    _initializing = false;
+    _consecutiveFailures = 0;
     await _headless?.dispose();
     _headless = null;
     _controller = null;
+    debugPrint('=== WebViewImageFetcher: Reset (WebView will be re-created on next fetch)');
+  }
+
+  /// Full dispose the persistent WebView and clear everything.
+  Future<void> dispose() async {
+    await reset();
     debugPrint('=== WebViewImageFetcher: Disposed');
   }
 }

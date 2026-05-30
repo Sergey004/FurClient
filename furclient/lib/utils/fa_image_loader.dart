@@ -3,7 +3,6 @@ import 'dart:io' as io;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:fa_kit/fa_kit.dart';
-import 'fa_image_proxy.dart';
 import 'webview_image_fetcher.dart';
 import '../utils/cookie_store.dart';
 
@@ -47,13 +46,9 @@ class _FAImageState extends State<FAImage> {
           .bestThumbnailUrl(width: widget.width!, height: widget.height!)
           .toString();
     }
-    // On Windows, use WebView-based fetching directly (bypass proxy).
-    // The proxy uses Dio which has a non-browser TLS fingerprint that CF blocks.
-    // On other platforms, route through the proxy.
-    if (io.Platform.isWindows) {
-      return url; // Use the original URL; WebView fetcher handles it
-    }
-    return FAImageProxy.proxyUrl(url);
+    // Windows: WebView fetcher handles CF (same TLS fingerprint as login WebView).
+    // Android: direct HTTP with cookies (proxy server only runs on Windows).
+    return url;
   }
 
   Map<String, String> get _requestHeaders {
@@ -62,9 +57,8 @@ class _FAImageState extends State<FAImage> {
       'Referer': 'https://www.furaffinity.net',
     };
     // On Windows, WebView fetcher handles cookies and auth.
-    // On other platforms, add cookies from CookieStore for non-proxy URLs.
-    if (!io.Platform.isWindows &&
-        !FAImageProxy.proxyUrl(widget.url).startsWith('http://127.0.0.1')) {
+    // On Android/other, add cookies from CookieStore for direct HTTP.
+    if (!io.Platform.isWindows) {
       final cookieHeader = CookieStore.instance.cookieHeader;
       if (cookieHeader != null) headers['Cookie'] = cookieHeader;
     }
@@ -94,26 +88,23 @@ class _FAImageState extends State<FAImage> {
 
     setState(() { _isLoading = true; _hasError = false; _bytes = null; });
 
-    // On Windows, use WebView-based image fetching.
-    // WebView2 shares cookies + TLS fingerprint with the login WebView,
-    // so Cloudflare does not block it.
-    if (io.Platform.isWindows) {
-      try {
-        debugPrint('=== FAImage: using WebView fetcher for $imageUrl');
-        final bytes = await WebViewImageFetcher.instance.fetchImage(imageUrl);
-        if (bytes != null && bytes.isNotEmpty) {
-          if (mounted) {
-            setState(() {
-              _bytes = bytes;
-              _isLoading = false;
-            });
-          }
-          return;
+    // Use WebView-based image fetching on all platforms.
+    // WebView shares cookies + browser TLS fingerprint, so CF doesn't block it.
+    try {
+      debugPrint('=== FAImage: using WebView fetcher for $imageUrl');
+      final bytes = await WebViewImageFetcher.instance.fetchImage(imageUrl);
+      if (bytes != null && bytes.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _bytes = bytes;
+            _isLoading = false;
+          });
         }
-        debugPrint('=== FAImage: WebView fetch returned null, falling back to HTTP');
-      } catch (e) {
-        debugPrint('=== FAImage: WebView fetch error: $e');
+        return;
       }
+      debugPrint('=== FAImage: WebView fetch returned null, falling back to HTTP');
+    } catch (e) {
+      debugPrint('=== FAImage: WebView fetch error: $e');
     }
 
     // Fallback: HTTP-based loading (for non-Windows or if WebView fails)

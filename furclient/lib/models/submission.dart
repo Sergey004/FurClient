@@ -15,7 +15,10 @@ class Submission {
   final List<String> tags;
   final String date;
   final bool isNsfw;
+  final String rating; // 'general', 'mature', 'adult'
   final String url;
+  final bool isFavorite;
+  final String favoriteUrl;
 
   String get thumbnailUrl => imageUrl;
   String get fullImageUrl => imageUrl;
@@ -34,7 +37,10 @@ class Submission {
     required this.tags,
     required this.date,
     required this.isNsfw,
+    this.rating = 'general',
     required this.url,
+    this.isFavorite = false,
+    this.favoriteUrl = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -50,7 +56,10 @@ class Submission {
         'tags': tags,
         'date': date,
         'isNsfw': isNsfw,
+        'rating': rating,
         'url': url,
+        'isFavorite': isFavorite,
+        'favoriteUrl': favoriteUrl,
       };
 
   factory Submission.fromJson(Map<String, dynamic> json) => Submission(
@@ -66,7 +75,10 @@ class Submission {
         tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
         date: json['date'] as String? ?? '',
         isNsfw: json['isNsfw'] as bool? ?? false,
+        rating: json['rating'] as String? ?? 'general',
         url: json['url'] as String? ?? '',
+        isFavorite: json['isFavorite'] as bool? ?? false,
+        favoriteUrl: json['favoriteUrl'] as String? ?? '',
       );
 
   static List<Submission> parseSubmissionsPage(String htmlString) {
@@ -100,10 +112,10 @@ class Submission {
         author = authorMatch?.group(1) ?? captionLinks[1].text.trim();
       }
 
-      final isNsfw = fig.querySelector('[data-rating="adult"]') != null ||
-          fig.querySelector('[data-rating="mature"]') != null ||
-          fig.classes.contains('r-adult') ||
-          fig.classes.contains('r-mature');
+      final isAdult = fig.querySelector('[data-rating="adult"]') != null || fig.classes.contains('r-adult');
+    final isMature = fig.querySelector('[data-rating="mature"]') != null || fig.classes.contains('r-mature');
+    final isNsfw = isAdult || isMature;
+    final rating = isAdult ? 'adult' : isMature ? 'mature' : 'general';
 
       submissions.add(Submission(
         id: id,
@@ -118,7 +130,10 @@ class Submission {
         tags: [],
         date: DateTime.now().toIso8601String(),
         isNsfw: isNsfw,
+        rating: rating,
         url: 'https://www.furaffinity.net/view/$id/',
+        isFavorite: false,
+        favoriteUrl: '',
       ));
     }
 
@@ -175,10 +190,41 @@ class Submission {
     final ratingEl = document.querySelector('[class*="c-contentRating"]');
     final ratingText = ratingEl?.text.trim() ?? '';
     final isNsfw = ratingText == 'Adult' || ratingText == 'Mature';
+    final rating = ratingText == 'Adult' ? 'adult' : ratingText == 'Mature' ? 'mature' : 'general';
 
     // iOS: span.popup_date
     final dateEl = document.querySelector('span.popup_date');
     final date = dateEl?.attributes['title'] ?? dateEl?.text.trim() ?? '';
+
+    // Parse favorite button: look for /fav/ID/ or /unfav/ID/ link
+    bool isFavorite = false;
+    String favoriteUrl = '';
+    final favLinks = document.querySelectorAll('a[href*="/unfav/"], a[href*="/fav/"]');
+    if (favLinks.isNotEmpty) {
+      // The first matching link is the active action
+      final favHref = favLinks.first.attributes['href'] ?? '';
+      if (favHref.contains('/unfav/')) {
+        isFavorite = true;
+        favoriteUrl = favHref;
+      } else if (favHref.contains('/fav/')) {
+        isFavorite = false;
+        favoriteUrl = favHref;
+      }
+    }
+    // Fallback: check for button elements too
+    if (favoriteUrl.isEmpty) {
+      final favBtns = document.querySelectorAll('button[data-action="fav"], button[data-action="unfav"]');
+      if (favBtns.isNotEmpty) {
+        final action = favBtns.first.attributes['data-action'] ?? '';
+        final sid = favBtns.first.attributes['data-id'] ?? submissionId;
+        if (action == 'unfav') {
+          isFavorite = true;
+          favoriteUrl = '/unfav/$sid/';
+        } else {
+          favoriteUrl = '/fav/$sid/';
+        }
+      }
+    }
 
     return Submission(
       id: submissionId,
@@ -193,7 +239,10 @@ class Submission {
       tags: tags,
       date: date,
       isNsfw: isNsfw,
+      rating: rating,
       url: 'https://www.furaffinity.net/view/$submissionId/',
+      isFavorite: isFavorite,
+      favoriteUrl: favoriteUrl,
     );
   }
 

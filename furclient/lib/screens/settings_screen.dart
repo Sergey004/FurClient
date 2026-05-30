@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../widgets/adaptive/adaptive.dart';
 
@@ -21,6 +22,9 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen>
     with AutomaticKeepAliveClientMixin {
   bool _sfwMode = false;
+  bool _autoDownloadOnFave = false;
+  bool _autoCloseOnFave = true;
+  String _imageQuality = 'high'; // low, medium, high
 
   @override
   bool get wantKeepAlive => true;
@@ -29,6 +33,24 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     _sfwMode = widget.sfwMode;
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _autoDownloadOnFave = prefs.getBool('auto_download_on_fave') ?? false;
+        _autoCloseOnFave = prefs.getBool('auto_close_on_fave') ?? true;
+        _imageQuality = prefs.getString('image_quality') ?? 'high';
+      });
+    }
+  }
+
+  Future<void> _saveSetting(String key, dynamic value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value is bool) await prefs.setBool(key, value);
+    if (value is String) await prefs.setString(key, value);
   }
 
   void _confirmLogout() {
@@ -91,6 +113,76 @@ class _SettingsScreenState extends State<SettingsScreen>
             },
             title: 'SFW Mode',
             subtitle: 'Blur NSFW content',
+          ),
+          const Divider(height: 1, indent: 16, color: AppColors.border),
+          _adaptiveSwitchTile(
+            icon: Icons.download_outlined,
+            iconColor: AppColors.fluentCyan,
+            value: _autoDownloadOnFave,
+            onChanged: (v) {
+              setState(() => _autoDownloadOnFave = v);
+              _saveSetting('auto_download_on_fave', v);
+            },
+            title: 'Auto-download on Fave',
+            subtitle: 'Save image when favoriting',
+          ),
+          const Divider(height: 1, indent: 16, color: AppColors.border),
+          _adaptiveSwitchTile(
+            icon: Icons.close_fullscreen_outlined,
+            iconColor: AppColors.cupertinoPurple,
+            value: _autoCloseOnFave,
+            onChanged: (v) {
+              setState(() => _autoCloseOnFave = v);
+              _saveSetting('auto_close_on_fave', v);
+            },
+            title: 'Auto-close on Fave',
+            subtitle: 'Close submission view after favoriting',
+          ),
+          const Divider(height: 1, indent: 16, color: AppColors.border),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            title: Row(
+              children: [
+                const Icon(Icons.high_quality_outlined, color: AppColors.materialLavender, size: 20),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text('Image Quality',
+                      style: TextStyle(color: AppColors.text, fontSize: 15)),
+                ),
+              ],
+            ),
+            subtitle: const Padding(
+              padding: EdgeInsets.only(left: 32),
+              child: Text('Quality for full-size images',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+            ),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.bgInput,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _imageQuality,
+                  isDense: true,
+                  style: const TextStyle(color: AppColors.text, fontSize: 13),
+                  dropdownColor: AppColors.bgCard,
+                  items: const [
+                    DropdownMenuItem(value: 'low', child: Text('Low')),
+                    DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                    DropdownMenuItem(value: 'high', child: Text('High')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() => _imageQuality = v);
+                      _saveSetting('image_quality', v);
+                    }
+                  },
+                ),
+              ),
+            ),
           ),
         ]),
         const SizedBox(height: 24),
@@ -174,6 +266,76 @@ class _SettingsScreenState extends State<SettingsScreen>
                     },
                     title: 'SFW Mode',
                     subtitle: 'Blur NSFW content',
+                  ),
+                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  _adaptiveSwitchTile(
+                    icon: Icons.download_outlined,
+                    iconColor: AppColors.fluentCyan,
+                    value: _autoDownloadOnFave,
+                    onChanged: (v) {
+                      setState(() => _autoDownloadOnFave = v);
+                      _saveSetting('auto_download_on_fave', v);
+                    },
+                    title: 'Auto-download on Fave',
+                    subtitle: 'Save image when favoriting',
+                  ),
+                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  _adaptiveSwitchTile(
+                    icon: Icons.close_fullscreen_outlined,
+                    iconColor: AppColors.cupertinoPurple,
+                    value: _autoCloseOnFave,
+                    onChanged: (v) {
+                      setState(() => _autoCloseOnFave = v);
+                      _saveSetting('auto_close_on_fave', v);
+                    },
+                    title: 'Auto-close on Fave',
+                    subtitle: 'Close submission view after favoriting',
+                  ),
+                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    title: Row(
+                      children: [
+                        const Icon(Icons.high_quality_outlined, color: AppColors.materialLavender, size: 20),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text('Image Quality',
+                              style: TextStyle(color: AppColors.text, fontSize: 15)),
+                        ),
+                      ],
+                    ),
+                    subtitle: const Padding(
+                      padding: EdgeInsets.only(left: 32),
+                      child: Text('Quality for full-size images',
+                          style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgInput,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _imageQuality,
+                          isDense: true,
+                          style: const TextStyle(color: AppColors.text, fontSize: 13),
+                          dropdownColor: AppColors.bgCard,
+                          items: const [
+                            DropdownMenuItem(value: 'low', child: Text('Low')),
+                            DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                            DropdownMenuItem(value: 'high', child: Text('High')),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() => _imageQuality = v);
+                              _saveSetting('image_quality', v);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),

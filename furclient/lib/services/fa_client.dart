@@ -489,10 +489,95 @@ class FAClient {
     return result.comments;
   }
 
-  Future<List<Submission>> search(String query, {int page = 1}) async {
-    final url = FAUrls.search(query, page: page);
+  Future<List<Submission>> search(String query, {
+    int page = 1,
+    String sortBy = 'relevancyt',
+    String sortDirection = 'desc',
+  }) async {
+    final url = FAUrls.search(query, page: page, sortBy: sortBy, sortDirection: sortDirection);
     final html = await _getHtml(url);
     return Submission.parseSearchResults(html);
+  }
+
+  /// Toggle favorite on a submission.
+  /// [favoriteUrl] is the action URL parsed from the submission page
+  /// (e.g. "/fav/123456/?key=abc" to fave, "/unfav/123456/?key=abc" to unfave).
+  /// Returns true if the action succeeded.
+  Future<bool> toggleFavorite(String favoriteUrl) async {
+    final url = favoriteUrl.startsWith('http')
+        ? favoriteUrl
+        : '${FAUrls.baseUrl}$favoriteUrl';
+
+    debugPrint('=== toggleFavorite: POST via WebView $url');
+
+    // FA fav/unfav requires POST with cookies — always use WebView to bypass CF.
+    final completer = Completer<bool>();
+    HeadlessInAppWebView? headless;
+
+    headless = HeadlessInAppWebView(
+      webViewEnvironment: webViewEnvironment,
+      initialSettings: InAppWebViewSettings(
+        javaScriptEnabled: true,
+      ),
+      onLoadStop: (controller, loadedUrl) async {
+        try {
+          final html = await controller.getHtml() ?? '';
+          debugPrint('=== toggleFavorite WebView: ${html.length}B from $loadedUrl');
+
+          if (_isCloudflarePage(html)) {
+            debugPrint('=== toggleFavorite: CF challenge, waiting...');
+            await Future.delayed(const Duration(seconds: 3));
+            final retryHtml = await controller.getHtml() ?? '';
+            if (!_isCloudflarePage(retryHtml)) {
+              if (!completer.isCompleted) completer.complete(true);
+            }
+            return;
+          }
+
+          // If we got a real page back (not CF), the action succeeded
+          if (!completer.isCompleted) completer.complete(html.isNotEmpty);
+        } catch (e) {
+          debugPrint('=== toggleFavorite onLoadStop error: $e');
+          if (!completer.isCompleted) completer.completeError(e);
+        }
+      },
+      onReceivedHttpError: (controller, request, response) async {
+        if (!(request.isForMainFrame ?? false)) return;
+        final status = response.statusCode ?? 0;
+        debugPrint('=== toggleFavorite: HTTP $status');
+      },
+      initialUrlRequest: URLRequest(
+        url: WebUri(url),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': FAUrls.baseUrl,
+        },
+      ),
+    );
+
+    await headless.run();
+
+    try {
+      final success = await completer.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint('=== toggleFavorite: timeout');
+          return false;
+        },
+      );
+      await headless.dispose();
+
+      // Sync cookies after action
+      await _syncCookiesFromWebView();
+
+      debugPrint('=== toggleFavorite: result=$success');
+      return success;
+    } catch (e) {
+      await headless.dispose();
+      debugPrint('=== toggleFavorite error: $e');
+      return false;
+    }
   }
 
   Future<List<FANotification>> getNotifications() async {

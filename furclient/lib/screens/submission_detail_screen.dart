@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/fa_client.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/platform_utils.dart';
 import '../utils/fa_image_loader.dart';
 import '../widgets/fullscreen_image_viewer.dart';
+import '../services/download_service.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
 
@@ -30,6 +32,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   Submission? _submission;
   List<FAComment> _comments = [];
   bool _isLoading = true;
+  bool _isFaving = false;
+  bool _isDownloading = false;
 
   String? _error;
 
@@ -81,6 +85,105 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     );
   }
 
+  Future<void> _toggleFavorite() async {
+    final sub = _submission;
+    if (sub == null || sub.favoriteUrl.isEmpty || _isFaving) return;
+    setState(() => _isFaving = true);
+    bool success = false;
+    try {
+      success = await widget.client.toggleFavorite(sub.favoriteUrl);
+      if (mounted && success) {
+        setState(() {
+          // Toggle local state: swap between /fav/ and /unfav/
+          final wasFav = sub.isFavorite;
+          final sid = sub.id;
+          _submission = Submission(
+            id: sub.id,
+            title: sub.title,
+            author: sub.author,
+            category: sub.category,
+            imageUrl: sub.imageUrl,
+            views: sub.views,
+            faves: sub.faves + (wasFav ? -1 : 1),
+            commentsCount: sub.commentsCount,
+            description: sub.description,
+            tags: sub.tags,
+            date: sub.date,
+            isNsfw: sub.isNsfw,
+            rating: sub.rating,
+            url: sub.url,
+            isFavorite: !wasFav,
+            favoriteUrl: wasFav ? '/fav/$sid/' : '/unfav/$sid/',
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('=== toggleFavorite error: $e');
+    } finally {
+      if (mounted) setState(() => _isFaving = false);
+    }
+
+    // Auto-download on fave
+    if (success && mounted) {
+      final prefs = await SharedPreferences.getInstance();
+      final autoDownload = prefs.getBool('auto_download_on_fave') ?? false;
+      if (autoDownload) {
+        await _downloadImage();
+      }
+      // Auto-close on fave (check mounted again after async download)
+      final autoClose = prefs.getBool('auto_close_on_fave') ?? true;
+      if (autoClose && mounted) {
+        Navigator.of(context).maybePop();
+      }
+    }
+  }
+
+  Future<void> _downloadImage() async {
+    final sub = _submission;
+    if (sub == null || sub.imageUrl.isEmpty || _isDownloading) return;
+    setState(() => _isDownloading = true);
+    try {
+      final path = await DownloadService.instance.downloadImage(
+        imageUrl: sub.imageUrl,
+        title: sub.title,
+        author: sub.author,
+        rating: sub.rating,
+      );
+      if (mounted) {
+        if (path != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Saved: ${path.split('/').last}'),
+              duration: const Duration(seconds: 2),
+              backgroundColor: AppColors.materialGreen,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Download failed'),
+              duration: Duration(seconds: 2),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('=== downloadImage error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -94,7 +197,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
     return AdaptiveScaffold(
       backgroundColor: AppColors.bg,
-      body: _buildBody(isDesktop),
+      body: SafeArea(
+        bottom: false,
+        child: _buildBody(isDesktop),
+      ),
     );
   }
 
@@ -195,11 +301,17 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   Widget _buildMobileLayout(Submission sub) {
     return CustomScrollView(
       slivers: [
-        const SliverAppBar(
-          backgroundColor: AppColors.bg,
-          foregroundColor: AppColors.text,
-          elevation: 0,
-          pinned: true,
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.text),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+          ),
         ),
         SliverToBoxAdapter(
           child: Column(
@@ -320,14 +432,97 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
-              _statChip(Icons.visibility, '${sub.views}', 'Views',
-                  AppColors.fluentCyan),
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _statChip(Icons.visibility, '${sub.views}', 'Views',
+                        AppColors.fluentCyan),
+                    _statChip(Icons.comment, '${sub.commentsCount}', 'Comments',
+                        AppColors.materialGreen),
+                  ],
+                ),
+              ),
               const SizedBox(width: 8),
-              _statChip(Icons.favorite, '${sub.faves}', 'Faves',
-                  AppColors.notifFave),
+              // Download button
+              GestureDetector(
+                onTap: _isDownloading ? null : _downloadImage,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgInput,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: _isDownloading
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.fluentCyan,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.download,
+                          size: 16,
+                          color: AppColors.textDim,
+                        ),
+                ),
+              ),
               const SizedBox(width: 8),
-              _statChip(Icons.comment, '${sub.commentsCount}', 'Comments',
-                  AppColors.materialGreen),
+              // Fave button
+              GestureDetector(
+                onTap: _isFaving ? null : _toggleFavorite,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: sub.isFavorite
+                        ? AppColors.notifFave.withValues(alpha: 0.15)
+                        : AppColors.bgInput,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: sub.isFavorite
+                          ? AppColors.notifFave
+                          : AppColors.border,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isFaving)
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.notifFave,
+                          ),
+                        )
+                      else
+                        Icon(
+                          sub.isFavorite ? Icons.favorite : Icons.favorite_border,
+                          size: 16,
+                          color: sub.isFavorite
+                              ? AppColors.notifFave
+                              : AppColors.textDim,
+                        ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${sub.faves}',
+                        style: TextStyle(
+                          color: sub.isFavorite
+                              ? AppColors.notifFave
+                              : AppColors.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
           if (sub.description.isNotEmpty) ...[

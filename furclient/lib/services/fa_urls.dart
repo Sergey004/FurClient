@@ -31,10 +31,25 @@ class FAUrls {
   }
 
   static String viewSubmission(String id) => '$baseUrl/view/$id/';
-  static String search(String query, {int page = 1}) {
+  /// FA search sort options
+  /// datet = by date, popularityt = by popularity, relevancyt = by relevance
+  static const Map<String, String> searchSortLabels = {
+    'relevancyt': 'Relevance',
+    'datet': 'Newest',
+    'popularityt': 'Popular',
+  };
+
+  static String search(String query, {
+    int page = 1,
+    String sortBy = 'relevancyt',
+    String sortDirection = 'desc',
+  }) {
     final q = Uri.encodeComponent(query);
-    final p = page > 1 ? '&page=$page' : '';
-    return '$baseUrl/search/?q=$q$p';
+    final parts = <String>[];
+    if (page > 1) parts.add('page=$page');
+    parts.add('sort_by=$sortBy');
+    parts.add('sort_direction=$sortDirection');
+    return '$baseUrl/search/?q=$q&${parts.join('&')}';
   }
 
   static String get notifications => '$baseUrl/msg/others/';
