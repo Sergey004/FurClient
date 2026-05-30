@@ -7,51 +7,60 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../main.dart' show webViewEnvironment;
 
-/// Fetches images via HeadlessInAppWebView (one per fetch).
+/// Fetches images via a SINGLE persistent HeadlessInAppWebView.
 ///
 /// Problem: dart:io HttpClient and Dio have non-browser TLS fingerprints.
 /// Cloudflare detects this and returns 403 for ALL requests to FA domains
 /// (including CDN t.furaffinity.net).
 ///
-/// Solution: HeadlessInAppWebView shares the same webViewEnvironment as the
-/// login WebView, so it has the correct TLS fingerprint and cookies.
-/// We navigate to each image URL directly, then use same-origin fetch() to
-/// extract the binary data. No CORS issues because the fetch is same-origin.
+/// Solution: ONE HeadlessInAppWebView shares the same webViewEnvironment as
+/// the login WebView. It stays alive and navigates to each image URL
+/// sequentially via controller.loadUrl(). No create/dispose per image.
 ///
-/// Each image fetch creates a short-lived HeadlessInAppWebView (same pattern
-/// as fa_client.dart _fetchHtmlWithWebView), processes sequentially via a
-/// queue, and disposes after extraction.
+/// Strategy (per image):
+/// 1. controller.loadUrl(imageUrl)  — WebView renders the image natively.
+/// 2. onLoadStop fires  — extract via <canvas> + toDataURL().
+///    (Image is already rendered, no network re-fetch needed.)
+/// 3. addJavaScriptHandler passes base64 data URL back to Dart.
+///
+/// Why canvas and not XHR/fetch?
+/// WebView2 renders raw image URLs as "resource documents". XHR/fetch don't
+/// work in that context. But <canvas> captures the already-rendered image
+/// via document.images[0]. Same-origin (no CORS issues since the page origin
+/// IS the image URL).
 class WebViewImageFetcher {
   static WebViewImageFetcher? _instance;
   static WebViewImageFetcher get instance =>
       _instance ??= WebViewImageFetcher._();
   WebViewImageFetcher._();
 
-  // Sequential queue: one image at a time to avoid race conditions.
+  /// Single persistent HeadlessInAppWebView.
+  HeadlessInAppWebView? _headless;
+  InAppWebViewController? _controller;
+  bool _ready = false;
+  bool _initializing = false;
+
+  /// Sequential queue: one image at a time.
   final _queue = <_ImageRequest>[];
   bool _processing = false;
 
-  // Simple in-memory cache (keyed by URL) to avoid re-fetching.
+  /// In-memory cache.
   final _cache = <String, Uint8List>{};
-  static const int _maxCacheSize = 100;
+  static const int _maxCacheSize = 200;
 
-  /// Fetch an image using a HeadlessInAppWebView.
-  ///
-  /// On non-Windows platforms or if webViewEnvironment is unavailable,
-  /// returns null so the caller can fall back to HTTP.
+  /// Completer for the CURRENT image being extracted.
+  /// Set before loadUrl(), completed by the JS handler or error callbacks.
+  Completer<String?>? _currentImageCompleter;
+
   Future<Uint8List?> fetchImage(String url) async {
-    if (!io.Platform.isWindows || webViewEnvironment == null) {
-      return null;
-    }
+    if (!io.Platform.isWindows || webViewEnvironment == null) return null;
 
-    // Check cache first
     final cached = _cache[url];
     if (cached != null) {
       debugPrint('=== WebViewImageFetcher: Cache hit for $url');
       return cached;
     }
 
-    // Enqueue the request (sequential processing)
     final completer = Completer<Uint8List?>();
     _queue.add(_ImageRequest(url, completer));
     _processQueue();
@@ -64,12 +73,16 @@ class WebViewImageFetcher {
 
     while (_queue.isNotEmpty) {
       final request = _queue.removeAt(0);
-
       try {
-        final bytes = await _fetchSingleImage(request.url);
-        if (!request.completer.isCompleted) request.completer.complete(bytes);
+        await _ensureReady();
+        if (_controller == null || !_ready) {
+          if (!request.completer.isCompleted) request.completer.complete(null);
+          continue;
+        }
+        final data = await _fetchSingleImage(request.url);
+        if (!request.completer.isCompleted) request.completer.complete(data);
       } catch (e) {
-        debugPrint('=== WebViewImageFetcher: Queue processing error: $e');
+        debugPrint('=== WebViewImageFetcher: Queue error: $e');
         if (!request.completer.isCompleted) request.completer.complete(null);
       }
     }
@@ -77,166 +90,186 @@ class WebViewImageFetcher {
     _processing = false;
   }
 
-  /// Create a HeadlessInAppWebView, navigate to the image URL,
-  /// wait for onLoadStop, then extract bytes via evaluateJavascript.
-  ///
-  /// This matches the pattern used in fa_client.dart _fetchHtmlWithWebView:
-  /// all callbacks are set in the constructor (v6 API).
-  Future<Uint8List?> _fetchSingleImage(String url) async {
-    final resultCompleter = Completer<Uint8List?>();
-    HeadlessInAppWebView? headless;
+  /// Create the persistent HeadlessInAppWebView (once).
+  /// Starts on about:blank. The JS handler is registered in onWebViewCreated.
+  Future<void> _ensureReady() async {
+    if (_ready && _headless != null && _controller != null) return;
+    if (_initializing) {
+      while (_initializing) await Future.delayed(Duration(milliseconds: 50));
+      return;
+    }
 
+    _initializing = true;
     try {
-      headless = HeadlessInAppWebView(
+      await _headless?.dispose();
+      _headless = null;
+      _controller = null;
+      _ready = false;
+
+      final initCompleter = Completer<void>();
+
+      _headless = HeadlessInAppWebView(
         webViewEnvironment: webViewEnvironment,
         initialSettings: InAppWebViewSettings(
           javaScriptEnabled: true,
         ),
-        onLoadStop: (controller, loadedUrl) async {
-          try {
-            // Check for CF challenge page
-            final html = await controller.getHtml() ?? '';
-            if (_isCloudflarePage(html) && html.length < 30000) {
-              debugPrint(
-                  '=== WebViewImageFetcher: CF challenge on image, waiting...');
-              await Future.delayed(const Duration(seconds: 3));
-              final retryHtml = await controller.getHtml() ?? '';
-              if (_isCloudflarePage(retryHtml) &&
-                  retryHtml.length < 30000) {
-                if (!resultCompleter.isCompleted) {
-                  resultCompleter.complete(null);
-                }
-                return;
-              }
-            }
+        onWebViewCreated: (controller) {
+          _controller = controller;
+          debugPrint('=== WebViewImageFetcher: Persistent WebView created');
 
-            // Extract image bytes using synchronous XHR + base64.
-            //
-            // evaluateJavascript does NOT await Promises, so async fetch()
-            // returns the Promise object itself (serialized as _Map).
-            // Instead, use a synchronous XMLHttpRequest which returns
-            // a plain string (base64) that the JS bridge can serialize safely.
-            final result = await controller.evaluateJavascript(
+          // Register handler ONCE. It will be used for all images.
+          controller.addJavaScriptHandler(
+            handlerName: '_imgB64',
+            callback: (args) {
+              final completer = _currentImageCompleter;
+              if (completer == null || completer.isCompleted) return;
+              try {
+                if (args.isNotEmpty && args[0] is String) {
+                  final val = args[0] as String;
+                  if (val.startsWith('data:') && val.contains(',')) {
+                    completer.complete(val);
+                    return;
+                  }
+                }
+              } catch (e) {
+                debugPrint('=== WebViewImageFetcher: Handler error: $e');
+              }
+              completer.complete(null);
+            },
+          );
+        },
+        onLoadStop: (controller, loadedUrl) async {
+          final completer = _currentImageCompleter;
+
+          // If no image is being awaited, just mark init as done.
+          if (completer == null || completer.isCompleted) {
+            if (!initCompleter.isCompleted) initCompleter.complete();
+            return;
+          }
+
+          try {
+            // Small delay to ensure the image is fully painted.
+            await Future.delayed(Duration(milliseconds: 100));
+
+            // Extract via canvas. The image is already rendered by WebView2.
+            await controller.evaluateJavascript(
               source: r'''
                 (function() {
                   try {
-                    var xhr = new XMLHttpRequest();
-                    xhr.open('GET', location.href, false);
-                    xhr.responseType = 'arraybuffer';
-                    xhr.send();
-                    if (xhr.status !== 200) return null;
-                    var bytes = new Uint8Array(xhr.response);
-                    var binary = '';
-                    var chunk = 0x8000;
-                    for (var i = 0; i < bytes.length; i += chunk) {
-                      var slice = bytes.subarray(i, Math.min(i + chunk, bytes.length));
-                      binary += String.fromCharCode.apply(null, slice);
+                    var img = document.images[0];
+                    if (img && img.naturalWidth > 0) {
+                      var c = document.createElement('canvas');
+                      c.width = img.naturalWidth;
+                      c.height = img.naturalHeight;
+                      c.getContext('2d').drawImage(img, 0, 0);
+                      window.flutter_inappwebview.callHandler('_imgB64',
+                        c.toDataURL('image/png'));
+                      return;
                     }
-                    return btoa(binary);
+                    window.flutter_inappwebview.callHandler('_imgB64', '');
                   } catch(e) {
-                    return null;
+                    window.flutter_inappwebview.callHandler('_imgB64', '');
                   }
                 })()
               ''',
-            ).timeout(const Duration(seconds: 10));
-
-            if (result == null || result is! String || result.isEmpty) {
-              debugPrint(
-                  '=== WebViewImageFetcher: XHR returned null for $url');
-              if (!resultCompleter.isCompleted) resultCompleter.complete(null);
-              return;
-            }
-
-            final data = base64Decode(result);
-
-            debugPrint(
-                '=== WebViewImageFetcher: Fetched ${data.length}B from $url');
-
-            if (!resultCompleter.isCompleted) {
-              resultCompleter.complete(data);
-            }
+            );
           } catch (e) {
-            debugPrint(
-                '=== WebViewImageFetcher: onLoadStop processing error: $e');
-            if (!resultCompleter.isCompleted) {
-              resultCompleter.complete(null);
-            }
+            debugPrint('=== WebViewImageFetcher: JS eval error: $e');
+            if (!completer.isCompleted) completer.complete(null);
           }
         },
         onReceivedHttpError: (controller, request, response) {
           if (!(request.isForMainFrame ?? false)) return;
           final status = response.statusCode ?? 0;
           if (status == 403 || status == 503) {
-            debugPrint(
-                '=== WebViewImageFetcher: HTTP $status loading $url');
-            if (!resultCompleter.isCompleted) {
-              resultCompleter.complete(null);
+            final completer = _currentImageCompleter;
+            if (completer != null && !completer.isCompleted) {
+              completer.complete(null);
             }
           }
         },
         onReceivedError: (controller, request, error) {
           if (!(request.isForMainFrame ?? false)) return;
-          debugPrint(
-              '=== WebViewImageFetcher: Error loading $url: ${error.description}');
-          if (!resultCompleter.isCompleted) {
-            resultCompleter.complete(null);
+          final completer = _currentImageCompleter;
+          if (completer != null && !completer.isCompleted) {
+            completer.complete(null);
           }
         },
-        initialUrlRequest: URLRequest(
-          url: WebUri(url),
-        ),
+        initialUrlRequest: URLRequest(url: WebUri('about:blank')),
       );
 
-      await headless.run();
+      await _headless!.run();
 
-      final data = await resultCompleter.future.timeout(
-        const Duration(seconds: 20),
+      // Wait for about:blank to load (onLoadStop fires).
+      await initCompleter.future.timeout(
+        Duration(seconds: 5),
+        onTimeout: () {},
+      );
+
+      _ready = true;
+      debugPrint('=== WebViewImageFetcher: Persistent WebView ready');
+    } catch (e) {
+      debugPrint('=== WebViewImageFetcher: Init error: $e');
+      _ready = false;
+    } finally {
+      _initializing = false;
+    }
+  }
+
+  /// Navigate the persistent WebView to the image URL,
+  /// wait for onLoadStop → canvas extraction → handler callback.
+  Future<Uint8List?> _fetchSingleImage(String url) async {
+    // Set completer BEFORE loadUrl so callbacks can complete it.
+    _currentImageCompleter = Completer<String?>();
+
+    try {
+      await _controller!.loadUrl(
+        urlRequest: URLRequest(url: WebUri(url)),
+      );
+
+      // Wait for: onLoadStop → canvas JS → handler callback.
+      final dataUrl = await _currentImageCompleter!.future.timeout(
+        Duration(seconds: 15),
         onTimeout: () {
-          debugPrint('=== WebViewImageFetcher: Timeout fetching $url');
+          debugPrint('=== WebViewImageFetcher: Timeout for $url');
           return null;
         },
       );
 
-      // Cache the result
-      if (data != null) {
-        if (_cache.length >= _maxCacheSize) {
-          _cache.remove(_cache.keys.first);
-        }
-        _cache[url] = data;
-      }
+      if (dataUrl == null || dataUrl.isEmpty) return null;
 
+      final b64 = dataUrl.substring(dataUrl.indexOf(',') + 1);
+      final data = base64Decode(b64);
+
+      // Cache
+      if (_cache.length >= _maxCacheSize) _cache.remove(_cache.keys.first);
+      _cache[url] = data;
+
+      debugPrint('=== WebViewImageFetcher: ${data.length}B from $url');
       return data;
     } catch (e) {
-      debugPrint('=== WebViewImageFetcher: Fetch error for $url: $e');
+      debugPrint('=== WebViewImageFetcher: Error for $url: $e');
       return null;
     } finally {
-      await headless?.dispose();
+      _currentImageCompleter = null;
     }
-  }
-
-  bool _isCloudflarePage(String html) {
-    final lower = html.toLowerCase();
-    return lower.contains('just a moment') ||
-        lower.contains('checking your browser') ||
-        lower.contains('challenges.cloudflare.com') ||
-        lower.contains('cf_chl_page') ||
-        lower.contains('cf-turnstile') ||
-        (lower.contains('cloudflare') &&
-            (lower.contains('challenge') ||
-                lower.contains('verify you are human')));
   }
 
   /// Clear the image cache.
   void clearCache() {
     _cache.clear();
-    debugPrint('=== WebViewImageFetcher: Cache cleared');
   }
 
-  /// Dispose the fetcher (clears queue and cache).
+  /// Dispose the persistent WebView and clear everything.
   Future<void> dispose() async {
     _queue.clear();
     _cache.clear();
+    _currentImageCompleter = null;
     _processing = false;
+    _ready = false;
+    await _headless?.dispose();
+    _headless = null;
+    _controller = null;
     debugPrint('=== WebViewImageFetcher: Disposed');
   }
 }
