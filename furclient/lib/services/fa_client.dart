@@ -468,16 +468,25 @@ class FAClient {
     return Submission.parseSubmissionsPage(html);
   }
 
-  Future<Submission?> getSubmission(String id) async {
+  /// Fetch submission details + comments in a single HTML fetch.
+  /// Avoids loading the same page twice through WebView.
+  Future<({Submission? submission, List<FAComment> comments})>
+      getSubmissionWithComments(String id) async {
     final url = FAUrls.viewSubmission(id);
     final html = await _getHtml(url);
-    return Submission.parseSubmissionDetails(html, id);
+    final submission = Submission.parseSubmissionDetails(html, id);
+    final comments = FAComment.parseComments(html);
+    return (submission: submission, comments: comments);
+  }
+
+  Future<Submission?> getSubmission(String id) async {
+    final result = await getSubmissionWithComments(id);
+    return result.submission;
   }
 
   Future<List<FAComment>> getComments(String id) async {
-    final url = FAUrls.viewSubmission(id);
-    final html = await _getHtml(url);
-    return FAComment.parseComments(html);
+    final result = await getSubmissionWithComments(id);
+    return result.comments;
   }
 
   Future<List<Submission>> search(String query, {int page = 1}) async {
@@ -660,16 +669,25 @@ class FAClient {
     }
   }
 
+  /// Check if the HTML is a CF challenge INTERSTITIAL page.
+  /// Key insight: CF challenge pages are tiny (< 30 KB).
+  /// Real FA pages are 80 KB+ and may contain Turnstile/Cloudflare
+  /// references in <script> tags — those are NOT challenge pages.
   bool _isCloudflarePage(String html) {
+    // Real FA pages are always > 30 KB. CF interstitials are small.
+    if (html.length > 30000) return false;
+
     final lower = html.toLowerCase();
-    return lower.contains('just a moment') ||
-        lower.contains('checking your browser') ||
-        lower.contains('cloudflare') ||
-        lower.contains('cf_chl_page') ||
+    // Title-based check — CF interstitial always has this exact title
+    if (!lower.contains('just a moment') &&
+        !lower.contains('checking your browser')) {
+      return false;
+    }
+    // Confirm with additional challenge-only markers
+    return lower.contains('cf_chl_page') ||
         lower.contains('challenges.cloudflare.com') ||
         lower.contains('cf-turnstile') ||
-        lower.contains('verify you are human') ||
-        lower.contains('turnstile');
+        lower.contains('verify you are human');
   }
 
   Future<void> _syncCookiesFromWebView() async {

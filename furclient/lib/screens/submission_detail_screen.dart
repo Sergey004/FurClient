@@ -29,7 +29,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   Submission? _submission;
   List<FAComment> _comments = [];
   bool _isLoading = true;
-  bool _isLoadingComments = false;
+
   String? _error;
 
   @override
@@ -44,13 +44,19 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       _error = null;
     });
     try {
-      final submission = await widget.client.getSubmission(widget.submissionId);
+      // Single fetch for both submission details and comments
+      final result = await widget.client.getSubmissionWithComments(widget.submissionId);
       if (mounted) {
         setState(() {
-          _submission = submission;
+          _submission = result.submission;
+          _comments = result.comments;
           _isLoading = false;
         });
-        _loadComments();
+        if (_submission == null) {
+          setState(() {
+            _error = 'Failed to parse submission page. Empty or invalid HTML.';
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -59,21 +65,6 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           _isLoading = false;
         });
       }
-    }
-  }
-
-  Future<void> _loadComments() async {
-    setState(() => _isLoadingComments = true);
-    try {
-      final comments = await widget.client.getComments(widget.submissionId);
-      if (mounted) {
-        setState(() {
-          _comments = comments;
-          _isLoadingComments = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingComments = false);
     }
   }
 
@@ -109,6 +100,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   Widget _buildBody(bool isDesktop) {
     if (_isLoading) return const Center(child: AdaptiveProgress());
     if (_error != null) return _buildError();
+    if (_submission == null) return _buildError();
     return _buildContent(isDesktop);
   }
 
@@ -421,14 +413,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          if (_isLoadingComments)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: AdaptiveProgress(strokeWidth: 2),
-              ),
-            )
-          else if (_comments.isEmpty)
+          if (_comments.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(
