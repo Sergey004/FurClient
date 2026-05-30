@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../widgets/adaptive/adaptive.dart';
+import '../services/fa_client.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool sfwMode;
   final ValueChanged<bool> onSfwModeChanged;
   final VoidCallback onLogout;
+  final FAClient? client;
 
   const SettingsScreen({
     super.key,
     this.sfwMode = false,
     required this.onSfwModeChanged,
     required this.onLogout,
+    this.client,
   });
 
   @override
@@ -51,6 +54,18 @@ class _SettingsScreenState extends State<SettingsScreen>
     final prefs = await SharedPreferences.getInstance();
     if (value is bool) await prefs.setBool(key, value);
     if (value is String) await prefs.setString(key, value);
+  }
+
+  Future<void> _onSfwToggle(bool value) async {
+    setState(() => _sfwMode = value);
+    widget.onSfwModeChanged(value);
+    // Save to SharedPreferences
+    await _saveSetting('sfw_mode', value);
+    // Sync with FA website
+    if (widget.client != null) {
+      debugPrint('=== SettingsScreen: Syncing SFW toggle with FA website...');
+      await widget.client!.toggleSiteSfwMode();
+    }
   }
 
   void _confirmLogout() {
@@ -107,10 +122,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             icon: Icons.shield_outlined,
             iconColor: AppColors.materialGreen,
             value: _sfwMode,
-            onChanged: (v) {
-              setState(() => _sfwMode = v);
-              widget.onSfwModeChanged(v);
-            },
+            onChanged: _onSfwToggle,
             title: 'SFW Mode',
             subtitle: 'Blur NSFW content',
           ),
@@ -260,10 +272,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     icon: Icons.shield_outlined,
                     iconColor: AppColors.materialGreen,
                     value: _sfwMode,
-                    onChanged: (v) {
-                      setState(() => _sfwMode = v);
-                      widget.onSfwModeChanged(v);
-                    },
+                    onChanged: _onSfwToggle,
                     title: 'SFW Mode',
                     subtitle: 'Blur NSFW content',
                   ),

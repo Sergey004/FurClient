@@ -151,6 +151,7 @@ class WebViewImageFetcher {
               try {
                 if (args.isNotEmpty && args[0] is String) {
                   final val = args[0] as String;
+                  // Accept any data URL (image, video, audio, text, etc.)
                   if (val.startsWith('data:') && val.contains(',')) {
                     completer.complete(val);
                     return;
@@ -173,13 +174,33 @@ class WebViewImageFetcher {
           }
 
           try {
-            // Small delay to ensure the image is fully painted.
+            // Small delay to ensure content is loaded.
             await Future.delayed(Duration(milliseconds: 100));
 
-            // Extract via canvas. The image is already rendered by WebView2.
+            // Strategy 1: fetch() raw bytes — works for ALL file types
+            // (images, video, audio, text). Preserves original format.
             await controller.evaluateJavascript(
               source: r'''
-                (function() {
+                (async function() {
+                  // Try fetch first — gets raw bytes for any file type
+                  try {
+                    var resp = await fetch(window.location.href);
+                    if (resp && resp.ok) {
+                      var blob = await resp.blob();
+                      var reader = new FileReader();
+                      reader.onloadend = function() {
+                        window.flutter_inappwebview.callHandler('_imgB64',
+                          reader.result);
+                      };
+                      reader.onerror = function() {
+                        window.flutter_inappwebview.callHandler('_imgB64', '');
+                      };
+                      reader.readAsDataURL(blob);
+                      return;
+                    }
+                  } catch(e) {}
+
+                  // Fallback: canvas extraction (images only)
                   try {
                     var img = document.images[0];
                     if (img && img.naturalWidth > 0) {
@@ -187,14 +208,18 @@ class WebViewImageFetcher {
                       c.width = img.naturalWidth;
                       c.height = img.naturalHeight;
                       c.getContext('2d').drawImage(img, 0, 0);
+                      var url = window.location.href || '';
+                      var mime = 'image/png';
+                      var qual = undefined;
+                      if (/\.jpe?g$/i.test(url)) { mime = 'image/jpeg'; qual = 1.0; }
+                      else if (/\.webp$/i.test(url)) { mime = 'image/webp'; qual = 1.0; }
                       window.flutter_inappwebview.callHandler('_imgB64',
-                        c.toDataURL('image/png'));
+                        c.toDataURL(mime, qual));
                       return;
                     }
-                    window.flutter_inappwebview.callHandler('_imgB64', '');
-                  } catch(e) {
-                    window.flutter_inappwebview.callHandler('_imgB64', '');
-                  }
+                  } catch(e) {}
+
+                  window.flutter_inappwebview.callHandler('_imgB64', '');
                 })()
               ''',
             );
@@ -228,21 +253,13 @@ class WebViewImageFetcher {
       await _headless!.run();
 
       // Wait for about:blank to load (onLoadStop fires).
-      final initResult = await initCompleter.future.timeout(
-        Duration(seconds: 5),
-        onTimeout: () {
-          debugPrint('=== WebViewImageFetcher: Init timeout — WebView may be dead');
-          return false;
-        },
-      );
-
-      if (initResult == false) {
-        // about:blank never loaded — WebView is broken
-        _ready = false;
-        debugPrint('=== WebViewImageFetcher: Init failed (timeout), marking as not ready');
-      } else {
+      try {
+        await initCompleter.future.timeout(Duration(seconds: 5));
         _ready = true;
         debugPrint('=== WebViewImageFetcher: Persistent WebView ready');
+      } on TimeoutException {
+        _ready = false;
+        debugPrint('=== WebViewImageFetcher: Init timeout — WebView may be dead');
       }
     } catch (e) {
       debugPrint('=== WebViewImageFetcher: Init error: $e');
@@ -271,9 +288,10 @@ class WebViewImageFetcher {
         urlRequest: URLRequest(url: WebUri(url)),
       );
 
-      // Wait for: onLoadStop → canvas JS → handler callback.
+      // Wait for: onLoadStop → fetch/canvas JS → handler callback.
+      // Longer timeout for large files (video can be 100+ MB).
       final dataUrl = await _currentImageCompleter!.future.timeout(
-        Duration(seconds: 15),
+        Duration(seconds: 60),
         onTimeout: () {
           debugPrint('=== WebViewImageFetcher: Timeout for $url');
           return null;

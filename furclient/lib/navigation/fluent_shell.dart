@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../screens/gallery_screen.dart';
@@ -27,6 +28,20 @@ class FluentShell extends StatefulWidget {
 class _FluentShellState extends State<FluentShell> {
   int _currentIndex = 0;
   bool _sfwMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSfwMode();
+  }
+
+  Future<void> _loadSfwMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getBool('sfw_mode') ?? false;
+    if (mounted && saved != _sfwMode) {
+      setState(() => _sfwMode = saved);
+    }
+  }
 
   void _onSfwModeChanged(bool value) {
     setState(() => _sfwMode = value);
@@ -156,6 +171,7 @@ class _FluentShellState extends State<FluentShell> {
               sfwMode: _sfwMode,
               onSfwModeChanged: _onSfwModeChanged,
               onLogout: widget.onLogout,
+              client: widget.client,
             ),
           ),
         ],

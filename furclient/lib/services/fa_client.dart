@@ -580,6 +580,81 @@ class FAClient {
     }
   }
 
+  /// Toggle SFW mode on FurAffinity website.
+  /// Posts to /sfw/toggle/ which sets/removes the sfw_toggle cookie.
+  /// Returns true if the toggle succeeded.
+  Future<bool> toggleSiteSfwMode() async {
+    final url = '${FAUrls.baseUrl}/sfw/toggle/';
+    debugPrint('=== toggleSiteSfwMode: POST via WebView $url');
+
+    final completer = Completer<bool>();
+    HeadlessInAppWebView? headless;
+
+    headless = HeadlessInAppWebView(
+      webViewEnvironment: webViewEnvironment,
+      initialSettings: InAppWebViewSettings(
+        javaScriptEnabled: true,
+      ),
+      onLoadStop: (controller, loadedUrl) async {
+        try {
+          final html = await controller.getHtml() ?? '';
+          debugPrint('=== toggleSiteSfwMode WebView: ${html.length}B from $loadedUrl');
+
+          if (_isCloudflarePage(html)) {
+            debugPrint('=== toggleSiteSfwMode: CF challenge, waiting...');
+            await Future.delayed(const Duration(seconds: 3));
+            final retryHtml = await controller.getHtml() ?? '';
+            if (!_isCloudflarePage(retryHtml)) {
+              if (!completer.isCompleted) completer.complete(true);
+            }
+            return;
+          }
+
+          if (!completer.isCompleted) completer.complete(html.isNotEmpty);
+        } catch (e) {
+          debugPrint('=== toggleSiteSfwMode onLoadStop error: $e');
+          if (!completer.isCompleted) completer.completeError(e);
+        }
+      },
+      onReceivedHttpError: (controller, request, response) async {
+        if (!(request.isForMainFrame ?? false)) return;
+        final status = response.statusCode ?? 0;
+        debugPrint('=== toggleSiteSfwMode: HTTP $status');
+      },
+      initialUrlRequest: URLRequest(
+        url: WebUri(url),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': FAUrls.baseUrl,
+        },
+      ),
+    );
+
+    await headless.run();
+
+    try {
+      final success = await completer.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint('=== toggleSiteSfwMode: timeout');
+          return false;
+        },
+      );
+      await headless.dispose();
+
+      // Sync cookies after toggle
+      await _syncCookiesFromWebView();
+
+      debugPrint('=== toggleSiteSfwMode: result=$success');
+      return success;
+    } catch (e) {
+      await headless.dispose();
+      debugPrint('=== toggleSiteSfwMode error: $e');
+      return false;
+    }
+  }
+
   Future<List<FANotification>> getNotifications() async {
     final html = await _getHtml(FAUrls.notifications);
     return FANotification.parseNotifications(html);

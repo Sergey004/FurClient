@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -56,6 +57,20 @@ class _AppNavigatorState extends State<AppNavigator> {
         accent: AppColors.textMuted),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSfwMode();
+  }
+
+  Future<void> _loadSfwMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getBool('sfw_mode') ?? false;
+    if (mounted && saved != _sfwMode) {
+      setState(() => _sfwMode = saved);
+    }
+  }
+
   void _onSfwModeChanged(bool value) {
     setState(() => _sfwMode = value);
   }
@@ -70,6 +85,7 @@ class _AppNavigatorState extends State<AppNavigator> {
         sfwMode: _sfwMode,
         onSfwModeChanged: _onSfwModeChanged,
         onLogout: widget.onLogout,
+        client: widget.client,
       ),
     ];
   }
