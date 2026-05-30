@@ -123,7 +123,7 @@ class FAClient {
       for (final item in cookiePairs) {
         String? name;
         String? value;
-        
+
         if (item is Map<String, dynamic>) {
           name = item['name']?.toString();
           value = item['value']?.toString();
@@ -131,8 +131,11 @@ class FAClient {
           name = item[0].toString();
           value = item[1].toString();
         }
-        
-        if (name != null && value != null && name.isNotEmpty && value.isNotEmpty) {
+
+        if (name != null &&
+            value != null &&
+            name.isNotEmpty &&
+            value.isNotEmpty) {
           final cookie = io.Cookie(name, value)
             ..domain = '.furaffinity.net'
             ..path = '/';
@@ -144,13 +147,13 @@ class FAClient {
           Uri.parse(FAUrls.baseUrl),
           cookies,
         );
-        
+
         // Also store in enhanced client
         for (final cookie in cookies) {
-          _enhancedClient.setSessionData('cookie_${cookie.name}', 
+          _enhancedClient.setSessionData('cookie_${cookie.name}',
               '${cookie.name}=${cookie.value}; Domain=${cookie.domain}');
         }
-        
+
         debugPrint('=== Restored ${cookies.length} cookies from session');
       }
     } catch (e) {
@@ -167,10 +170,10 @@ class FAClient {
 
   Future<String> _getHtml(String url) async {
     await _ensureInitialized();
-    
+
     // Use enhanced client for CDN URLs
-    if (url.contains('t.furaffinity.net') || 
-        url.contains('d.furaffinity.net') || 
+    if (url.contains('t.furaffinity.net') ||
+        url.contains('d.furaffinity.net') ||
         url.contains('a.furaffinity.net')) {
       try {
         final content = await _enhancedClient.fetchContent(url);
@@ -181,7 +184,7 @@ class FAClient {
         debugPrint('=== Enhanced client failed for $url: $e');
       }
     }
-    
+
     try {
       final response = await _dio.get<String>(url);
       _checkCloudflare(response);
@@ -207,8 +210,8 @@ class FAClient {
           final retryOptions = retryHeader != null
               ? Options(headers: {'Cookie': retryHeader})
               : null;
-          final retryResponse = await _dio.get<String>(url,
-              options: retryOptions ?? Options());
+          final retryResponse =
+              await _dio.get<String>(url, options: retryOptions ?? Options());
           _checkCloudflare(retryResponse);
           if (retryResponse.statusCode == null ||
               retryResponse.statusCode! < 200 ||
@@ -241,13 +244,32 @@ class FAClient {
       try {
         _checkCloudflare(response);
       } on CloudflareError {
-        return false;
+        debugPrint('=== verifySession: Cloudflare detected on initial request');
+        final passed = await passCloudflareChallenge();
+        if (!passed) return false;
+        final retry = await _dio.get<String>(FAUrls.home);
+        final retryStatus = retry.statusCode ?? 0;
+        debugPrint('=== verifySession retry status: $retryStatus');
+        return retryStatus >= 200 && retryStatus < 300;
       }
 
       final status = response.statusCode ?? 0;
-      if (status == 401 || status == 403) return false;
-      if (status >= 500) return true;
+      debugPrint('=== verifySession status: $status');
       if (status >= 200 && status < 300) return true;
+      if (status == 401 || status == 403) {
+        if (await FAICookieManager.hasSession()) {
+          debugPrint(
+              '=== verifySession: session cookies exist, retrying after CF pass');
+          final passed = await passCloudflareChallenge();
+          if (!passed) return false;
+          final retry = await _dio.get<String>(FAUrls.home);
+          final retryStatus = retry.statusCode ?? 0;
+          debugPrint('=== verifySession retry status: $retryStatus');
+          return retryStatus >= 200 && retryStatus < 300;
+        }
+        return false;
+      }
+      if (status >= 500) return true;
       return false;
     } on CloudflareError {
       return false;
@@ -293,8 +315,6 @@ class FAClient {
       fit: fit,
     );
   }
-
-
 
   // Get enhanced client statistics
   Map<String, dynamic> getEnhancedStats() {
@@ -397,21 +417,22 @@ class FAClient {
         onLoadStop: (controller, url) async {
           final html = await controller.getHtml() ?? '';
           debugPrint('=== CF pass: HTML length: ${html.length}');
-          
+
           if (_isCloudflarePage(html)) {
             debugPrint('=== CF pass: challenge detected, waiting...');
             // Ждем 20 секунд для решения challenge
             await Future.delayed(const Duration(seconds: 20));
             final retryHtml = await controller.getHtml() ?? '';
             debugPrint('=== CF pass: retry HTML length: ${retryHtml.length}');
-            
+
             if (_isCloudflarePage(retryHtml)) {
               debugPrint('=== CF pass: challenge NOT resolved after 20s');
               return;
             }
           }
-          
-          debugPrint('=== CF pass: page loaded successfully, syncing cookies...');
+
+          debugPrint(
+              '=== CF pass: page loaded successfully, syncing cookies...');
           await _syncCookiesFromWebView();
           completer.complete(true);
         },
@@ -459,10 +480,10 @@ class FAClient {
   }
 
   bool _isCloudflarePage(String html) {
-    return html.contains('Just a moment') || 
-           html.contains('checking your browser') ||
-           html.contains('cloudflare') ||
-           html.contains('cf_chl_page');
+    return html.contains('Just a moment') ||
+        html.contains('checking your browser') ||
+        html.contains('cloudflare') ||
+        html.contains('cf_chl_page');
   }
 
   Future<void> _syncCookiesFromWebView() async {
@@ -481,7 +502,8 @@ class FAClient {
             ioCookie.secure = c.isSecure ?? true;
             ioCookie.httpOnly = c.isHttpOnly ?? false;
             if (c.expiresDate != null) {
-              ioCookie.expires = DateTime.fromMillisecondsSinceEpoch(c.expiresDate!);
+              ioCookie.expires =
+                  DateTime.fromMillisecondsSinceEpoch(c.expiresDate!);
             }
             // Преобразуем io.Cookie в flutter_inappwebview.Cookie
             allCookies.add(Cookie(
@@ -511,20 +533,24 @@ class FAClient {
 
     await _saveWebViewCookiesToSession(allCookies);
     // Преобразуем flutter_inappwebview.Cookie в io.Cookie
-    final ioCookies = allCookies.map((c) => io.Cookie(c.name, c.value)
-      ..domain = c.domain ?? '.furaffinity.net'
-      ..path = c.path ?? '/'
-      ..secure = c.isSecure ?? false).toList();
+    final ioCookies = allCookies
+        .map((c) => io.Cookie(c.name, c.value)
+          ..domain = c.domain ?? '.furaffinity.net'
+          ..path = c.path ?? '/'
+          ..secure = c.isSecure ?? false)
+        .toList();
     // Преобразуем io.Cookie в flutter_inappwebview.Cookie
-    final flutterCookies = ioCookies.map((c) => Cookie(
-      name: c.name,
-      value: c.value,
-      domain: c.domain,
-      path: c.path,
-      isHttpOnly: c.httpOnly,
-      isSecure: c.secure,
-      expiresDate: c.expires?.millisecondsSinceEpoch,
-    )).toList();
+    final flutterCookies = ioCookies
+        .map((c) => Cookie(
+              name: c.name,
+              value: c.value,
+              domain: c.domain,
+              path: c.path,
+              isHttpOnly: c.httpOnly,
+              isSecure: c.secure,
+              expiresDate: c.expires?.millisecondsSinceEpoch,
+            ))
+        .toList();
     await _saveWebViewCookiesToCookieJar(flutterCookies);
   }
 
@@ -568,7 +594,8 @@ class FAClient {
     }
   }
 
-  Future<void> _saveWebViewCookiesToCookieJar(List<Cookie> webViewCookies) async {
+  Future<void> _saveWebViewCookiesToCookieJar(
+      List<Cookie> webViewCookies) async {
     if (io.Platform.isWindows != true) {
       await _ensureInitialized();
     }
@@ -585,7 +612,7 @@ class FAClient {
     if (cookies.isNotEmpty && io.Platform.isWindows != true) {
       await _cookieJar.saveFromResponse(Uri.parse(FAUrls.baseUrl), cookies);
       debugPrint('=== CookieJar updated with ${cookies.length} cookies');
-      
+
       // Обновляем CookieStore для использования в FAImage
       CookieStore.instance.setCookies(cookies);
       debugPrint('=== CookieStore updated with ${cookies.length} cookies');

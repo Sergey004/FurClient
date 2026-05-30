@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
-
-import 'package:flutter_inappwebview/flutter_inappwebview.dart' as inapp;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../utils/cookie_manager.dart';
 
 import '../models/models.dart';
 import '../utils/cookie_store.dart';
@@ -83,8 +83,7 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    final cookieManager = inapp.CookieManager();
-    await cookieManager.deleteAllCookies();
+    await FAICookieManager.deleteAll();
 
     _currentSession = null;
     CookieStore.instance.clear();

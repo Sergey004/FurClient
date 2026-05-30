@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:furclient/providers/auth_provider.dart';
 import 'package:furclient/providers/session_provider.dart';
-import 'package:furclient/utils/cookie_manager.dart';
 
 void main() {
   group('AuthProvider', () {

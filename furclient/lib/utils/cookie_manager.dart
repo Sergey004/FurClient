@@ -21,19 +21,22 @@ class FAICookieManager {
   FAICookieManager._();
 
   // ── Cookie storage ───────────────────────────────────────────────
-  static final Map<String, _CookieEntry> _cookies = {};
+  static final Map<String, CookieEntry> _cookies = {};
   static const List<String> _essentialCookies = ['a', 'b', 'cf_clearance'];
 
   static CookieManager get instance {
     if (io.Platform.isWindows) {
       if (webViewEnvironment == null) {
-        debugPrint('=== FAICookieManager WARNING: webViewEnvironment is null on Windows!');
+        debugPrint(
+            '=== FAICookieManager WARNING: webViewEnvironment is null on Windows!');
       }
       final cm = CookieManager.instance(webViewEnvironment: webViewEnvironment);
-      debugPrint('=== FAICookieManager: Created CookieManager for Windows with webViewEnvironment: ${webViewEnvironment != null}');
+      debugPrint(
+          '=== FAICookieManager: Created CookieManager for Windows with webViewEnvironment: ${webViewEnvironment != null}');
       return cm;
     }
-    debugPrint('=== FAICookieManager: Created CookieManager for non-Windows platform');
+    debugPrint(
+        '=== FAICookieManager: Created CookieManager for non-Windows platform');
     return CookieManager.instance();
   }
 
@@ -48,7 +51,7 @@ class FAICookieManager {
         final decoded = jsonDecode(cookieData) as Map<String, dynamic>;
         for (final entry in decoded.entries) {
           final data = entry.value as Map<String, dynamic>;
-          _cookies[entry.key] = _CookieEntry(
+          _cookies[entry.key] = CookieEntry(
             name: data['name'] as String,
             value: data['value'] as String,
             domain: data['domain'] as String? ?? '.furaffinity.net',
@@ -58,7 +61,8 @@ class FAICookieManager {
             isSecure: data['isSecure'] as bool? ?? true,
           );
         }
-        debugPrint('=== FAICookieManager: Loaded ${_cookies.length} cookies from storage');
+        debugPrint(
+            '=== FAICookieManager: Loaded ${_cookies.length} cookies from storage');
       }
     } catch (e) {
       debugPrint('=== FAICookieManager: Error loading cookies: $e');
@@ -88,14 +92,15 @@ class FAICookieManager {
   }
 
   /// Get cookies for URL (for CDNLoader)
-  static Future<List<_CookieEntry>> getCookiesForUrl(String url) async {
+  static Future<List<CookieEntry>> getCookiesForUrl(String url) async {
     final uri = Uri.parse(url);
     final domain = uri.host;
 
     return _cookies.values.where((cookie) {
       final cookieDomain = cookie.domain;
 
-      if (domain == cookieDomain || domain.endsWith(cookieDomain.replaceFirst('.', ''))) {
+      if (domain == cookieDomain ||
+          domain.endsWith(cookieDomain.replaceFirst('.', ''))) {
         if (cookie.expiresDate != null) {
           final now = DateTime.now().millisecondsSinceEpoch;
           if (cookie.expiresDate! < now) return false;
@@ -146,7 +151,7 @@ class FAICookieManager {
         }
       }
 
-      _cookies[name] = _CookieEntry(
+      _cookies[name] = CookieEntry(
         name: name,
         value: value,
         domain: cookieDomain,
@@ -172,14 +177,16 @@ class FAICookieManager {
         url: WebUri('https://www.furaffinity.net'),
       );
 
-      debugPrint('=== FAICookieManager: Got ${cookies.length} cookies from WebViewManager');
+      debugPrint(
+          '=== FAICookieManager: Got ${cookies.length} cookies from WebViewManager');
       for (final cookie in cookies) {
-        debugPrint('=== FAICookieManager:   - ${cookie.name} (domain: ${cookie.domain}, path: ${cookie.path}, httpOnly: ${cookie.isHttpOnly}, secure: ${cookie.isSecure}, expires: ${cookie.expiresDate})');
+        debugPrint(
+            '=== FAICookieManager:   - ${cookie.name} (domain: ${cookie.domain}, path: ${cookie.path}, httpOnly: ${cookie.isHttpOnly}, secure: ${cookie.isSecure}, expires: ${cookie.expiresDate})');
 
         // expiresDate from flutter_inappwebview is int?
-        expiresDate = cookie.expiresDate;
+        final expiresDate = cookie.expiresDate;
 
-        _cookies[cookie.name] = _CookieEntry(
+        _cookies[cookie.name] = CookieEntry(
           name: cookie.name,
           value: cookie.value ?? '',
           domain: cookie.domain ?? '.furaffinity.net',
@@ -191,14 +198,16 @@ class FAICookieManager {
       }
 
       _saveCookies();
-      debugPrint('=== FAICookieManager: Synced ${cookies.length} cookies to internal storage, total ${_cookies.length} cookies');
+      debugPrint(
+          '=== FAICookieManager: Synced ${cookies.length} cookies to internal storage, total ${_cookies.length} cookies');
     } catch (e) {
       debugPrint('=== FAICookieManager: WebView sync failed: $e');
     }
   }
 
   /// Sync cookies to WebView (for CDNLoader)
-  static Future<void> syncToWebView(InAppWebViewController controller, String url) async {
+  static Future<void> syncToWebView(
+      InAppWebViewController controller, String url) async {
     try {
       final webViewManager = instance;
       final cookies = await getCookiesForUrl(url);
@@ -216,7 +225,8 @@ class FAICookieManager {
         );
       }
 
-      debugPrint('=== FAICookieManager: Synced ${cookies.length} cookies to WebView');
+      debugPrint(
+          '=== FAICookieManager: Synced ${cookies.length} cookies to WebView');
     } catch (e) {
       debugPrint('=== FAICookieManager: Sync to WebView failed: $e');
     }
@@ -285,7 +295,10 @@ class FAICookieManager {
     debugPrint('=== FAICookieManager: Getting cookie $name from $url');
     final cookie = await instance.getCookie(url: WebUri(url), name: name);
     if (cookie != null) {
-      debugPrint('=== FAICookieManager: Got cookie: $name | httpOnly=${cookie.isHttpOnly} | value=${cookie.value?.substring(0, min(cookie.value?.length ?? 0, 10) ?? 0)}...');
+      final valueLength = cookie.value?.length ?? 0;
+      final previewLength = valueLength < 10 ? valueLength : 10;
+      debugPrint(
+          '=== FAICookieManager: Got cookie: $name | httpOnly=${cookie.isHttpOnly} | value=${cookie.value?.substring(0, previewLength)}...');
     } else {
       debugPrint('=== FAICookieManager: Cookie $name not found');
     }
@@ -337,12 +350,15 @@ class FAICookieManager {
   /// Получить все FA cookies (включая cf_clearance, a, b).
   static Future<Map<String, Cookie>> getFACookies() async {
     debugPrint('=== FAICookieManager: Getting all cookies from WebViewManager');
-    debugPrint('=== FAICookieManager: Current time: ${DateTime.now().toIso8601String()}');
+    debugPrint(
+        '=== FAICookieManager: Current time: ${DateTime.now().toIso8601String()}');
 
     final cookies = await getCookies('https://www.furaffinity.net');
-    debugPrint('=== FAICookieManager: Got ${cookies.length} cookies total: ${cookies.map((c) => c.name).join(", ")}');
+    debugPrint(
+        '=== FAICookieManager: Got ${cookies.length} cookies total: ${cookies.map((c) => c.name).join(", ")}');
     for (final cookie in cookies) {
-      debugPrint('=== FAICookieManager:   - ${cookie.name} (domain: ${cookie.domain}, path: ${cookie.path}, httpOnly: ${cookie.isHttpOnly}, secure: ${cookie.isSecure}, expires: ${cookie.expiresDate})');
+      debugPrint(
+          '=== FAICookieManager:   - ${cookie.name} (domain: ${cookie.domain}, path: ${cookie.path}, httpOnly: ${cookie.isHttpOnly}, secure: ${cookie.isSecure}, expires: ${cookie.expiresDate})');
     }
     return {for (final c in cookies) c.name: c};
   }
@@ -353,10 +369,12 @@ class FAICookieManager {
       final enhancedClient = FAEnhancedClient.instance;
       if (enhancedClient.isInitialized) {
         await enhancedClient.syncCookies();
-        debugPrint('=== FAICookieManager: Successfully synced with Enhanced Client');
+        debugPrint(
+            '=== FAICookieManager: Successfully synced with Enhanced Client');
       }
     } catch (e) {
-      debugPrint('=== FAICookieManager: Error syncing with Enhanced Client: $e');
+      debugPrint(
+          '=== FAICookieManager: Error syncing with Enhanced Client: $e');
     }
   }
 
@@ -364,12 +382,12 @@ class FAICookieManager {
   static Future<String> getCdnCookieHeader(String url) async {
     final uri = Uri.parse(url);
     final domain = uri.host;
-    
+
     // Используем Enhanced Client для получения cookies
     if (FAEnhancedClient.instance.isInitialized) {
       final sessionData = FAEnhancedClient.instance.sessionData;
       final cookies = <String>[];
-      
+
       for (final entry in sessionData.entries) {
         if (entry.key.startsWith('cookie_')) {
           final cookie = entry.value as String;
@@ -378,10 +396,10 @@ class FAICookieManager {
           }
         }
       }
-      
+
       return cookies.join('; ');
     }
-    
+
     // Fallback to standard cookie manager
     final faCookies = await getFACookies();
     return faCookies.values.map((c) => '${c.name}=${c.value}').join('; ');
@@ -393,10 +411,9 @@ class FAICookieManager {
       final prefs = await SharedPreferences.getInstance();
       final cookies = await getFACookies();
       final cookieData = {
-        for (final cookie in cookies.entries)
-          cookie.key: cookie.value.value
+        for (final cookie in cookies.entries) cookie.key: cookie.value.value
       };
-      
+
       await prefs.setString('cached_cookies', jsonEncode(cookieData));
       debugPrint('=== FAICookieManager: Cached ${cookies.length} cookies');
     } catch (e) {
@@ -412,8 +429,7 @@ class FAICookieManager {
       if (cookieData != null) {
         final decoded = jsonDecode(cookieData) as Map<String, dynamic>;
         return {
-          for (final entry in decoded.entries)
-            entry.key: entry.value as String
+          for (final entry in decoded.entries) entry.key: entry.value as String
         };
       }
     } catch (e) {
@@ -438,18 +454,18 @@ class FAICookieManager {
     try {
       final sessionValid = await hasSession();
       if (!sessionValid) return false;
-      
+
       // Проверка времени последней синхронизации
       final prefs = await SharedPreferences.getInstance();
       final lastSync = prefs.getInt('last_cookie_sync') ?? 0;
       final now = DateTime.now().millisecondsSinceEpoch;
-      
+
       // Синхронизировать если старше 5 минут
       if (now - lastSync > 5 * 60 * 1000) {
         await syncWithEnhancedClient();
         await prefs.setInt('last_cookie_sync', now);
       }
-      
+
       return true;
     } catch (e) {
       debugPrint('=== FAICookieManager: Error checking cookie validity: $e');
@@ -462,12 +478,14 @@ class FAICookieManager {
     try {
       final faCookies = await getFACookies();
       final cachedCookies = await loadCachedCookies();
-      
+
       return {
         'active_cookies': faCookies.length,
         'cached_cookies': cachedCookies.length,
         'has_session': await hasSession(),
-        'last_sync': (await SharedPreferences.getInstance()).getInt('last_cookie_sync') ?? 0,
+        'last_sync': (await SharedPreferences.getInstance())
+                .getInt('last_cookie_sync') ??
+            0,
       };
     } catch (e) {
       debugPrint('=== FAICookieManager: Error getting cookie stats: $e');
@@ -477,7 +495,7 @@ class FAICookieManager {
 }
 
 /// Cookie entry for internal storage
-class _CookieEntry {
+class CookieEntry {
   final String name;
   final String value;
   final String domain;
@@ -486,7 +504,7 @@ class _CookieEntry {
   final bool isHttpOnly;
   final bool isSecure;
 
-  _CookieEntry({
+  CookieEntry({
     required this.name,
     required this.value,
     required this.domain,

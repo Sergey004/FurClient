@@ -9,9 +9,10 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:cronet_http/cronet_http.dart';
 import 'package:cupertino_http/cupertino_http.dart';
-import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'services/fa_client.dart';
+import 'theme/app_theme.dart';
+import 'utils/cookie_manager.dart';
 import 'screens/login_screen.dart';
 import 'navigation/adaptive_shell.dart';
 import 'utils/platform_utils.dart';
@@ -33,14 +34,16 @@ void main() {
         final availableVersion = await WebViewEnvironment.getAvailableVersion();
         assert(availableVersion != null, 'WebView2 Runtime not found.');
         final dir = await getApplicationSupportDirectory();
-        debugPrint('=== Creating WebViewEnvironment with webview2_data profile at: ${dir.path}\\webview2_data');
+        debugPrint(
+            '=== Creating WebViewEnvironment with webview2_data profile at: ${dir.path}\\webview2_data');
         webViewEnvironment = await WebViewEnvironment.create(
           settings: WebViewEnvironmentSettings(
             userDataFolder: '${dir.path}\\webview2_data',
             additionalBrowserArguments: '--disable-gpu --use-gl=swiftshader',
           ),
         );
-        debugPrint('=== WebViewEnvironment created successfully, version: $availableVersion');
+        debugPrint(
+            '=== WebViewEnvironment created successfully, version: $availableVersion');
         // Запускаем прокси для FA CDN — читает cookies из webview2_data профиля
         await FAImageProxy().start();
       }
@@ -94,11 +97,13 @@ class _FurClientAppState extends State<FurClientApp> {
       await _client.init();
       debugPrint('=== _initApp: FAClient initialized');
       await _authService.loadSavedSession();
-      debugPrint('=== _initApp: Session loaded: ${_authService.currentSession != null}');
+      debugPrint(
+          '=== _initApp: Session loaded: ${_authService.currentSession != null}');
       final session = _authService.currentSession;
 
       if (session != null && session.isLoggedIn) {
-        debugPrint('=== _initApp: Restoring session for user: ${session.username}');
+        debugPrint(
+            '=== _initApp: Restoring session for user: ${session.username}');
         await _client.setSession(session);
         final valid = await _client.verifySession();
         debugPrint('=== _initApp: Session verification result: $valid');
@@ -150,9 +155,7 @@ class _FurClientAppState extends State<FurClientApp> {
   void _onLogout() async {
     try {
       await _client.clearCookies();
-      if (!Platform.isWindows) {
-        await CookieManager.instance().deleteAllCookies();
-      }
+      await FAICookieManager.deleteAll();
       await _authService.logout();
     } catch (_) {}
     if (mounted) {
