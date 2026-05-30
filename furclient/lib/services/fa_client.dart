@@ -169,31 +169,37 @@ class FAClient {
   }
 
   /// Check if response is a genuine Cloudflare challenge page.
-  /// Only throws if CF-specific indicators are present, NOT on every 403.
+  /// CF challenge pages are small (< 30KB). Normal FA pages are 100KB+.
+  /// Only throws if CF-specific markers are found in a small response body.
   void _checkCloudflare(Response response) {
-    // Check CF-specific response header
     final cfMitigated = response.headers.value('cf-mitigated');
     if (cfMitigated == 'challenge') {
       throw CloudflareError();
     }
 
-    // Check response body for Cloudflare markers
     final body = response.data?.toString() ?? '';
-    if (response.statusCode == 403 || response.statusCode == 503) {
-      final lower = body.toLowerCase();
-      if (lower.contains('just a moment') ||
-          lower.contains('checking your browser') ||
-          lower.contains('cf-browser-verification') ||
-          lower.contains('cloudflare') &&
-              (lower.contains('challenge') || lower.contains('turnstile')) ||
-          lower.contains('challenges.cloudflare.com') ||
-          lower.contains('cf_chl_page')) {
-        debugPrint('=== CF challenge detected in response body (HTTP ${response.statusCode})');
-        throw CloudflareError();
-      }
-      // 403/503 without CF markers is NOT a CF challenge — it's a normal HTTP error
-      debugPrint('=== HTTP ${response.statusCode} without CF markers, not a Cloudflare challenge');
+    if (response.statusCode != 403 && response.statusCode != 503) return;
+
+    // CF challenge pages are typically small — a real FA page is 100KB+
+    if (body.length > 30000) {
+      debugPrint('=== HTTP ${response.statusCode} with ${body.length}B body — not a CF challenge (too large)');
+      return;
     }
+
+    final lower = body.toLowerCase();
+    final hasCfMarkers = lower.contains('just a moment') ||
+        lower.contains('checking your browser') ||
+        lower.contains('cf-browser-verification') ||
+        lower.contains('challenges.cloudflare.com') ||
+        lower.contains('cf_chl_page') ||
+        (lower.contains('cf-turnstile') && lower.contains('challenge')) ||
+        (lower.contains('cloudflare') && lower.contains('verify you are human'));
+
+    if (hasCfMarkers) {
+      debugPrint('=== CF challenge detected (HTTP ${response.statusCode}, body ${body.length}B)');
+      throw CloudflareError();
+    }
+    debugPrint('=== HTTP ${response.statusCode} — not a CF challenge');
   }
 
   Future<String> _getHtml(String url) async {
@@ -214,12 +220,13 @@ class FAClient {
     }
 
     // Always build explicit Cookie header from session data.
-    // PersistCookieJar on Windows/other platforms may fail to attach cookies.
     final cookieHeader = _buildCookieHeader();
     final options = cookieHeader != null
         ? Options(headers: {'Cookie': cookieHeader})
         : null;
 
+    // Strategy 1: Try Dio (fast HTTP client).
+    // This works when CF is not active or does not require Turnstile.
     try {
       final response =
           await _dio.get<String>(url, options: options ?? Options());
@@ -236,40 +243,115 @@ class FAClient {
       }
       return response.data ?? '';
     } on CloudflareError {
-      debugPrint('=== CF detected on Dio request, attempting CF pass...');
-      final passed = await passCloudflareChallenge();
-      if (passed) {
-        try {
-          final retryHeader = io.Platform.isWindows
-              ? (await _buildCookieHeaderFromWebView() ??
-                  _buildCookieHeader())
-              : _buildCookieHeader();
-          final retryOptions = retryHeader != null
-              ? Options(headers: {'Cookie': retryHeader})
-              : null;
-          final retryResponse = await _dio.get<String>(
-              url,
-              options: retryOptions ?? Options());
-          _checkCloudflare(retryResponse);
-          if (retryResponse.statusCode == null ||
-              retryResponse.statusCode! < 200 ||
-              retryResponse.statusCode! >= 300) {
-            throw DioException(
-              requestOptions: retryResponse.requestOptions,
-              response: retryResponse,
-              type: DioExceptionType.badResponse,
-              message: 'HTTP ${retryResponse.statusCode}',
-            );
-          }
-          return retryResponse.data ?? '';
-        } catch (e) {
-          debugPrint('=== Dio retry after CF pass failed: $e');
-          rethrow;
-        }
-      } else {
-        debugPrint('=== CF pass failed, throwing original error');
+      // Dio cannot pass CF Turnstile — different TLS fingerprint than WebView2.
+      // Do NOT retry with Dio. Fall back to HeadlessInAppWebView which shares
+      // the same WebViewEnvironment and can solve CF automatically.
+      debugPrint('=== Dio blocked by CF, falling back to WebView for $url');
+      try {
+        return await _fetchHtmlWithWebView(url);
+      } catch (e) {
+        debugPrint('=== WebView fallback failed for $url: $e');
         rethrow;
       }
+    } catch (e) {
+      debugPrint('=== Dio request failed for $url: $e');
+      rethrow;
+    }
+  }
+
+  /// Fetch HTML using HeadlessInAppWebView.
+  /// Shares the same WebViewEnvironment as the login WebView, so it has
+  /// the same cookies and can pass CF Turnstile (same TLS fingerprint).
+  Future<String> _fetchHtmlWithWebView(String url) async {
+    final completer = Completer<String>();
+    HeadlessInAppWebView? headless;
+    int solveAttempts = 0;
+
+    headless = HeadlessInAppWebView(
+      webViewEnvironment: webViewEnvironment,
+      initialSettings: InAppWebViewSettings(
+        javaScriptEnabled: true,
+      ),
+      onLoadStop: (controller, loadedUrl) async {
+        try {
+          final html = await controller.getHtml() ?? '';
+          debugPrint(
+              '=== WebView fetch: ${html.length}B from $loadedUrl');
+
+          // If this is a CF challenge page, wait for it to be solved
+          if (_isCloudflarePage(html)) {
+            solveAttempts++;
+            debugPrint(
+                '=== WebView fetch: CF challenge, attempt $solveAttempts');
+            if (solveAttempts > 5) {
+              if (!completer.isCompleted) {
+                completer.completeError(Exception(
+                    'CF challenge not solved after $solveAttempts attempts'));
+              }
+              return;
+            }
+            await _attemptSolveCloudflareChallenge(controller);
+            await Future.delayed(const Duration(seconds: 5));
+            final retryHtml = await controller.getHtml() ?? '';
+            if (!_isCloudflarePage(retryHtml)) {
+              if (!completer.isCompleted) {
+                completer.complete(retryHtml);
+              }
+            }
+            // If still CF, onLoadStop will fire again after redirect
+            return;
+          }
+
+          if (!completer.isCompleted) {
+            completer.complete(html);
+          }
+        } catch (e) {
+          debugPrint('=== WebView fetch onLoadStop error: $e');
+          if (!completer.isCompleted) {
+            completer.completeError(e);
+          }
+        }
+      },
+      onReceivedHttpError: (controller, request, response) async {
+        if (!(request.isForMainFrame ?? false)) return;
+        final status = response.statusCode ?? 0;
+        debugPrint('=== WebView fetch: HTTP $status');
+      },
+      onReceivedError: (controller, request, error) async {
+        if (!(request.isForMainFrame ?? false)) return;
+        debugPrint('=== WebView fetch error: ${error.description}');
+      },
+      initialUrlRequest: URLRequest(
+        url: WebUri(url),
+      ),
+    );
+
+    await headless.run();
+
+    try {
+      final html = await completer.future.timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          debugPrint('=== WebView fetch timeout for $url');
+          return ''; // Return empty instead of throwing
+        },
+      );
+      await headless.dispose();
+
+      // Sync any new cookies from this request
+      await _syncCookiesFromWebView();
+
+      if (html.isEmpty) {
+        debugPrint('=== WebView fetch returned empty for $url');
+        return '';
+      }
+
+      debugPrint('=== WebView fetch success: ${html.length}B from $url');
+      return html;
+    } catch (e) {
+      await headless.dispose();
+      debugPrint('=== WebView fetch exception for $url: $e');
+      rethrow;
     }
   }
 
@@ -279,8 +361,6 @@ class FAClient {
       await _ensureInitialized();
 
       // Build explicit Cookie header from session data.
-      // PersistCookieJar on Windows often fails to attach cookies to Dio requests,
-      // so we MUST pass cookies explicitly.
       final cookieHeader = _buildCookieHeader();
       debugPrint(
           '=== verifySession: cookie header length: ${cookieHeader?.length ?? 0}');
@@ -292,35 +372,26 @@ class FAClient {
       final response =
           await _dio.get<String>(FAUrls.home, options: options ?? Options());
 
-      // Detect Cloudflare mitigation
       try {
         _checkCloudflare(response);
       } on CloudflareError {
+        // Dio can't pass CF — use WebView to check if session is valid
         debugPrint(
-            '=== verifySession: Cloudflare detected on initial request');
-        final passed = await passCloudflareChallenge();
-        if (!passed) return false;
-        // Retry with explicit cookies + fresh CF cookies
-        final retryHeader = io.Platform.isWindows
-            ? (await _buildCookieHeaderFromWebView() ??
-                _buildCookieHeader())
-            : _buildCookieHeader();
-        final retryOptions = retryHeader != null
-            ? Options(headers: {'Cookie': retryHeader})
-            : null;
-        final retry = await _dio.get<String>(FAUrls.home,
-            options: retryOptions ?? Options());
-        final retryStatus = retry.statusCode ?? 0;
-        debugPrint('=== verifySession retry status: $retryStatus');
-        return retryStatus >= 200 && retryStatus < 300;
+            '=== verifySession: CF detected, checking via WebView');
+        try {
+          final html = await _fetchHtmlWithWebView(FAUrls.home);
+          // If we got a real FA page (not empty, not CF page), session is valid
+          return html.isNotEmpty && !_isCloudflarePage(html);
+        } catch (e) {
+          debugPrint('=== verifySession: WebView check failed: $e');
+          return false;
+        }
       }
 
       final status = response.statusCode ?? 0;
       debugPrint('=== verifySession status: $status');
       if (status >= 200 && status < 300) return true;
       if (status == 401 || status == 403) {
-        // Session might be expired — do NOT retry blindly.
-        // Check if we have session cookies at all.
         debugPrint('=== verifySession: HTTP $status, session may be invalid');
         return false;
       }
