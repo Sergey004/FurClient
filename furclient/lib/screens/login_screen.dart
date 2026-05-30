@@ -289,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  ({bool isValid, String reason}) _validateCookies(
+  ({bool isValid, String reason, Map<String, dynamic>? details}) _validateCookies(
     Map<String, Map<String, dynamic>> cookieDataMap,
   ) {
     debugPrint('=== Starting cookie validation');
@@ -299,9 +299,14 @@ class _LoginScreenState extends State<LoginScreen>
     final hasBackupCookie = cookieDataMap.containsKey('b');
     final hasCloudflareClearance = cookieDataMap.containsKey('cf_clearance');
     
+    debugPrint('=== Essential cookies check:');
+    debugPrint('   - Session cookie (a): ${hasSessionCookie ? "present" : "missing"}');
+    debugPrint('   - Backup cookie (b): ${hasBackupCookie ? "present" : "missing"}');
+    debugPrint('   - Cloudflare clearance: ${hasCloudflareClearance ? "present" : "missing"}');
+    
     if (!hasSessionCookie && !hasBackupCookie) {
       debugPrint('=== Missing both session cookies (a and b)');
-      return (isValid: false, reason: 'Missing session cookies');
+      return (isValid: false, reason: 'Missing session cookies', details: null);
     }
     
     // Validate Cloudflare clearance if present
@@ -309,7 +314,7 @@ class _LoginScreenState extends State<LoginScreen>
       final cfCookie = cookieDataMap['cf_clearance'];
       if (cfCookie == null || cfCookie['value'] == null || cfCookie['value'].toString().isEmpty) {
         debugPrint('=== Invalid cf_clearance cookie');
-        return (isValid: false, reason: 'Invalid Cloudflare clearance cookie');
+        return (isValid: false, reason: 'Invalid Cloudflare clearance cookie', details: null);
       }
       debugPrint('=== Cloudflare clearance cookie is valid');
     }
@@ -319,7 +324,7 @@ class _LoginScreenState extends State<LoginScreen>
       final sessionCookie = cookieDataMap['a'];
       if (sessionCookie == null || sessionCookie['value'] == null || sessionCookie['value'].toString().isEmpty) {
         debugPrint('=== Invalid session cookie (a)');
-        return (isValid: false, reason: 'Invalid session cookie');
+        return (isValid: false, reason: 'Invalid session cookie', details: null);
       }
       debugPrint('=== Session cookie (a) is valid');
     }
@@ -329,23 +334,88 @@ class _LoginScreenState extends State<LoginScreen>
       final backupCookie = cookieDataMap['b'];
       if (backupCookie == null || backupCookie['value'] == null || backupCookie['value'].toString().isEmpty) {
         debugPrint('=== Invalid backup cookie (b)');
-        return (isValid: false, reason: 'Invalid backup cookie');
+        return (isValid: false, reason: 'Invalid backup cookie', details: null);
       }
       debugPrint('=== Backup cookie (b) is valid');
     }
     
-    // Check cookie age (not expired)
+    // Check cookie age - only essential cookies must be valid
     final now = DateTime.now().millisecondsSinceEpoch;
+    final List<String> expiredEssentialCookies = [];
+    final List<String> expiredOptionalCookies = [];
+    
     for (final cookie in cookieDataMap.values) {
+      final cookieName = cookie['name'] as String;
       final expiresDate = cookie['expiresDate'] as int? ?? 0;
+      
       if (expiresDate > 0 && expiresDate < now) {
-        debugPrint('=== Cookie ${cookie['name']} is expired');
-        return (isValid: false, reason: 'Expired cookie found');
+        final isEssential = cookieName == 'a' || cookieName == 'b' || cookieName == 'cf_clearance';
+        
+        if (isEssential) {
+          expiredEssentialCookies.add(cookieName);
+          debugPrint('=== Essential cookie $cookieName is expired');
+        } else {
+          expiredOptionalCookies.add(cookieName);
+          debugPrint('=== Optional cookie $cookieName is expired (ignored)');
+        }
       }
     }
     
+    // Only fail if essential cookies are expired
+    if (expiredEssentialCookies.isNotEmpty) {
+      debugPrint('=== Session rejected: Essential cookies expired: $expiredEssentialCookies');
+      return (isValid: false, reason: 'Essential cookies expired: $expiredEssentialCookies', details: {
+        'expiredEssentialCookies': expiredEssentialCookies,
+      });
+    }
+    
+    // Log optional expired cookies but continue
+    if (expiredOptionalCookies.isNotEmpty) {
+      debugPrint('=== Session proceeding with expired optional cookies: $expiredOptionalCookies');
+    }
+    
     debugPrint('=== Cookie validation passed');
-    return (isValid: true, reason: 'Valid');
+    return (isValid: true, reason: 'Valid', details: {
+      'totalCookies': cookieDataMap.length,
+      'essentialCookies': {
+        'session': hasSessionCookie,
+        'backup': hasBackupCookie,
+        'cloudflare': hasCloudflareClearance,
+      },
+      'expiredOptionalCookies': expiredOptionalCookies,
+    });
+  }
+
+  /// Clean up expired optional cookies from the cookie map
+  Map<String, Map<String, dynamic>> _cleanExpiredOptionalCookies(
+    Map<String, Map<String, dynamic>> cookieDataMap,
+  ) {
+    final cleanedMap = Map<String, Map<String, dynamic>>.from(cookieDataMap);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final cleanedCookies = <String>[];
+    
+    for (final entry in cookieDataMap.entries) {
+      final cookieName = entry.key;
+      final cookie = entry.value;
+      final expiresDate = cookie['expiresDate'] as int? ?? 0;
+      
+      // Remove only non-essential expired cookies
+      if (expiresDate > 0 && expiresDate < now) {
+        final isEssential = cookieName == 'a' || cookieName == 'b' || cookieName == 'cf_clearance';
+        
+        if (!isEssential) {
+          cleanedMap.remove(cookieName);
+          cleanedCookies.add(cookieName);
+          debugPrint('=== Cleaned up expired optional cookie: $cookieName');
+        }
+      }
+    }
+    
+    if (cleanedCookies.isNotEmpty) {
+      debugPrint('=== Cleaned up ${cleanedCookies.length} expired optional cookies: $cleanedCookies');
+    }
+    
+    return cleanedMap;
   }
 
   List<WebCookie> _parseDocumentCookieString(String cookieString) {
@@ -424,64 +494,7 @@ class _LoginScreenState extends State<LoginScreen>
     return cookies;
   }
 
-  Future<void> _solveCloudflareChallenge(InAppWebViewController controller) async {
-    debugPrint('=== Attempting to solve Cloudflare challenge');
-    
-    try {
-      // Try to click the Cloudflare challenge button if it exists
-      final result = await controller.evaluateJavascript(
-        source: '''
-          // Look for Cloudflare challenge elements and attempt to solve them
-          const challengeSelectors = [
-            '.cf-browser-verification',
-            '.cf-challenge',
-            '#challenge-form',
-            'input[type="submit"]',
-            'button[type="submit"]'
-          ];
-          
-          let elementClicked = false;
-          
-          for (const selector of challengeSelectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-              console.log('Found Cloudflare challenge element:', selector);
-              element.click();
-              elementClicked = true;
-              
-              // Wait a bit for the click to take effect
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              break;
-            }
-          }
-          
-          // If no specific challenge element found, try general click on page
-          if (!elementClicked) {
-            console.log('No specific Cloudflare challenge element found, trying general click');
-            // Try to click on the page body to simulate user interaction
-            document.body.click();
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-          
-          // Return success status
-          return { success: true, clicked: elementClicked };
-        ''',
-      ).timeout(const Duration(seconds: 5));
-      
-      if (result != null && result is Map) {
-        final success = result['success'] as bool? ?? false;
-        final clicked = result['clicked'] as bool? ?? false;
-        debugPrint('=== Cloudflare challenge result: success=$success, clicked=$clicked');
-      } else {
-        debugPrint('=== Cloudflare challenge result: $result');
-      }
-      
-    } catch (e) {
-      debugPrint('=== Error solving Cloudflare challenge: $e');
-    }
-  }
-
-  Future<void> _saveCookiesToCookieStore(
+Future<void> _saveCookiesToCookieStore(
     Map<String, Map<String, dynamic>> cookieDataMap,
   ) async {
     debugPrint('=== Starting enhanced cookie saving with validation');
@@ -493,6 +506,38 @@ class _LoginScreenState extends State<LoginScreen>
     final validation = _validateCookies(cookieDataMap);
     if (!validation.isValid) {
       debugPrint('=== Cookie validation failed: ${validation.reason}');
+      
+      // Try cleaning up expired optional cookies and re-validate
+      if (validation.reason.contains('Expired cookie found') == true) {
+        debugPrint('=== Attempting to clean up expired optional cookies...');
+        final cleanedCookieMap = _cleanExpiredOptionalCookies(cookieDataMap);
+        final cleanedValidation = _validateCookies(cleanedCookieMap);
+        
+        if (cleanedValidation.isValid) {
+          debugPrint('=== Cookie validation passed after cleanup');
+// Create session with cleaned cookies
+          final cleanedCookieDataList = cleanedCookieMap.values.map((e) => e).toList();
+          final cleanedSession = UserSession(
+            username: 'temp_user', // This will be updated when we get the actual username
+            avatarUrl: '',
+            isLoggedIn: true,
+            cookies: jsonEncode(cleanedCookieDataList),
+          );
+          
+          if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
+            debugPrint('=== Saving cleaned session');
+            await widget.authService.saveSession(cleanedSession).timeout(
+              const Duration(seconds: 10),
+              onTimeout: () async {
+                debugPrint('=== Timeout saving cleaned session');
+              },
+            );
+            _loginCompleter?.complete(null);
+          }
+          return;
+        }
+      }
+      
       return;
     }
 
@@ -596,11 +641,54 @@ class _LoginScreenState extends State<LoginScreen>
       final validation = _validateCookies(cookieDataMap);
       if (!validation.isValid) {
         debugPrint('=== Cookie validation failed: ${validation.reason}');
+        
+        // Try cleaning up expired optional cookies and re-validate
+if (validation.reason.contains('Expired cookie found') == true) {
+          debugPrint('=== Attempting to clean up expired optional cookies...');
+          final cleanedCookieMap = _cleanExpiredOptionalCookies(cookieDataMap);
+          final cleanedValidation = _validateCookies(cleanedCookieMap);
+          
+          if (cleanedValidation.isValid) {
+            debugPrint('=== Cookie validation passed after cleanup');
+            // Create session with cleaned cookies
+            final cleanedCookieDataList = cleanedCookieMap.values.map((e) => e).toList();
+            final cleanedSession = UserSession(
+              username: 'temp_user', // This will be updated when we get the actual username
+              avatarUrl: '',
+              isLoggedIn: true,
+              cookies: jsonEncode(cleanedCookieDataList),
+            );
+            
+            if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
+              debugPrint('=== Saving cleaned session');
+              await widget.authService.saveSession(cleanedSession).timeout(
+                const Duration(seconds: 10),
+                onTimeout: () async {
+                  debugPrint('=== Timeout saving cleaned session');
+                },
+              );
+_loginCompleter?.complete(null);
+            }
+            return;
+          }
+        }
+        
         debugPrint('=== Waiting for more cookies...');
         return;
       }
 
       debugPrint('=== Cookie validation passed: ${validation.reason}');
+      
+      // Log validation details
+      if (validation.details != null) {
+        final details = validation.details!;
+        debugPrint('=== Validation details:');
+        debugPrint('   - Total cookies: ${details['totalCookies']}');
+        debugPrint('   - Essential cookies: ${details['essentialCookies']}');
+        if (details['expiredOptionalCookies']?.isNotEmpty == true) {
+          debugPrint('   - Expired optional cookies: ${details['expiredOptionalCookies']}');
+        }
+      }
 
       // Логируем найденные FA cookies
       debugPrint('=== === Found FA Cookies === ===');
