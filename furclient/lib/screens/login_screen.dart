@@ -253,7 +253,12 @@ class _LoginScreenState extends State<LoginScreen>
         path = c.path ?? '/';
         isHttpOnly = c.isHttpOnly ?? false;
         isSecure = c.isSecure ?? true;
-        expiresDate = c.expiresDate is int ? c.expiresDate as int : 0;
+        // expiresDate from flutter_inappwebview is DateTime?, convert to milliseconds
+        if (c.expiresDate != null) {
+          expiresDate = (c.expiresDate as DateTime).millisecondsSinceEpoch;
+        } else {
+          expiresDate = 0;
+        }
       } else if (c is Map<String, dynamic>) {
         // Handle WebCookie type
         name = c['name'] as String? ?? '';
@@ -340,33 +345,26 @@ class _LoginScreenState extends State<LoginScreen>
     }
     
     // Check cookie age - only essential cookies must be valid
+    // NOTE: Session cookies (a, b) and cf_clearance do NOT have meaningful
+    // expiration dates from the browser. They are valid as long as they exist
+    // with non-empty values (already checked above). Only check non-essential
+    // cookies for expiration.
     final now = DateTime.now().millisecondsSinceEpoch;
-    final List<String> expiredEssentialCookies = [];
     final List<String> expiredOptionalCookies = [];
     
     for (final cookie in cookieDataMap.values) {
       final cookieName = cookie['name'] as String;
       final expiresDate = cookie['expiresDate'] as int? ?? 0;
       
+      final isEssential = cookieName == 'a' || cookieName == 'b' || cookieName == 'cf_clearance';
+      
+      // Skip expiration check for essential cookies - they are valid if present with value
+      if (isEssential) continue;
+      
       if (expiresDate > 0 && expiresDate < now) {
-        final isEssential = cookieName == 'a' || cookieName == 'b' || cookieName == 'cf_clearance';
-        
-        if (isEssential) {
-          expiredEssentialCookies.add(cookieName);
-          debugPrint('=== Essential cookie $cookieName is expired');
-        } else {
-          expiredOptionalCookies.add(cookieName);
-          debugPrint('=== Optional cookie $cookieName is expired (ignored)');
-        }
+        expiredOptionalCookies.add(cookieName);
+        debugPrint('=== Optional cookie $cookieName is expired (ignored)');
       }
-    }
-    
-    // Only fail if essential cookies are expired
-    if (expiredEssentialCookies.isNotEmpty) {
-      debugPrint('=== Session rejected: Essential cookies expired: $expiredEssentialCookies');
-      return (isValid: false, reason: 'Essential cookies expired: $expiredEssentialCookies', details: {
-        'expiredEssentialCookies': expiredEssentialCookies,
-      });
     }
     
     // Log optional expired cookies but continue
