@@ -474,8 +474,19 @@ class FAClient {
       getSubmissionWithComments(String id) async {
     final url = FAUrls.viewSubmission(id);
     final html = await _getHtml(url);
+    // Debug: dump comment section HTML to see real structure
+    final commentStart = html.indexOf('comment');
+    if (commentStart > 0) {
+      final start = commentStart > 200 ? commentStart - 200 : 0;
+      final end = commentStart + 2000 < html.length ? commentStart + 2000 : html.length;
+      debugPrint('=== HTML comment section (pos $commentStart):');
+      debugPrint('=== ${html.substring(start, end)}');
+    } else {
+      debugPrint('=== HTML: no "comment" string found, length=${html.length}');
+    }
     final submission = Submission.parseSubmissionDetails(html, id);
     final comments = FAComment.parseComments(html);
+    debugPrint('=== getSubmissionWithComments: ${comments.length} comments parsed');
     return (submission: submission, comments: comments);
   }
 

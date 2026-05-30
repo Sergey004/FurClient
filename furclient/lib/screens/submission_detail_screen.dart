@@ -57,6 +57,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           _comments = result.comments;
           _isLoading = false;
         });
+        debugPrint('=== Comments: parsed ${result.comments.length} comments');
+        for (final c in result.comments) {
+          debugPrint('=== Comment: ${c.author}: ${c.text.length} chars');
+        }
         if (_submission == null) {
           setState(() {
             _error = 'Failed to parse submission page. Empty or invalid HTML.';
