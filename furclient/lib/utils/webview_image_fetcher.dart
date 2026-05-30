@@ -95,7 +95,9 @@ class WebViewImageFetcher {
   Future<void> _ensureReady() async {
     if (_ready && _headless != null && _controller != null) return;
     if (_initializing) {
-      while (_initializing) await Future.delayed(Duration(milliseconds: 50));
+      while (_initializing) {
+        await Future.delayed(Duration(milliseconds: 50));
+      }
       return;
     }
 

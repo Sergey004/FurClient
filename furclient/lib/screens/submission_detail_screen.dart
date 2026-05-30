@@ -7,6 +7,7 @@ import '../screens/profile_screen.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/platform_utils.dart';
 import '../utils/fa_image_loader.dart';
+import '../widgets/fullscreen_image_viewer.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
 
@@ -216,36 +217,52 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   // ── Shared widgets ────────────────────────────────────────────────────────
 
   Widget _buildImageSection(Submission sub) {
-    return Container(
-      color: AppColors.bgDeep,
-      child: sub.imageUrl.isNotEmpty
-          ? FAImage(
-              url: sub.imageUrl,
-              fit: BoxFit.contain,
-              placeholder: Container(
-                height: 300,
-                color: AppColors.bgInput,
-                child: const Center(
-                  child: AdaptiveProgress(strokeWidth: 2),
+    return GestureDetector(
+      onTap: sub.imageUrl.isNotEmpty
+          ? () => FullscreenImageViewer.open(
+                context,
+                imageUrl: sub.imageUrl,
+                title: sub.title,
+                author: sub.author,
+              )
+          : null,
+      child: MouseRegion(
+        cursor: sub.imageUrl.isNotEmpty
+            ? SystemMouseCursors.zoomIn
+            : SystemMouseCursors.basic,
+        child: Container(
+          color: AppColors.bgDeep,
+          child: sub.imageUrl.isNotEmpty
+              ? FAImage(
+                  url: sub.imageUrl,
+                  fit: BoxFit.contain,
+                  placeholder: Container(
+                    height: 300,
+                    color: AppColors.bgInput,
+                    child: const Center(
+                      child: AdaptiveProgress(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: Container(
+                    height: 200,
+                    color: AppColors.bgInput,
+                    child: const Icon(
+                      Icons.broken_image,
+                      color: AppColors.textMuted,
+                      size: 48,
+                    ),
+                  ),
+                )
+              : Container(
+                  height: 200,
+                  color: AppColors.bgInput,
+                  child: const Center(
+                    child:
+                        Icon(Icons.image, color: AppColors.textMuted, size: 48),
+                  ),
                 ),
-              ),
-              errorWidget: Container(
-                height: 200,
-                color: AppColors.bgInput,
-                child: const Icon(
-                  Icons.broken_image,
-                  color: AppColors.textMuted,
-                  size: 48,
-                ),
-              ),
-            )
-          : Container(
-              height: 200,
-              color: AppColors.bgInput,
-              child: const Center(
-                child: Icon(Icons.image, color: AppColors.textMuted, size: 48),
-              ),
-            ),
+        ),
+      ),
     );
   }
 

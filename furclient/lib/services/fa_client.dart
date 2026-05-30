@@ -842,22 +842,5 @@ class FAClient {
     }
   }
 
-  Future<String?> _buildCookieHeaderFromWebView() async {
-    try {
-      final seen = <String>{};
-      final parts = <String>[];
-      for (final url in _cfCookieUrls) {
-        final cookies = await FAICookieManager.getCookies(url);
-        for (final c in cookies) {
-          if (seen.add(c.name)) {
-            parts.add('${c.name}=${c.value}');
-          }
-        }
-      }
-      return parts.join('; ');
-    } catch (e) {
-      debugPrint('=== Error building cookie header from WebView: $e');
-      return null;
-    }
-  }
+
 }

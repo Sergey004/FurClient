@@ -311,10 +311,8 @@ class CDNContentFetcher {
   String _getCookieHeader(String url) {
     final uri = Uri.parse(url);
     final domain = uri.host;
-    final path = uri.path;
-    
+
     final cookies = <String>[];
-    final now = DateTime.now();
     
     for (final entry in _cookieCache.entries) {
       final cookie = entry.value;
