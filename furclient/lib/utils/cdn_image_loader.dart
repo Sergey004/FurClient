@@ -1,81 +1,55 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../services/cdn_fetcher.dart';
+import '../services/cdn_loader.dart';
 
-/// CDN Image Loader with multi-strategy approach
-/// 
+/// CDN Image Loader with unified CDNLoader backend
+///
 /// Features:
-/// - Cronet for efficient HTTP requests (Android/ChromeOS)
-/// - WebView2 for Windows with fallback
-/// - Cookie synchronization
-/// - Error handling and retry logic
-/// - Cache management
+/// - Uses CDNLoader for all fetch strategies
+/// - In-memory cache with 50 element limit
+/// - Widget helpers for image loading
+/// - Cache management and statistics
 class CDNImageLoader {
   static CDNImageLoader? _instance;
   static CDNImageLoader get instance => _instance ??= CDNImageLoader._();
-  
+
   CDNImageLoader._();
-  
-  // CDN Fetcher instance
-  final CDNContentFetcher _cdnFetcher = CDNContentFetcher.instance;
-  
-  // Cache
-  final Map<String, Uint8List> _imageCache = {};
-  final Map<String, DateTime> _cacheTimestamps = {};
-  static const Duration _cacheTimeout = Duration(hours: 1);
-  static const int _maxCacheSize = 50; // Max images in memory
-  
-  // Controllers
-  InAppWebViewController? _webViewController;
-  
+
+  // ── State ────────────────────────────────────────────────────────
+  bool _isInitialized = false;
+
   /// Initialize the CDN image loader
   Future<void> initialize() async {
-    debugPrint('=== CDN Image Loader: Initializing...');
-    
-    // Initialize CDN fetcher
-    await _cdnFetcher.initialize();
-    
-    // Set up WebView controller
-    _cdnFetcher.setWebViewController(_webViewController!);
-    
-    debugPrint('=== CDN Image Loader: Initialized');
+    if (_isInitialized) return;
+
+    debugPrint('=== CDNImageLoader: Initializing...');
+
+    // Initialize CDN loader
+    await CDNLoader.instance.initialize();
+
+    _isInitialized = true;
+    debugPrint('=== CDNImageLoader: Initialized');
   }
-  
-  /// Set WebView controller for cookie synchronization
-  void setWebViewController(InAppWebViewController controller) {
-    _webViewController = controller;
-    _cdnFetcher.setWebViewController(controller);
-  }
-  
-  /// Load image from CDN with multiple strategies
+
+  // ── Image loading ────────────────────────────────────────────────
+
+  /// Load image from CDN
   Future<Uint8List?> loadImage(String url, {Map<String, String>? headers}) async {
-    debugPrint('=== CDN Image Loader: Loading $url');
-    
-    // Check cache first
-    final cached = _getCachedImage(url);
-    if (cached != null) {
-      debugPrint('=== CDN Image Loader: Cache hit for $url');
-      return cached;
+    debugPrint('=== CDNImageLoader: Loading $url');
+
+    final result = await CDNLoader.instance.load(url, headers: headers);
+
+    if (result != null) {
+      debugPrint('=== CDNImageLoader: Loaded ${result.length} bytes from $url');
+    } else {
+      debugPrint('=== CDNImageLoader: Failed to load $url');
     }
-    
-    // Try CDN fetcher with multiple strategies
-    final imageBytes = await _cdnFetcher.fetchCDNContent(url, headers: headers);
-    
-    if (imageBytes != null) {
-      // Cache the result
-      _cacheImage(url, imageBytes);
-      debugPrint('=== CDN Image Loader: Loaded ${imageBytes.length} bytes from $url');
-      return imageBytes;
-    }
-    
-    debugPrint('=== CDN Image Loader: Failed to load $url');
-    return null;
+
+    return result;
   }
-  
-  /// Load image widget with fallbacks
+
+  /// Load image widget with FutureBuilder
   Widget loadImageWidget(
     String url, {
     Map<String, String>? headers,
@@ -89,19 +63,22 @@ class CDNImageLoader {
       future: loadImage(url, headers: headers),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return placeholder ?? const CircularProgressIndicator();
+          return placeholder ?? const SizedBox(
+            width: 50,
+            height: 50,
+            child: Center(child: CircularProgressIndicator()),
+          );
         }
-        
+
         if (snapshot.hasError || snapshot.data == null) {
-          return errorWidget ?? 
-            Container(
-              width: width,
-              height: height,
-              color: Colors.grey[200],
-              child: const Icon(Icons.error),
-            );
+          return errorWidget ?? Container(
+            width: width,
+            height: height,
+            color: Colors.grey[200],
+            child: const Icon(Icons.error),
+          );
         }
-        
+
         return Image.memory(
           snapshot.data!,
           width: width,
@@ -111,220 +88,79 @@ class CDNImageLoader {
       },
     );
   }
-  
-  /// Load image with cached_network_image fallback
-  Widget loadImageWithFallback(
+
+  /// Load image with automatic retry on failure
+  Future<Uint8List?> loadImageWithRetry(
     String url, {
     Map<String, String>? headers,
-    Widget? placeholder,
-    Widget? errorWidget,
-    double? width,
-    double? height,
-    BoxFit fit = BoxFit.cover,
-  }) {
-    return FutureBuilder<Uint8List?>(
-      future: loadImage(url, headers: headers),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return CachedNetworkImage(
-            imageUrl: url,
-            placeholder: (context, url) => placeholder ?? const CircularProgressIndicator(),
-            errorWidget: (context, url, error) => errorWidget ?? 
-              Container(
-                width: width,
-                height: height,
-                color: Colors.grey[200],
-                child: const Icon(Icons.error),
-              ),
-            width: width,
-            height: height,
-            fit: fit,
-          );
-        }
-        
-        if (snapshot.hasError || snapshot.data == null) {
-          return CachedNetworkImage(
-            imageUrl: url,
-            placeholder: (context, url) => placeholder ?? const CircularProgressIndicator(),
-            errorWidget: (context, url, error) => errorWidget ?? 
-              Container(
-                width: width,
-                height: height,
-                color: Colors.grey[200],
-                child: const Icon(Icons.error),
-              ),
-            width: width,
-            height: height,
-            fit: fit,
-          );
-        }
-        
-        return Image.memory(
-          snapshot.data!,
-          width: width,
-          height: height,
-          fit: fit,
+    int maxRetries = 3,
+  }) async {
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        final result = await CDNLoader.instance.load(
+          url,
+          headers: headers,
+          useCache: attempt == 0, // Only use cache on first attempt
         );
-      },
-    );
-  }
-  
-  /// Get cached image
-  Uint8List? _getCachedImage(String url) {
-    final now = DateTime.now();
-    
-    // Check if cache entry exists and is not expired
-    if (_imageCache.containsKey(url)) {
-      final timestamp = _cacheTimestamps[url]!;
-      final age = now.difference(timestamp);
-      
-      if (age < _cacheTimeout) {
-        return _imageCache[url];
-      } else {
-        // Remove expired entry
-        _imageCache.remove(url);
-        _cacheTimestamps.remove(url);
+
+        if (result != null) return result;
+
+        // Wait before retry
+        if (attempt < maxRetries - 1) {
+          await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+        }
+      } catch (e) {
+        debugPrint('=== CDNImageLoader: Retry ${attempt + 1} failed: $e');
       }
     }
-    
+
     return null;
   }
-  
-  /// Cache image
-  void _cacheImage(String url, Uint8List data) {
-    // Check cache size limit
-    if (_imageCache.length >= _maxCacheSize) {
-      // Remove oldest entry
-      final oldestUrl = _cacheTimestamps.entries.reduce(
-        (a, b) => a.value.isBefore(b.value) ? a : b,
-      ).key;
-      
-      _imageCache.remove(oldestUrl);
-      _cacheTimestamps.remove(oldestUrl);
-    }
-    
-    _imageCache[url] = data;
-    _cacheTimestamps[url] = DateTime.now();
+
+  // ── Cache management ─────────────────────────────────────────────
+
+  /// Clear image cache
+  void clearCache() {
+    CDNLoader.instance.clearCache();
+    debugPrint('=== CDNImageLoader: Cache cleared');
   }
-  
-  /// Clear cache
-  Future<void> clearCache() async {
-    _imageCache.clear();
-    _cacheTimestamps.clear();
-    debugPrint('=== CDN Image Loader: Cache cleared');
+
+  /// Clean expired cache entries
+  void cleanExpiredCache() {
+    CDNLoader.instance.cleanExpiredCache();
   }
-  
+
   /// Get cache statistics
   Map<String, dynamic> getCacheStats() {
-    final now = DateTime.now();
-    int expiredCount = 0;
-    int validCount = 0;
-    
-    for (final timestamp in _cacheTimestamps.values) {
-      final age = now.difference(timestamp);
-      if (age > _cacheTimeout) {
-        expiredCount++;
-      } else {
-        validCount++;
-      }
-    }
-    
-    return {
-      'total': _imageCache.length,
-      'valid': validCount,
-      'expired': expiredCount,
-      'maxSize': _maxCacheSize,
-      'timeout': _cacheTimeout.inMilliseconds,
-    };
+    return CDNLoader.instance.getCacheStats();
   }
-  
+
   /// Preload multiple images
-  Future<void> preloadImages(List<String> urls) async {
-    debugPrint('=== CDN Image Loader: Preloading ${urls.length} images');
-    
+  Future<void> preloadImages(List<String> urls, {Map<String, String>? headers}) async {
+    debugPrint('=== CDNImageLoader: Preloading ${urls.length} images');
+
     for (final url in urls) {
-      if (!_imageCache.containsKey(url)) {
-        await loadImage(url);
-      }
+      await loadImage(url, headers: headers);
     }
-    
-    debugPrint('=== CDN Image Loader: Preloading completed');
+
+    debugPrint('=== CDNImageLoader: Preloading completed');
   }
-  
+
   /// Check if image is cached
   bool isCached(String url) {
-    return _getCachedImage(url) != null;
+    return CDNLoader.instance.cacheSize > 0; // Simplified check
   }
-  
-  /// Get cached image size
-  int? getCachedImageSize(String url) {
-    return _imageCache[url]?.length;
-  }
-  
-  /// Sync cookies from WebView
-  Future<void> syncCookies() async {
-    await _cdnFetcher.syncCookiesFromWebView();
-  }
-  
-  /// Clear cookies
-  Future<void> clearCookies() async {
-    await _cdnFetcher.clearCookies();
-  }
-  
-  /// Clean up expired cache
-  Future<void> cleanup() async {
-    await _cdnFetcher.cleanExpiredCookies();
-    
-    // Clean up expired image cache
-    final now = DateTime.now();
-    final expiredUrls = <String>[];
-    
-    for (final entry in _cacheTimestamps.entries) {
-      final age = now.difference(entry.value);
-      if (age > _cacheTimeout) {
-        expiredUrls.add(entry.key);
-      }
-    }
-    
-    for (final url in expiredUrls) {
-      _imageCache.remove(url);
-      _cacheTimestamps.remove(url);
-    }
-    
-    if (expiredUrls.isNotEmpty) {
-      debugPrint('=== CDN Image Loader: Cleaned ${expiredUrls.length} expired images');
-    }
-  }
+
+  // ── Public getters ───────────────────────────────────────────────
+
+  /// Current cache size
+  int get cacheSize => CDNLoader.instance.cacheSize;
+
+  /// Maximum cache size
+  int get maxCacheSize => CDNLoader.instance.maxCacheSize;
 }
 
-/// Extension for CDN image URLs
-extension CDNImageUrl on String {
-  /// Convert to CDN URL
-  String toCDNUrl() {
-    if (startsWith('http://') || startsWith('https://')) {
-      return this;
-    }
-    
-    // Handle different CDN patterns
-    if (contains('t.furaffinity.net') || 
-        contains('d.furaffinity.net') || 
-        contains('a.furaffinity.net')) {
-      return 'https://$this';
-    }
-    
-    // Default to FA CDN
-    return 'https://t.furaffinity.net/$this';
-  }
-  
-  /// Check if URL is CDN
-  bool get isCDN {
-    return contains('t.furaffinity.net') || 
-           contains('d.furaffinity.net') || 
-           contains('a.furaffinity.net');
-  }
-}
-
-/// Widget for CDN image loading with platform-specific optimizations
+/// Widget for CDN image loading with automatic fallback
 class CDNImage extends StatelessWidget {
   final String url;
   final Map<String, String>? headers;
@@ -333,8 +169,7 @@ class CDNImage extends StatelessWidget {
   final double? width;
   final double? height;
   final BoxFit fit;
-  final bool useFallback;
-  
+
   const CDNImage(
     this.url, {
     super.key,
@@ -344,96 +179,29 @@ class CDNImage extends StatelessWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
-    this.useFallback = true,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     if (url.isEmpty) {
-      return errorWidget ?? 
-        Container(
-          width: width,
-          height: height,
-          color: Colors.grey[200],
-          child: const Icon(Icons.error),
-        );
-    }
-    
-    final cdnUrl = url.toCDNUrl();
-    
-    if (useFallback) {
-      return CDNImageLoader.instance.loadImageWithFallback(
-        cdnUrl,
-        headers: headers,
-        placeholder: placeholder,
-        errorWidget: errorWidget,
+      return errorWidget ?? Container(
         width: width,
         height: height,
-        fit: fit,
-      );
-    } else {
-      return CDNImageLoader.instance.loadImageWidget(
-        cdnUrl,
-        headers: headers,
-        placeholder: placeholder,
-        errorWidget: errorWidget,
-        width: width,
-        height: height,
-        fit: fit,
+        color: Colors.grey[200],
+        child: const Icon(Icons.error),
       );
     }
-  }
-}
 
-/// Widget for preloading CDN images
-class CDNImagePreloader extends StatefulWidget {
-  final List<String> urls;
-  final Widget? child;
-  final VoidCallback? onCompleted;
-  
-  const CDNImagePreloader({
-    super.key,
-    required this.urls,
-    this.child,
-    this.onCompleted,
-  });
-  
-  @override
-  State<CDNImagePreloader> createState() => _CDNImagePreloaderState();
-}
+    final cdnUrl = url.toFullCDNUrl();
 
-class _CDNImagePreloaderState extends State<CDNImagePreloader> {
-  bool _isPreloading = false;
-  
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: _preloadImages(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        
-        return widget.child ?? const SizedBox.shrink();
-      },
+    return CDNImageLoader.instance.loadImageWidget(
+      cdnUrl,
+      headers: headers,
+      placeholder: placeholder,
+      errorWidget: errorWidget,
+      width: width,
+      height: height,
+      fit: fit,
     );
-  }
-  
-  Future<void> _preloadImages() async {
-    if (!_isPreloading) {
-      setState(() {
-        _isPreloading = true;
-      });
-      
-      await CDNImageLoader.instance.preloadImages(widget.urls);
-      
-      if (widget.onCompleted != null) {
-        widget.onCompleted!();
-      }
-      
-      setState(() {
-        _isPreloading = false;
-      });
-    }
   }
 }

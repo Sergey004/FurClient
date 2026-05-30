@@ -3,7 +3,7 @@ import 'dart:io' as io;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:fa_kit/fa_kit.dart';
-
+import 'fa_image_proxy.dart';
 import '../utils/cookie_store.dart';
 
 
@@ -38,26 +38,28 @@ class _FAImageState extends State<FAImage> {
   bool _hasError = false;
 
   String get _resolvedUrl {
+    String url = widget.url;
     if (widget.dynamicThumbnail != null &&
         widget.width != null &&
         widget.height != null) {
-      return widget.dynamicThumbnail!
+      url = widget.dynamicThumbnail!
           .bestThumbnailUrl(width: widget.width!, height: widget.height!)
           .toString();
     }
-    return widget.url;
+    // На Windows роутим через прокси — он подставляет cookies из webview2_data
+    return FAImageProxy.proxyUrl(url);
   }
 
   Map<String, String> get _requestHeaders {
     final headers = <String, String>{
-      'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'User-Agent': 'ceylo.FurAffinityApp/1.0',
       'Referer': 'https://www.furaffinity.net',
     };
-    final cookieHeader = CookieStore.instance.cookieHeader;
-    debugPrint('=== FAImage CookieStore header: $cookieHeader');
-    if (cookieHeader != null) {
-      headers['Cookie'] = cookieHeader;
+    // Прокси уже подставляет cookies на Windows;
+    // на других платформах берём из CookieStore
+    if (!FAImageProxy.proxyUrl(widget.url).startsWith('http://127.0.0.1')) {
+      final cookieHeader = CookieStore.instance.cookieHeader;
+      if (cookieHeader != null) headers['Cookie'] = cookieHeader;
     }
     return headers;
   }

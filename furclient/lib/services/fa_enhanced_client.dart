@@ -5,8 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
-import '../services/cdn_fetcher.dart';
+import '../services/cdn_loader.dart';
 import '../utils/cdn_image_loader.dart';
+import '../utils/cookie_manager.dart';
 
 /// Enhanced FA Client with multi-strategy CDN support
 /// 
@@ -23,8 +24,7 @@ class FAEnhancedClient {
   FAEnhancedClient._();
   
   // Services
-  final CDNContentFetcher _cdnFetcher = CDNContentFetcher.instance;
-  final CDNImageLoader _cdnImageLoader = CDNImageLoader.instance;
+  final CDNLoader _cdnLoader = CDNLoader.instance;
   
   // State
   InAppWebViewController? _webViewController;
@@ -52,9 +52,8 @@ class FAEnhancedClient {
     debugPrint('=== FA Enhanced Client: Initializing...');
     
     try {
-      // Initialize CDN services
-      await _cdnFetcher.initialize();
-      await _cdnImageLoader.initialize();
+      // Initialize CDN loader
+      await _cdnLoader.initialize();
       
       // Initialize Cronet on Android
       if (_isCronetAvailable) {
@@ -123,8 +122,7 @@ class FAEnhancedClient {
   /// Set WebView controller
   void setWebViewController(InAppWebViewController controller) {
     _webViewController = controller;
-    _cdnFetcher.setWebViewController(controller);
-    _cdnImageLoader.setWebViewController(controller);
+    _cdnLoader.setWebViewController(controller);
     
     debugPrint('=== FA Enhanced Client: WebView controller set');
   }
@@ -154,7 +152,7 @@ class FAEnhancedClient {
     if (url.contains('t.furaffinity.net') || 
         url.contains('d.furaffinity.net') || 
         url.contains('a.furaffinity.net')) {
-      return await _cdnFetcher.fetchCDNContent(url, headers: headers);
+      return await _cdnLoader.load(url, headers: headers);
     }
     
     // Use platform-specific client
@@ -300,7 +298,7 @@ class FAEnhancedClient {
   
   /// Load image with CDN optimization
   Future<Uint8List?> loadImage(String url, {Map<String, String>? headers}) async {
-    return await _cdnImageLoader.loadImage(url, headers: headers);
+    return await _cdnLoader.load(url, headers: headers);
   }
   
   /// Get CDN image widget
@@ -327,8 +325,9 @@ class FAEnhancedClient {
   /// Sync cookies from WebView
   Future<void> syncCookies() async {
     try {
-      await _cdnFetcher.syncCookiesFromWebView();
-      await _cdnImageLoader.syncCookies();
+      if (_webViewController != null) {
+        await FAICookieManager.syncFromWebView(_webViewController!);
+      }
       debugPrint('=== FA Enhanced Client: Cookies synced');
     } catch (e) {
       debugPrint('=== FA Enhanced Client: Error syncing cookies: $e');
@@ -338,8 +337,8 @@ class FAEnhancedClient {
   /// Clear all data
   Future<void> clearData() async {
     _sessionData.clear();
-    await _cdnFetcher.clearCookies();
-    _cdnImageLoader.clearCache();
+    await FAICookieManager.deleteAll();
+    _cdnLoader.clearCache();
     
     debugPrint('=== FA Enhanced Client: All data cleared');
   }
@@ -350,8 +349,7 @@ class FAEnhancedClient {
       'initialized': _isInitialized,
       'cronetAvailable': isCronetAvailable,
       'sessionData': _sessionData.length,
-      'cdnCookies': _cdnFetcher.cachedCookiesCount,
-      'imageCache': _cdnImageLoader.getCacheStats(),
+      'cdnCache': _cdnLoader.getCacheStats(),
     };
   }
   
@@ -425,7 +423,7 @@ class FAEnhancedClient {
   
   /// Cleanup resources
   Future<void> cleanup() async {
-    await _cdnImageLoader.cleanup();
+    _cdnLoader.clearCache();
     
     if (_cronetClient != null) {
       _cronetClient!.close();
@@ -440,7 +438,7 @@ class FAEnhancedClient {
 extension FAEnhancedUrls on String {
   /// Get optimized CDN URL
   String get optimizedCDNUrl {
-    if (isCDN) {
+    if (CDNLoader.isCDNUrl(this)) {
       return this;
     }
     

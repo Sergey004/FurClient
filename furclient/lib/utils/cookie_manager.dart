@@ -20,12 +20,246 @@ import '../services/fa_enhanced_client.dart';
 class FAICookieManager {
   FAICookieManager._();
 
+  // ── Cookie storage ───────────────────────────────────────────────
+  static final Map<String, _CookieEntry> _cookies = {};
+  static const List<String> _essentialCookies = ['a', 'b', 'cf_clearance'];
+
   static CookieManager get instance {
     if (io.Platform.isWindows) {
       return CookieManager.instance(webViewEnvironment: webViewEnvironment);
     }
     return CookieManager.instance();
   }
+
+  // ── CDNLoader compatibility methods ──────────────────────────────
+
+  /// Load cookies from persistent storage (for CDNLoader)
+  static Future<void> loadCookies() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cookieData = prefs.getString('unified_cookies');
+      if (cookieData != null) {
+        final decoded = jsonDecode(cookieData) as Map<String, dynamic>;
+        for (final entry in decoded.entries) {
+          final data = entry.value as Map<String, dynamic>;
+          _cookies[entry.key] = _CookieEntry(
+            name: data['name'] as String,
+            value: data['value'] as String,
+            domain: data['domain'] as String? ?? '.furaffinity.net',
+            path: data['path'] as String? ?? '/',
+            expiresDate: data['expiresDate'] as int?,
+            isHttpOnly: data['isHttpOnly'] as bool? ?? false,
+            isSecure: data['isSecure'] as bool? ?? true,
+          );
+        }
+        debugPrint('=== FAICookieManager: Loaded ${_cookies.length} cookies from storage');
+      }
+    } catch (e) {
+      debugPrint('=== FAICookieManager: Error loading cookies: $e');
+    }
+  }
+
+  /// Save cookies to persistent storage
+  static Future<void> _saveCookies() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = {
+        for (final entry in _cookies.entries)
+          entry.key: {
+            'name': entry.value.name,
+            'value': entry.value.value,
+            'domain': entry.value.domain,
+            'path': entry.value.path,
+            'expiresDate': entry.value.expiresDate,
+            'isHttpOnly': entry.value.isHttpOnly,
+            'isSecure': entry.value.isSecure,
+          }
+      };
+      await prefs.setString('unified_cookies', jsonEncode(data));
+    } catch (e) {
+      debugPrint('=== FAICookieManager: Error saving cookies: $e');
+    }
+  }
+
+  /// Get cookies for URL (for CDNLoader)
+  static Future<List<_CookieEntry>> getCookiesForUrl(String url) async {
+    final uri = Uri.parse(url);
+    final domain = uri.host;
+
+    return _cookies.values.where((cookie) {
+      final cookieDomain = cookie.domain;
+
+      if (domain == cookieDomain || domain.endsWith(cookieDomain.replaceFirst('.', ''))) {
+        if (cookie.expiresDate != null) {
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (cookie.expiresDate! < now) return false;
+        }
+        return true;
+      }
+
+      return false;
+    }).toList();
+  }
+
+  /// Parse Set-Cookie header and store cookies (for CDNLoader)
+  static void parseAndStoreCookies(String setCookieHeader, String domain) {
+    final cookieStrings = setCookieHeader.split(',');
+    for (final cookieStr in cookieStrings) {
+      final parts = cookieStr.trim().split(';');
+      if (parts.isEmpty) continue;
+
+      final nameValue = parts[0].trim().split('=');
+      if (nameValue.length < 2) continue;
+
+      final name = nameValue[0].trim();
+      final value = nameValue.sublist(1).join('=').trim();
+
+      if (name.isEmpty || value.isEmpty) continue;
+
+      String cookieDomain = domain;
+      String path = '/';
+      int? expiresDate;
+      bool isHttpOnly = false;
+      bool isSecure = false;
+
+      for (int i = 1; i < parts.length; i++) {
+        final attr = parts[i].trim().toLowerCase();
+        if (attr.startsWith('domain=')) {
+          cookieDomain = attr.substring(7).trim();
+        } else if (attr.startsWith('path=')) {
+          path = attr.substring(5).trim();
+        } else if (attr.startsWith('expires=')) {
+          try {
+            final date = io.HttpDate.parse(attr.substring(8).trim());
+            expiresDate = date.millisecondsSinceEpoch;
+          } catch (_) {}
+        } else if (attr == 'httponly') {
+          isHttpOnly = true;
+        } else if (attr == 'secure') {
+          isSecure = true;
+        }
+      }
+
+      _cookies[name] = _CookieEntry(
+        name: name,
+        value: value,
+        domain: cookieDomain,
+        path: path,
+        expiresDate: expiresDate,
+        isHttpOnly: isHttpOnly,
+        isSecure: isSecure,
+      );
+
+      debugPrint('=== FAICookieManager: Stored cookie: $name');
+    }
+
+    _saveCookies();
+  }
+
+  /// Sync cookies from WebView (for CDNLoader)
+  static Future<void> syncFromWebView(InAppWebViewController controller) async {
+    try {
+      final webViewManager = instance;
+      final cookies = await webViewManager.getCookies(
+        url: WebUri('https://www.furaffinity.net'),
+      );
+
+      for (final cookie in cookies) {
+        _cookies[cookie.name] = _CookieEntry(
+          name: cookie.name,
+          value: cookie.value ?? '',
+          domain: cookie.domain ?? '.furaffinity.net',
+          path: cookie.path ?? '/',
+          expiresDate: cookie.expiresDate,
+          isHttpOnly: cookie.isHttpOnly ?? false,
+          isSecure: cookie.isSecure ?? true,
+        );
+      }
+
+      _saveCookies();
+      debugPrint('=== FAICookieManager: Synced ${cookies.length} cookies from WebView');
+    } catch (e) {
+      debugPrint('=== FAICookieManager: WebView sync failed: $e');
+    }
+  }
+
+  /// Sync cookies to WebView (for CDNLoader)
+  static Future<void> syncToWebView(InAppWebViewController controller, String url) async {
+    try {
+      final webViewManager = instance;
+      final cookies = await getCookiesForUrl(url);
+
+      for (final cookie in cookies) {
+        await webViewManager.setCookie(
+          url: WebUri(url),
+          name: cookie.name,
+          value: cookie.value,
+          domain: cookie.domain,
+          path: cookie.path,
+          isHttpOnly: cookie.isHttpOnly,
+          isSecure: cookie.isSecure,
+          expiresDate: cookie.expiresDate,
+        );
+      }
+
+      debugPrint('=== FAICookieManager: Synced ${cookies.length} cookies to WebView');
+    } catch (e) {
+      debugPrint('=== FAICookieManager: Sync to WebView failed: $e');
+    }
+  }
+
+  /// Validate cookies (for CDNLoader)
+  static CookieValidationResult validate() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final expiredEssential = <String>[];
+    final expiredOptional = <String>[];
+
+    for (final cookie in _cookies.values) {
+      if (cookie.expiresDate != null && cookie.expiresDate! < now) {
+        if (_essentialCookies.contains(cookie.name)) {
+          expiredEssential.add(cookie.name);
+        } else {
+          expiredOptional.add(cookie.name);
+        }
+      }
+    }
+
+    return CookieValidationResult(
+      isValid: expiredEssential.isEmpty,
+      expiredEssential: expiredEssential,
+      expiredOptional: expiredOptional,
+      totalCookies: _cookies.length,
+    );
+  }
+
+  /// Remove expired optional cookies (for CDNLoader)
+  static void cleanExpiredOptionalCookies() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final toRemove = <String>[];
+
+    for (final entry in _cookies.entries) {
+      if (entry.value.expiresDate != null &&
+          entry.value.expiresDate! < now &&
+          !_essentialCookies.contains(entry.key)) {
+        toRemove.add(entry.key);
+      }
+    }
+
+    for (final key in toRemove) {
+      _cookies.remove(key);
+      debugPrint('=== FAICookieManager: Removed expired optional cookie: $key');
+    }
+
+    if (toRemove.isNotEmpty) {
+      _saveCookies();
+    }
+  }
+
+  /// Get cookie count
+  static int get cookieCount => _cookies.length;
+
+  /// Get all cookie names
+  static List<String> get cookieNames => _cookies.keys.toList();
 
   /// Получить все cookies для URL с учётом платформы.
   static Future<List<Cookie>> getCookies(String url) async {
@@ -211,5 +445,49 @@ class FAICookieManager {
       debugPrint('=== FAICookieManager: Error getting cookie stats: $e');
       return {'error': e.toString()};
     }
+  }
+}
+
+/// Cookie entry for internal storage
+class _CookieEntry {
+  final String name;
+  final String value;
+  final String domain;
+  final String path;
+  final int? expiresDate;
+  final bool isHttpOnly;
+  final bool isSecure;
+
+  _CookieEntry({
+    required this.name,
+    required this.value,
+    required this.domain,
+    required this.path,
+    this.expiresDate,
+    required this.isHttpOnly,
+    required this.isSecure,
+  });
+}
+
+/// Cookie validation result
+class CookieValidationResult {
+  final bool isValid;
+  final List<String> expiredEssential;
+  final List<String> expiredOptional;
+  final int totalCookies;
+
+  CookieValidationResult({
+    required this.isValid,
+    required this.expiredEssential,
+    required this.expiredOptional,
+    required this.totalCookies,
+  });
+
+  @override
+  String toString() {
+    return 'CookieValidationResult(isValid=$isValid, '
+        'expiredEssential=$expiredEssential, '
+        'expiredOptional=$expiredOptional, '
+        'totalCookies=$totalCookies)';
   }
 }

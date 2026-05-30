@@ -15,6 +15,7 @@ import 'services/fa_client.dart';
 import 'screens/login_screen.dart';
 import 'navigation/adaptive_shell.dart';
 import 'utils/platform_utils.dart';
+import 'utils/fa_image_proxy.dart';
 import 'package:path_provider/path_provider.dart';
 
 WebViewEnvironment? webViewEnvironment;
@@ -38,6 +39,8 @@ void main() {
             additionalBrowserArguments: '--disable-gpu --use-gl=swiftshader',
           ),
         );
+        // Запускаем прокси для FA CDN — читает cookies из webview2_data профиля
+        await FAImageProxy().start();
       }
 
       if (isDesktop) {
