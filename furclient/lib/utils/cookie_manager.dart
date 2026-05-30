@@ -290,6 +290,33 @@ class FAICookieManager {
     return instance.getCookies(url: WebUri(url));
   }
 
+  /// Получить все cookies из WebView для известных FA URL.
+  static Future<List<Cookie>> getAllCookies() async {
+    final urls = [
+      'https://www.furaffinity.net',
+      'https://furaffinity.net',
+      'https://www.furaffinity.net/login',
+      'https://www.furaffinity.net/',
+    ];
+
+    final cookiesByName = <String, Cookie>{};
+    for (final url in urls) {
+      try {
+        final cookies = await getCookies(url);
+        for (final cookie in cookies) {
+          cookiesByName[cookie.name] = cookie;
+        }
+      } catch (e) {
+        debugPrint('=== FAICookieManager: Error fetching cookies for $url: $e');
+      }
+    }
+
+    final allCookies = cookiesByName.values.toList();
+    debugPrint(
+        '=== FAICookieManager: Collected ${allCookies.length} cookies from WebView: ${allCookies.map((c) => c.name).join(", ")}');
+    return allCookies;
+  }
+
   /// Получить конкретный cookie по имени.
   static Future<Cookie?> getCookie(String url, String name) async {
     debugPrint('=== FAICookieManager: Getting cookie $name from $url');
@@ -353,7 +380,7 @@ class FAICookieManager {
     debugPrint(
         '=== FAICookieManager: Current time: ${DateTime.now().toIso8601String()}');
 
-    final cookies = await getCookies('https://www.furaffinity.net');
+    final cookies = await getAllCookies();
     debugPrint(
         '=== FAICookieManager: Got ${cookies.length} cookies total: ${cookies.map((c) => c.name).join(", ")}');
     for (final cookie in cookies) {

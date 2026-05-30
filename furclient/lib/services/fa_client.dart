@@ -408,6 +408,7 @@ class FAClient {
       debugPrint('=== CF pass: opening HeadlessWebView for ${FAUrls.baseUrl}');
       final completer = Completer<bool>();
       HeadlessInAppWebView? headless;
+      int solveAttempts = 0;
 
       headless = HeadlessInAppWebView(
         webViewEnvironment: webViewEnvironment,
@@ -415,26 +416,37 @@ class FAClient {
           javaScriptEnabled: true,
         ),
         onLoadStop: (controller, url) async {
-          final html = await controller.getHtml() ?? '';
-          debugPrint('=== CF pass: HTML length: ${html.length}');
+          try {
+            final html = await controller.getHtml() ?? '';
+            debugPrint('=== CF pass: HTML length: ${html.length}');
 
-          if (_isCloudflarePage(html)) {
-            debugPrint('=== CF pass: challenge detected, waiting...');
-            // Ждем 20 секунд для решения challenge
-            await Future.delayed(const Duration(seconds: 20));
-            final retryHtml = await controller.getHtml() ?? '';
-            debugPrint('=== CF pass: retry HTML length: ${retryHtml.length}');
+            if (_isCloudflarePage(html)) {
+              solveAttempts++;
+              debugPrint(
+                  '=== CF pass: challenge detected, attempt $solveAttempts');
+              await _attemptSolveCloudflareChallenge(controller);
+              await Future.delayed(const Duration(seconds: 5));
+              final retryHtml = await controller.getHtml() ?? '';
+              debugPrint('=== CF pass: retry HTML length: ${retryHtml.length}');
 
-            if (_isCloudflarePage(retryHtml)) {
-              debugPrint('=== CF pass: challenge NOT resolved after 20s');
-              return;
+              if (_isCloudflarePage(retryHtml)) {
+                debugPrint(
+                    '=== CF pass: challenge still present after attempt $solveAttempts');
+                if (solveAttempts >= 4) {
+                  debugPrint('=== CF pass: maximum challenge attempts reached');
+                  return;
+                }
+                return;
+              }
             }
-          }
 
-          debugPrint(
-              '=== CF pass: page loaded successfully, syncing cookies...');
-          await _syncCookiesFromWebView();
-          completer.complete(true);
+            debugPrint(
+                '=== CF pass: page loaded successfully, syncing cookies...');
+            await _syncCookiesFromWebView();
+            if (!completer.isCompleted) completer.complete(true);
+          } catch (e) {
+            debugPrint('=== CF pass onLoadStop error: $e');
+          }
         },
         onReceivedHttpError: (controller, request, response) async {
           if (!(request.isForMainFrame ?? false)) return;
@@ -455,7 +467,7 @@ class FAClient {
       await headless.run();
 
       final success = await completer.future.timeout(
-        const Duration(seconds: 30),
+        const Duration(seconds: 60),
         onTimeout: () {
           debugPrint('=== CF pass: timeout, syncing cookies anyway');
           return false;
@@ -479,11 +491,53 @@ class FAClient {
     }
   }
 
+  Future<void> _attemptSolveCloudflareChallenge(
+    InAppWebViewController controller,
+  ) async {
+    try {
+      await controller.evaluateJavascript(source: '''
+        (async () => {
+          const selectors = [
+            'iframe[src*="turnstile"]',
+            '.cf-turnstile',
+            '#cf-turnstile',
+            '.cf-browser-verification',
+            '.cf-challenge',
+            '#challenge-form',
+            'button[type="submit"]',
+            'input[type="submit"]',
+          ];
+
+          for (const selector of selectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+              element.scrollIntoView({behavior: 'smooth', block: 'center'});
+              if (typeof element.click === 'function') {
+                element.click();
+              }
+              console.log('CF attempt click', selector);
+              break;
+            }
+          }
+
+          return true;
+        })();
+      ''');
+    } catch (e) {
+      debugPrint('=== CF pass: solver JS error: $e');
+    }
+  }
+
   bool _isCloudflarePage(String html) {
-    return html.contains('Just a moment') ||
-        html.contains('checking your browser') ||
-        html.contains('cloudflare') ||
-        html.contains('cf_chl_page');
+    final lower = html.toLowerCase();
+    return lower.contains('just a moment') ||
+        lower.contains('checking your browser') ||
+        lower.contains('cloudflare') ||
+        lower.contains('cf_chl_page') ||
+        lower.contains('challenges.cloudflare.com') ||
+        lower.contains('cf-turnstile') ||
+        lower.contains('verify you are human') ||
+        lower.contains('turnstile');
   }
 
   Future<void> _syncCookiesFromWebView() async {

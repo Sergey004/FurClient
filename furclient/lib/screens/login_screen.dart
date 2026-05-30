@@ -153,42 +153,14 @@ class _LoginScreenState extends State<LoginScreen>
     debugPrint(
         '=== Starting enhanced cookie extraction with multiple strategies');
 
-    // Strategy 1: CookieManager (can get HttpOnly cookies)
+    // Strategy 1: Pull all cookies from the WebView cookie store.
     try {
-      final cm = FAICookieManager.instance;
-      final urls = [
-        'https://www.furaffinity.net',
-        'https://furaffinity.net',
-        'https://www.furaffinity.net/',
-      ];
-
-      for (var attempt = 0; attempt < 3; attempt++) {
-        if (attempt > 0) {
-          debugPrint('=== CookieManager retry attempt ${attempt + 1}...');
-          await Future.delayed(const Duration(seconds: 1));
-        }
-
-        for (final url in urls) {
-          try {
-            final cookies = await cm
-                .getCookies(url: WebUri(url))
-                .timeout(const Duration(seconds: 3));
-            if (cookies.isNotEmpty) {
-              debugPrint(
-                  '=== $url cookies: ${cookies.length} (${cookies.map((c) => c.name).join(", ")})');
-              _addCookiesToMap(cookies, cookieDataMap);
-            }
-          } catch (e) {
-            debugPrint('=== CookieManager error for $url: $e');
-          }
-        }
-
-        if (cookieDataMap.containsKey('cf_clearance')) {
-          debugPrint('=== cf_clearance found on attempt ${attempt + 1}');
-          break;
-        }
+      final cookies = await FAICookieManager.getAllCookies();
+      if (cookies.isNotEmpty) {
+        debugPrint(
+            '=== FAICookieManager.getAllCookies returned ${cookies.length} cookies: ${cookies.map((c) => c.name).join(", ")}');
+        _addCookiesToMap(cookies, cookieDataMap);
       }
-
       debugPrint(
         '=== CookieManager total: ${cookieDataMap.length} cookies (${cookieDataMap.keys.join(", ")})',
       );
