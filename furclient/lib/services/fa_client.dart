@@ -480,6 +480,9 @@ class FAClient {
         await _syncCookiesFromWebView();
       }
 
+      // Restore all session cookies to ensure essential cookies (a, cf_clearance) are in cookieJar
+      await _restoreCookiesFromSession();
+
       _lastCfPass = DateTime.now();
       debugPrint('=== CF pass: completed');
       return true;
@@ -650,9 +653,7 @@ class FAClient {
 
   Future<void> _saveWebViewCookiesToCookieJar(
       List<Cookie> webViewCookies) async {
-    if (io.Platform.isWindows != true) {
-      await _ensureInitialized();
-    }
+    await _ensureInitialized();
     final cookies = <io.Cookie>[];
     for (final c in webViewCookies) {
       final value = c.value;
@@ -663,7 +664,7 @@ class FAClient {
       cookie.secure = c.isSecure ?? false;
       cookies.add(cookie);
     }
-    if (cookies.isNotEmpty && io.Platform.isWindows != true) {
+    if (cookies.isNotEmpty) {
       await _cookieJar.saveFromResponse(Uri.parse(FAUrls.baseUrl), cookies);
       debugPrint('=== CookieJar updated with ${cookies.length} cookies');
 
