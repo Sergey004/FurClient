@@ -138,13 +138,10 @@ class _FurClientAppState extends State<FurClientApp> {
     debugPrint('=== _onLogin() called');
     final session = _authService.currentSession;
     if (session != null) {
-      await _client.setSession(session);
-      final valid = await _client.verifySession();
-      if (!valid) {
-        debugPrint('=== Session appears invalid — logout and show login');
-        await _authService.logout();
-        return;
-      }
+      // freshLogin=true: skip CF pass and verifySession — user just logged in
+      // through WebView, cookies are known-valid. verifySession with Dio HTTP
+      // client often gets 403 due to PersistCookieJar issues or CF TLS fingerprint.
+      await _client.setSession(session, freshLogin: true);
     }
     if (mounted) {
       setState(() => _isLoggedIn = true);

@@ -107,11 +107,18 @@ class FAClient {
 
   UserSession? get session => _session;
 
-  Future<void> setSession(UserSession? session) async {
+  Future<void> setSession(UserSession? session, {bool freshLogin = false}) async {
     _session = session;
     await _restoreCookiesFromSession();
     await _enhancedClient.syncCookies();
-    await passCloudflareChallenge();
+    // Do NOT run CF pass for fresh logins — the user just authenticated
+    // through WebView, cookies are valid. CF pass is only needed when
+    // restoring a saved session or when actual CF errors occur.
+    if (!freshLogin) {
+      await passCloudflareChallenge();
+    } else {
+      debugPrint('=== setSession: skipping CF pass for fresh login');
+    }
   }
 
   Future<void> _restoreCookiesFromSession() async {
@@ -161,10 +168,31 @@ class FAClient {
     }
   }
 
+  /// Check if response is a genuine Cloudflare challenge page.
+  /// Only throws if CF-specific indicators are present, NOT on every 403.
   void _checkCloudflare(Response response) {
+    // Check CF-specific response header
     final cfMitigated = response.headers.value('cf-mitigated');
-    if (cfMitigated == 'challenge' || (response.statusCode == 403)) {
+    if (cfMitigated == 'challenge') {
       throw CloudflareError();
+    }
+
+    // Check response body for Cloudflare markers
+    final body = response.data?.toString() ?? '';
+    if (response.statusCode == 403 || response.statusCode == 503) {
+      final lower = body.toLowerCase();
+      if (lower.contains('just a moment') ||
+          lower.contains('checking your browser') ||
+          lower.contains('cf-browser-verification') ||
+          lower.contains('cloudflare') &&
+              (lower.contains('challenge') || lower.contains('turnstile')) ||
+          lower.contains('challenges.cloudflare.com') ||
+          lower.contains('cf_chl_page')) {
+        debugPrint('=== CF challenge detected in response body (HTTP ${response.statusCode})');
+        throw CloudflareError();
+      }
+      // 403/503 without CF markers is NOT a CF challenge — it's a normal HTTP error
+      debugPrint('=== HTTP ${response.statusCode} without CF markers, not a Cloudflare challenge');
     }
   }
 
@@ -185,8 +213,16 @@ class FAClient {
       }
     }
 
+    // Always build explicit Cookie header from session data.
+    // PersistCookieJar on Windows/other platforms may fail to attach cookies.
+    final cookieHeader = _buildCookieHeader();
+    final options = cookieHeader != null
+        ? Options(headers: {'Cookie': cookieHeader})
+        : null;
+
     try {
-      final response = await _dio.get<String>(url);
+      final response =
+          await _dio.get<String>(url, options: options ?? Options());
       _checkCloudflare(response);
       if (response.statusCode == null ||
           response.statusCode! < 200 ||
@@ -205,13 +241,15 @@ class FAClient {
       if (passed) {
         try {
           final retryHeader = io.Platform.isWindows
-              ? (await _buildCookieHeaderFromWebView() ?? _buildCookieHeader())
+              ? (await _buildCookieHeaderFromWebView() ??
+                  _buildCookieHeader())
               : _buildCookieHeader();
           final retryOptions = retryHeader != null
               ? Options(headers: {'Cookie': retryHeader})
               : null;
-          final retryResponse =
-              await _dio.get<String>(url, options: retryOptions ?? Options());
+          final retryResponse = await _dio.get<String>(
+              url,
+              options: retryOptions ?? Options());
           _checkCloudflare(retryResponse);
           if (retryResponse.statusCode == null ||
               retryResponse.statusCode! < 200 ||
@@ -239,15 +277,39 @@ class FAClient {
     if (_session?.cookies == null) return false;
     try {
       await _ensureInitialized();
-      final response = await _dio.get<String>(FAUrls.home);
-      // Detect Cloudflare mitigation if present in headers
+
+      // Build explicit Cookie header from session data.
+      // PersistCookieJar on Windows often fails to attach cookies to Dio requests,
+      // so we MUST pass cookies explicitly.
+      final cookieHeader = _buildCookieHeader();
+      debugPrint(
+          '=== verifySession: cookie header length: ${cookieHeader?.length ?? 0}');
+
+      final options = cookieHeader != null
+          ? Options(headers: {'Cookie': cookieHeader})
+          : null;
+
+      final response =
+          await _dio.get<String>(FAUrls.home, options: options ?? Options());
+
+      // Detect Cloudflare mitigation
       try {
         _checkCloudflare(response);
       } on CloudflareError {
-        debugPrint('=== verifySession: Cloudflare detected on initial request');
+        debugPrint(
+            '=== verifySession: Cloudflare detected on initial request');
         final passed = await passCloudflareChallenge();
         if (!passed) return false;
-        final retry = await _dio.get<String>(FAUrls.home);
+        // Retry with explicit cookies + fresh CF cookies
+        final retryHeader = io.Platform.isWindows
+            ? (await _buildCookieHeaderFromWebView() ??
+                _buildCookieHeader())
+            : _buildCookieHeader();
+        final retryOptions = retryHeader != null
+            ? Options(headers: {'Cookie': retryHeader})
+            : null;
+        final retry = await _dio.get<String>(FAUrls.home,
+            options: retryOptions ?? Options());
         final retryStatus = retry.statusCode ?? 0;
         debugPrint('=== verifySession retry status: $retryStatus');
         return retryStatus >= 200 && retryStatus < 300;
@@ -257,24 +319,16 @@ class FAClient {
       debugPrint('=== verifySession status: $status');
       if (status >= 200 && status < 300) return true;
       if (status == 401 || status == 403) {
-        if (await FAICookieManager.hasSession()) {
-          debugPrint(
-              '=== verifySession: session cookies exist, retrying after CF pass');
-          final passed = await passCloudflareChallenge();
-          if (!passed) return false;
-          final retry = await _dio.get<String>(FAUrls.home);
-          final retryStatus = retry.statusCode ?? 0;
-          debugPrint('=== verifySession retry status: $retryStatus');
-          return retryStatus >= 200 && retryStatus < 300;
-        }
+        // Session might be expired — do NOT retry blindly.
+        // Check if we have session cookies at all.
+        debugPrint('=== verifySession: HTTP $status, session may be invalid');
         return false;
       }
-      if (status >= 500) return true;
+      if (status >= 500) return true; // Server error, session itself is ok
       return false;
     } on CloudflareError {
       return false;
     } catch (e) {
-      // Network or parsing errors — treat as invalid session so UI can let WebView finish challenge
       debugPrint('verifySession error: $e');
       return false;
     }
@@ -386,7 +440,11 @@ class FAClient {
     final action = currentlyWatching ? 'unwatch' : 'watch';
     final url = '${FAUrls.baseUrl}/$action/$username/';
     await _ensureInitialized();
-    await _dio.post<String>(url);
+    final cookieHeader = _buildCookieHeader();
+    final options = cookieHeader != null
+        ? Options(headers: {'Cookie': cookieHeader})
+        : null;
+    await _dio.post<String>(url, options: options ?? Options());
     return !currentlyWatching;
   }
 
