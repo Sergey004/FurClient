@@ -511,29 +511,28 @@ Future<void> _saveCookiesToCookieStore(
         final cleanedCookieMap = _cleanExpiredOptionalCookies(cookieDataMap);
         final cleanedValidation = _validateCookies(cleanedCookieMap);
         
-        if (cleanedValidation.isValid) {
-          debugPrint('=== Cookie validation passed after cleanup');
-// Create session with cleaned cookies
-          final cleanedCookieDataList = cleanedCookieMap.values.map((e) => e).toList();
-          final cleanedSession = UserSession(
-            username: 'temp_user', // This will be updated when we get the actual username
-            avatarUrl: '',
-            isLoggedIn: true,
-            cookies: jsonEncode(cleanedCookieDataList),
-          );
-          
-          if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
-            debugPrint('=== Saving cleaned session');
-            await widget.authService.saveSession(cleanedSession).timeout(
-              const Duration(seconds: 10),
-              onTimeout: () async {
-                debugPrint('=== Timeout saving cleaned session');
-              },
+           if (cleanedValidation.isValid) {
+            debugPrint('=== Cookie validation passed after cleanup');
+            final cleanedCookieDataList = cleanedCookieMap.values.map((e) => e).toList();
+            final cleanedSession = UserSession(
+              username: 'temp_user',
+              avatarUrl: '',
+              isLoggedIn: true,
+              cookies: jsonEncode(cleanedCookieDataList),
             );
-            _loginCompleter?.complete(null);
+            
+            if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
+              debugPrint('=== Saving and completing login with cleaned session');
+              await widget.authService.saveSession(cleanedSession).timeout(
+                const Duration(seconds: 10),
+                onTimeout: () async {
+                  debugPrint('=== Timeout saving cleaned session');
+                },
+              );
+              _loginCompleter!.complete(cleanedSession);
+            }
+            return;
           }
-          return;
-        }
       }
       
       return;

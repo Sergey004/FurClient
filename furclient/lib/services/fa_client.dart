@@ -120,16 +120,23 @@ class FAClient {
     try {
       final List<dynamic> cookiePairs = jsonDecode(_session!.cookies!);
       final cookies = <io.Cookie>[];
-      for (final pair in cookiePairs) {
-        if (pair is List && pair.length >= 2) {
-          final name = pair[0].toString();
-          final value = pair[1].toString();
-          if (name.isNotEmpty && value.isNotEmpty) {
-            final cookie = io.Cookie(name, value)
-              ..domain = '.furaffinity.net'
-              ..path = '/';
-            cookies.add(cookie);
-          }
+      for (final item in cookiePairs) {
+        String? name;
+        String? value;
+        
+        if (item is Map<String, dynamic>) {
+          name = item['name']?.toString();
+          value = item['value']?.toString();
+        } else if (item is List && item.length >= 2) {
+          name = item[0].toString();
+          value = item[1].toString();
+        }
+        
+        if (name != null && value != null && name.isNotEmpty && value.isNotEmpty) {
+          final cookie = io.Cookie(name, value)
+            ..domain = '.furaffinity.net'
+            ..path = '/';
+          cookies.add(cookie);
         }
       }
       if (cookies.isNotEmpty) {
@@ -140,7 +147,6 @@ class FAClient {
         
         // Also store in enhanced client
         for (final cookie in cookies) {
-          // Use public method to set session data
           _enhancedClient.setSessionData('cookie_${cookie.name}', 
               '${cookie.name}=${cookie.value}; Domain=${cookie.domain}');
         }
