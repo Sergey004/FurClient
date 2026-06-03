@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -7,14 +8,22 @@ import '../widgets/submission_card.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
+import '../utils/platform_utils.dart';
 import 'submission_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final FAClient client;
   final bool sfwMode;
   final VoidCallback? onLogout;
+  final String? initialQuery;
 
-  const SearchScreen({super.key, required this.client, this.sfwMode = false, this.onLogout});
+  const SearchScreen({
+    super.key,
+    required this.client,
+    this.sfwMode = false,
+    this.onLogout,
+    this.initialQuery,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -47,9 +56,16 @@ class _SearchScreenState extends State<SearchScreen>
     super.initState();
     _scrollController.addListener(_onScroll);
     _initHistory();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocusNode.requestFocus();
-    });
+    SearchHistory.externalQuery.addListener(_onExternalQuery);
+    // If initial query provided, search immediately
+    if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+      _searchController.text = widget.initialQuery!;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _search(widget.initialQuery!));
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _searchFocusNode.requestFocus();
+      });
+    }
   }
 
   Future<void> _initHistory() async {
@@ -57,8 +73,18 @@ class _SearchScreenState extends State<SearchScreen>
     if (mounted) setState(() => _historyLoaded = true);
   }
 
+  void _onExternalQuery() {
+    final q = SearchHistory.externalQuery.value;
+    if (q != null && q.isNotEmpty) {
+      SearchHistory.externalQuery.value = null;
+      _searchController.text = q;
+      _search(q);
+    }
+  }
+
   @override
   void dispose() {
+    SearchHistory.externalQuery.removeListener(_onExternalQuery);
     _scrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -161,9 +187,64 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final isDesktop =
-        MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= AppBreakpoints.desktop;
 
+    if (isWindows) {
+      return _buildFluentLayout(isDesktop);
+    }
+    return _buildMaterialLayout(isDesktop);
+  }
+
+  // ── Windows: Fluent UI layout (no Material widgets) ─────────────────────
+
+  Widget _buildFluentLayout(bool isDesktop) {
+    return Column(
+      children: [
+        // Search bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: fluent.TextBox(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  placeholder: 'Search submissions...',
+                  style: const TextStyle(color: AppColors.text, fontSize: 14),
+                  prefix: const Padding(
+                    padding: EdgeInsets.only(left: 8),
+                    child: Icon(Icons.search, size: 16, color: AppColors.materialGreen),
+                  ),
+                  suffix: _searchController.text.isNotEmpty
+                      ? fluent.IconButton(
+                          icon: const Icon(Icons.clear, size: 14),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _query = '';
+                              _hasSearched = false;
+                              _results = [];
+                            });
+                            _searchFocusNode.requestFocus();
+                          },
+                        )
+                      : null,
+                  onSubmitted: _search,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _buildSortBar(),
+        Expanded(child: _buildBody(isDesktop)),
+      ],
+    );
+  }
+
+  // ── Android / other: Material layout ─────────────────────────────────────
+
+  Widget _buildMaterialLayout(bool isDesktop) {
     return AdaptiveScaffold(
       appBar: AppBar(
         title: const Text('Search'),
@@ -172,32 +253,26 @@ class _SearchScreenState extends State<SearchScreen>
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: TextField(
+            child: AdaptiveTextField(
               controller: _searchController,
               focusNode: _searchFocusNode,
+              hintText: 'Search submissions...',
               style: const TextStyle(color: AppColors.text, fontSize: 14),
               onSubmitted: _search,
-              decoration: InputDecoration(
-                hintText: 'Search submissions...',
-                hintStyle:
-                    const TextStyle(color: AppColors.textMuted, fontSize: 14),
-                prefixIcon: const Icon(Icons.search,
-                    size: 20, color: AppColors.materialGreen),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 20),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _query = '';
-                            _hasSearched = false;
-                            _results = [];
-                          });
-                          _searchFocusNode.requestFocus();
-                        },
-                      )
-                    : null,
-              ),
+              suffix: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 20),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _query = '';
+                          _hasSearched = false;
+                          _results = [];
+                        });
+                        _searchFocusNode.requestFocus();
+                      },
+                    )
+                  : null,
             ),
           ),
           _buildSortBar(),
@@ -207,6 +282,8 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
+  // ── Sort bar (shared, no platform-specific widgets) ─────────────────────
+
   Widget _buildSortBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
@@ -214,7 +291,7 @@ class _SearchScreenState extends State<SearchScreen>
         children: [
           const Icon(Icons.sort, size: 18, color: AppColors.textMuted),
           const SizedBox(width: 6),
-          Text('Sort:', style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          const Text('Sort:', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
           const SizedBox(width: 8),
           _sortChip('Relevance', 'relevancyt'),
           const SizedBox(width: 6),
@@ -294,6 +371,8 @@ class _SearchScreenState extends State<SearchScreen>
     if (_query.isNotEmpty) _search(_query);
   }
 
+  // ── Body (shared) ────────────────────────────────────────────────────────
+
   Widget _buildBody(bool isDesktop) {
     if (_isLoading) {
       return const LoadingIndicator(message: 'Searching...');
@@ -339,9 +418,9 @@ class _SearchScreenState extends State<SearchScreen>
             if (index >= _results.length) {
               return const Padding(
                 padding: EdgeInsets.all(16),
-          child: Center(
-              child: AdaptiveProgress(
-                color: AppColors.materialGreen, strokeWidth: 2)),
+                child: Center(
+                  child: AdaptiveProgress(
+                      color: AppColors.materialGreen, strokeWidth: 2)),
               );
             }
             final sub = _results[index];
@@ -357,6 +436,8 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
+  // ── Recent searches (platform-adaptive) ─────────────────────────────────
+
   Widget _buildRecentSearches() {
     if (!_historyLoaded) {
       return const LoadingIndicator();
@@ -368,8 +449,7 @@ class _SearchScreenState extends State<SearchScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.search,
-                color: AppColors.materialGreen.withValues(alpha: 0.5),
-                size: 48),
+                color: AppColors.materialGreen.withValues(alpha: 0.5), size: 48),
             const SizedBox(height: 16),
             const Text('Search for submissions',
                 style: TextStyle(color: AppColors.textDim, fontSize: 16)),
@@ -391,13 +471,30 @@ class _SearchScreenState extends State<SearchScreen>
                       fontSize: 16,
                       fontWeight: FontWeight.w600)),
               const Spacer(),
-              TextButton(
-                onPressed: () async {
-                  await _searchHistory.clear();
-                  setState(() {});
-                },
-                child: const Text('Clear All'),
-              ),
+              if (!isWindows)
+                TextButton(
+                  onPressed: () async {
+                    await _searchHistory.clear();
+                    setState(() {});
+                  },
+                  child: const Text('Clear All'),
+                )
+              else
+                GestureDetector(
+                  onTap: () async {
+                    await _searchHistory.clear();
+                    setState(() {});
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('Clear All',
+                        style: TextStyle(color: AppColors.textDim, fontSize: 12)),
+                  ),
+                ),
             ],
           ),
         ),
@@ -408,30 +505,59 @@ class _SearchScreenState extends State<SearchScreen>
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final term = recent[index];
-              return ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                leading: const Icon(Icons.history,
-                    color: AppColors.materialGreen, size: 20),
-                title: Text(term,
-                    style: const TextStyle(
-                        color: AppColors.textDim, fontSize: 14)),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close,
-                      color: AppColors.textMuted, size: 18),
-                  onPressed: () async {
-                    await _searchHistory.remove(term);
-                    setState(() {});
-                  },
-                ),
-                onTap: () {
-                  _searchController.text = term;
-                  _search(term);
-                },
-              );
+              return _buildRecentSearchItem(term);
             },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRecentSearchItem(String term) {
+    if (isWindows) {
+      return GestureDetector(
+        onTap: () {
+          _searchController.text = term;
+          _search(term);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          child: Row(
+            children: [
+              const Icon(Icons.history, color: AppColors.materialGreen, size: 18),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(term, style: const TextStyle(color: AppColors.textDim, fontSize: 14)),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () async {
+                  await _searchHistory.remove(term);
+                  setState(() {});
+                },
+                child: const Icon(Icons.close, color: AppColors.textMuted, size: 16),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    // Material
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      leading: const Icon(Icons.history, color: AppColors.materialGreen, size: 20),
+      title: Text(term, style: const TextStyle(color: AppColors.textDim, fontSize: 14)),
+      trailing: IconButton(
+        icon: const Icon(Icons.close, color: AppColors.textMuted, size: 18),
+        onPressed: () async {
+          await _searchHistory.remove(term);
+          setState(() {});
+        },
+      ),
+      onTap: () {
+        _searchController.text = term;
+        _search(term);
+      },
     );
   }
 }

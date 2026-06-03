@@ -1,8 +1,10 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:window_manager/window_manager.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
+import '../services/search_history.dart';
 import '../screens/gallery_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/notifications_screen.dart';
@@ -28,11 +30,25 @@ class FluentShell extends StatefulWidget {
 class _FluentShellState extends State<FluentShell> {
   int _currentIndex = 0;
   bool _sfwMode = false;
+  bool _isCompactMode = false;
 
   @override
   void initState() {
     super.initState();
     _loadSfwMode();
+    SearchHistory.externalQuery.addListener(_onExternalSearch);
+  }
+
+  void _onExternalSearch() {
+    if (SearchHistory.externalQuery.value != null && mounted) {
+      setState(() => _currentIndex = 1);
+    }
+  }
+
+  @override
+  void dispose() {
+    SearchHistory.externalQuery.removeListener(_onExternalSearch);
+    super.dispose();
   }
 
   Future<void> _loadSfwMode() async {
@@ -77,7 +93,33 @@ class _FluentShellState extends State<FluentShell> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    _isCompactMode = width < 640;
+
     return fluent.NavigationView(
+      titleBar: fluent.TitleBar(
+        isBackButtonVisible: false,
+        icon: Icon(fluent.FluentIcons.photo2,
+            size: 16,
+            color: fluent.FluentTheme.of(context).accentColor),
+        title: Text(
+          'FurClient',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        captionControls: _isCompactMode
+            ? null
+            : SizedBox(
+                width: 138,
+                height: 46,
+                child: WindowCaption(
+                  brightness: fluent.FluentTheme.of(context).brightness,
+                  backgroundColor: fluent.Colors.transparent,
+                ),
+              ),
+      ),
       pane: fluent.NavigationPane(
         selected: _currentIndex,
         onChanged: (index) => setState(() => _currentIndex = index),

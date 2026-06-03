@@ -1,8 +1,12 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import '../theme/theme_provider.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../services/fa_client.dart';
+import '../main.dart' show themeProvider;
 
 class SettingsScreen extends StatefulWidget {
   final bool sfwMode;
@@ -27,7 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _sfwMode = false;
   bool _autoDownloadOnFave = false;
   bool _autoCloseOnFave = true;
-  String _imageQuality = 'high'; // low, medium, high
+  String _imageQuality = 'high';
 
   @override
   bool get wantKeepAlive => true;
@@ -37,6 +41,17 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.initState();
     _sfwMode = widget.sfwMode;
     _loadSettings();
+    themeProvider.addListener(_onThemeChange);
+  }
+
+  @override
+  void dispose() {
+    themeProvider.removeListener(_onThemeChange);
+    super.dispose();
+  }
+
+  void _onThemeChange() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadSettings() async {
@@ -59,9 +74,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _onSfwToggle(bool value) async {
     setState(() => _sfwMode = value);
     widget.onSfwModeChanged(value);
-    // Save to SharedPreferences
     await _saveSetting('sfw_mode', value);
-    // Sync with FA website
     if (widget.client != null) {
       debugPrint('=== SettingsScreen: Syncing SFW toggle with FA website...');
       await widget.client!.toggleSiteSfwMode();
@@ -69,6 +82,10 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   void _confirmLogout() {
+    if (Platform.isWindows) {
+      _confirmLogoutFluent();
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -100,9 +117,40 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  void _confirmLogoutFluent() async {
+    final confirmed = await fluent.showDialog<bool>(
+      context: context,
+      builder: (ctx) => fluent.ContentDialog(
+        title: const fluent.Text('Sign out'),
+        content: fluent.Text('Sign out of your account?'),
+        actions: [
+          fluent.Button(
+            child: const fluent.Text('Cancel'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+          ),
+          fluent.FilledButton(
+            style: fluent.ButtonStyle(
+              backgroundColor: fluent.WidgetStateProperty.all(
+                fluent.Colors.errorPrimaryColor,
+              ),
+            ),
+            child: const fluent.Text('Sign out'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) widget.onLogout();
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
+    if (Platform.isWindows) {
+      return _buildFluentSettings();
+    }
+
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppBreakpoints.desktop;
 
@@ -112,12 +160,359 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FLUENT SETTINGS (Windows)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildFluentSettings() {
+    final currentMode = themeProvider.mode;
+    final p = Palette.of(context);
+
+    return fluent.ScaffoldPage(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      content: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Appearance ──────────────────────────────────────────────
+                _fluentSectionHeader('APPEARANCE', Icons.palette_outlined,
+                    AppColors.materialLavender),
+                const SizedBox(height: 8),
+                _fluentCard([
+                  fluent.InfoLabel(
+                    label: 'Theme',
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: AppThemeMode.values.map((m) {
+                          final active = m == currentMode;
+                          return fluent.ToggleButton(
+                            checked: active,
+                            onChanged: (v) {
+                              if (v) themeProvider.setMode(m);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(_themeIcon(m),
+                                      size: 16,
+                                      color: active
+                                          ? Colors.white
+                                          : p.textDim),
+                                  const SizedBox(width: 8),
+                                  fluent.Text(m.label),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _fluentDivider(),
+                  _fluentSwitch(
+                    icon: Icons.shield_outlined,
+                    iconColor: AppColors.materialGreen,
+                    value: _sfwMode,
+                    onChanged: _onSfwToggle,
+                    title: 'SFW Mode',
+                    subtitle: 'Blur NSFW content',
+                  ),
+                  const SizedBox(height: 4),
+                  _fluentDivider(),
+                  _fluentSwitch(
+                    icon: Icons.download_outlined,
+                    iconColor: AppColors.fluentCyan,
+                    value: _autoDownloadOnFave,
+                    onChanged: (v) {
+                      setState(() => _autoDownloadOnFave = v);
+                      _saveSetting('auto_download_on_fave', v);
+                    },
+                    title: 'Auto-download on Fave',
+                    subtitle: 'Save image when favoriting',
+                  ),
+                  const SizedBox(height: 4),
+                  _fluentDivider(),
+                  _fluentSwitch(
+                    icon: Icons.close_fullscreen_outlined,
+                    iconColor: AppColors.cupertinoPurple,
+                    value: _autoCloseOnFave,
+                    onChanged: (v) {
+                      setState(() => _autoCloseOnFave = v);
+                      _saveSetting('auto_close_on_fave', v);
+                    },
+                    title: 'Auto-close on Fave',
+                    subtitle: 'Close submission view after favoriting',
+                  ),
+                  const SizedBox(height: 8),
+                  _fluentImageQuality(),
+                ]),
+                const SizedBox(height: 24),
+
+                // ── Account ────────────────────────────────────────────────
+                _fluentSectionHeader('ACCOUNT', Icons.person_outline,
+                    AppColors.fluentCyan),
+                const SizedBox(height: 8),
+                _fluentCard([
+                  fluent.Button(
+                    style: fluent.ButtonStyle(
+                      backgroundColor: fluent.WidgetStateProperty.all(
+                          AppColors.danger),
+                    ),
+                    onPressed: _confirmLogoutFluent,
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.logout, size: 18),
+                        SizedBox(width: 8),
+                        fluent.Text('Sign out'),
+                      ],
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 24),
+
+                // ── About ─────────────────────────────────────────────────
+                _fluentSectionHeader('ABOUT', Icons.info_outline,
+                    AppColors.materialLavender),
+                const SizedBox(height: 8),
+                _fluentCard([
+                  _fluentInfoRow(
+                      Icons.pets, 'FurClient', 'A FurAffinity client',
+                      iconColor: AppColors.accentLight),
+                  _fluentDivider(),
+                  _fluentInfoRow(
+                      Icons.info_outline, 'Version', '1.0.0',
+                      trailing: true),
+                  _fluentDivider(),
+                  _fluentInfoRow(
+                      Icons.code, 'Built with', 'Flutter 3.x',
+                      trailing: true),
+                ]),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _fluentSectionHeader(String title, IconData icon, Color color) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _fluentCard(List<Widget> children) {
+    final p = Palette.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.bgCard,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: p.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _fluentDivider() {
+    final p = Palette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Container(height: 1, color: p.border),
+    );
+  }
+
+  Widget _fluentSwitch({
+    required IconData icon,
+    required Color iconColor,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required String title,
+    required String subtitle,
+  }) {
+    final p = Palette.of(context);
+    return Row(
+      children: [
+        Icon(icon, color: iconColor, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: TextStyle(
+                      color: p.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500)),
+              Text(subtitle,
+                  style: TextStyle(
+                      color: p.textMuted, fontSize: 12)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        fluent.ToggleSwitch(
+          checked: value,
+          onChanged: (v) => onChanged(v),
+        ),
+      ],
+    );
+  }
+
+  Widget _fluentImageQuality() {
+    final p = Palette.of(context);
+    return Row(
+      children: [
+        const Icon(Icons.high_quality_outlined,
+            color: AppColors.materialLavender, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Image Quality',
+                  style: TextStyle(
+                      color: p.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500)),
+              Text('Quality for full-size images',
+                  style: TextStyle(color: p.textMuted, fontSize: 12)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        fluent.ComboBox<String>(
+          value: _imageQuality,
+          items: const [
+            fluent.ComboBoxItem(value: 'low', child: Text('Low')),
+            fluent.ComboBoxItem(value: 'medium', child: Text('Medium')),
+            fluent.ComboBoxItem(value: 'high', child: Text('High')),
+          ],
+          onChanged: (v) {
+            if (v != null) {
+              setState(() => _imageQuality = v);
+              _saveSetting('image_quality', v);
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _fluentInfoRow(IconData icon, String title, String subtitle,
+      {Color? iconColor, bool trailing = false}) {
+    final p = Palette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor ?? p.textDim, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(title,
+                style: TextStyle(
+                    color: p.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500)),
+          ),
+          if (trailing)
+            Text(subtitle,
+                style: TextStyle(
+                    color: p.textMuted, fontSize: 14)),
+          if (!trailing)
+            Expanded(
+              child: Text(subtitle,
+                  style: TextStyle(
+                      color: p.textMuted, fontSize: 13)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MATERIAL SETTINGS (Android / desktop Material)
+  // ═══════════════════════════════════════════════════════════════════════════
+
   Widget _buildMobileBody() {
+    final currentMode = themeProvider.mode;
+
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
-        _sectionHeader('CONTENT'),
+        _sectionHeader('APPEARANCE'),
         _card([
+          // Theme picker
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Row(
+              children: [
+                const Icon(Icons.palette_outlined,
+                    color: AppColors.materialLavender, size: 20),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text('Theme',
+                      style: TextStyle(
+                          color: AppColors.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500)),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: AppThemeMode.values.map((m) {
+                  final active = m == currentMode;
+                  return ChoiceChip(
+                    avatar: Icon(_themeIcon(m),
+                        size: 16,
+                        color: active
+                            ? AppColors.text
+                            : AppColors.textMuted),
+                    label: Text(m.label),
+                    selected: active,
+                    selectedColor: AppColors.materialLavenderBg,
+                    onSelected: (_) => themeProvider.setMode(m),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          const Divider(height: 1, indent: 16, color: AppColors.border),
           _adaptiveSwitchTile(
             icon: Icons.shield_outlined,
             iconColor: AppColors.materialGreen,
@@ -151,51 +546,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             subtitle: 'Close submission view after favoriting',
           ),
           const Divider(height: 1, indent: 16, color: AppColors.border),
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            title: Row(
-              children: [
-                const Icon(Icons.high_quality_outlined, color: AppColors.materialLavender, size: 20),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text('Image Quality',
-                      style: TextStyle(color: AppColors.text, fontSize: 15)),
-                ),
-              ],
-            ),
-            subtitle: const Padding(
-              padding: EdgeInsets.only(left: 32),
-              child: Text('Quality for full-size images',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-            ),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.bgInput,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _imageQuality,
-                  isDense: true,
-                  style: const TextStyle(color: AppColors.text, fontSize: 13),
-                  dropdownColor: AppColors.bgCard,
-                  items: const [
-                    DropdownMenuItem(value: 'low', child: Text('Low')),
-                    DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                    DropdownMenuItem(value: 'high', child: Text('High')),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) {
-                      setState(() => _imageQuality = v);
-                      _saveSetting('image_quality', v);
-                    }
-                  },
-                ),
-              ),
-            ),
-          ),
+          _imageQualityTile(),
         ]),
         const SizedBox(height: 24),
         _sectionHeader('ACCOUNT'),
@@ -238,7 +589,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           const Divider(height: 1, indent: 56, color: AppColors.border),
           const ListTile(
-            leading: Icon(Icons.code, color: AppColors.textDim, size: 22),
+            leading:
+                Icon(Icons.code, color: AppColors.textDim, size: 22),
             title: Text('Built with Flutter',
                 style: TextStyle(color: AppColors.text, fontSize: 15)),
             trailing: Text('3.x',
@@ -252,6 +604,8 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _buildDesktopBody() {
+    final currentMode = themeProvider.mode;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
       child: Center(
@@ -264,10 +618,39 @@ class _SettingsScreenState extends State<SettingsScreen>
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 24),
               _desktopSection(
-                title: 'Content',
-                icon: Icons.tune,
-                accent: AppColors.materialGreen,
+                title: 'Appearance',
+                icon: Icons.palette_outlined,
+                accent: AppColors.materialLavender,
                 children: [
+                  // Theme picker
+                  Padding(
+                    padding:
+                        const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: AppThemeMode.values.map((m) {
+                          final active = m == currentMode;
+                          return ChoiceChip(
+                            avatar: Icon(_themeIcon(m),
+                                size: 16,
+                                color: active
+                                    ? AppColors.text
+                                    : AppColors.textMuted),
+                            label: Text(m.label),
+                            selected: active,
+                            selectedColor:
+                                AppColors.materialLavenderBg,
+                            onSelected: (_) => themeProvider.setMode(m),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                  const Divider(
+                      height: 1, indent: 16, color: AppColors.border),
                   _adaptiveSwitchTile(
                     icon: Icons.shield_outlined,
                     iconColor: AppColors.materialGreen,
@@ -276,7 +659,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'SFW Mode',
                     subtitle: 'Blur NSFW content',
                   ),
-                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  const Divider(
+                      height: 1, indent: 16, color: AppColors.border),
                   _adaptiveSwitchTile(
                     icon: Icons.download_outlined,
                     iconColor: AppColors.fluentCyan,
@@ -288,7 +672,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'Auto-download on Fave',
                     subtitle: 'Save image when favoriting',
                   ),
-                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  const Divider(
+                      height: 1, indent: 16, color: AppColors.border),
                   _adaptiveSwitchTile(
                     icon: Icons.close_fullscreen_outlined,
                     iconColor: AppColors.cupertinoPurple,
@@ -300,52 +685,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'Auto-close on Fave',
                     subtitle: 'Close submission view after favoriting',
                   ),
-                  const Divider(height: 1, indent: 16, color: AppColors.border),
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    title: Row(
-                      children: [
-                        const Icon(Icons.high_quality_outlined, color: AppColors.materialLavender, size: 20),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text('Image Quality',
-                              style: TextStyle(color: AppColors.text, fontSize: 15)),
-                        ),
-                      ],
-                    ),
-                    subtitle: const Padding(
-                      padding: EdgeInsets.only(left: 32),
-                      child: Text('Quality for full-size images',
-                          style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-                    ),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgInput,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _imageQuality,
-                          isDense: true,
-                          style: const TextStyle(color: AppColors.text, fontSize: 13),
-                          dropdownColor: AppColors.bgCard,
-                          items: const [
-                            DropdownMenuItem(value: 'low', child: Text('Low')),
-                            DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                            DropdownMenuItem(value: 'high', child: Text('High')),
-                          ],
-                          onChanged: (v) {
-                            if (v != null) {
-                              setState(() => _imageQuality = v);
-                              _saveSetting('image_quality', v);
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
+                  const Divider(
+                      height: 1, indent: 16, color: AppColors.border),
+                  _imageQualityTile(),
                 ],
               ),
               const SizedBox(height: 20),
@@ -420,13 +762,29 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  // ── Shared helpers ────────────────────────────────────────────────────────
+
+  IconData _themeIcon(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.system:
+        return Icons.brightness_auto;
+      case AppThemeMode.light:
+        return Icons.light_mode;
+      case AppThemeMode.dark:
+        return Icons.dark_mode;
+      case AppThemeMode.original:
+        return Icons.palette;
+    }
+  }
+
   Widget _sectionHeader(String text) {
+    final c = Palette.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Text(
         text,
-        style: const TextStyle(
-          color: AppColors.textMuted,
+        style: TextStyle(
+          color: c.textMuted,
           fontSize: 13,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
@@ -436,12 +794,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _card(List<Widget> children) {
+    final c = Palette.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
+        color: c.bgCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: c.border),
       ),
       child: Column(children: children),
     );
@@ -502,8 +861,56 @@ class _SettingsScreenState extends State<SettingsScreen>
         child: Text(subtitle,
             style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
       ),
-      activeThumbColor: AppColors.fluentCyanDark,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    );
+  }
+
+  Widget _imageQualityTile() {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      title: Row(
+        children: const [
+          Icon(Icons.high_quality_outlined,
+              color: AppColors.materialLavender, size: 20),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text('Image Quality',
+                style: TextStyle(color: AppColors.text, fontSize: 15)),
+          ),
+        ],
+      ),
+      subtitle: const Padding(
+        padding: EdgeInsets.only(left: 32),
+        child: Text('Quality for full-size images',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+      ),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.bgInput,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: _imageQuality,
+            isDense: true,
+            style: const TextStyle(color: AppColors.text, fontSize: 13),
+            dropdownColor: AppColors.bgCard,
+            items: const [
+              DropdownMenuItem(value: 'low', child: Text('Low')),
+              DropdownMenuItem(value: 'medium', child: Text('Medium')),
+              DropdownMenuItem(value: 'high', child: Text('High')),
+            ],
+            onChanged: (v) {
+              if (v != null) {
+                setState(() => _imageQuality = v);
+                _saveSetting('image_quality', v);
+              }
+            },
+          ),
+        ),
+      ),
     );
   }
 }

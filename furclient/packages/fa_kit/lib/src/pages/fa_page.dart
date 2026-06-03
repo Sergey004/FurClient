@@ -10,13 +10,11 @@ abstract class FAPage {
   /// [url] is the URL that was requested.
   static FAPage? detectAndParse(String html, Uri url) {
     // Check for system error page
-    if (html.contains('System Error') &&
-        html.contains('<h2>System Error</h2>')) {
+    if (html.contains('System Error') && html.contains('<h2>System Error</h2>')) {
       return FASystemErrorPage.parse(html);
     }
     // Check for system message page
-    if (html.contains('System Message') &&
-        html.contains('<h2>System Message</h2>')) {
+    if (html.contains('System Message') && html.contains('<h2>System Message</h2>')) {
       return FASystemMessagePage.parse(html);
     }
     return null;

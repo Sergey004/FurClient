@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'http_data_source.dart';
@@ -16,7 +15,7 @@ class HttpDataSourceImpl implements HTTPDataSource {
   @override
   Future<Uint8List> httpData({
     required Uri url,
-    List<Cookie>? cookies,
+    List<FACookie>? cookies,
     HTTPMethod method = HTTPMethod.GET,
     Map<String, String>? parameters,
   }) async {
@@ -24,6 +23,7 @@ class HttpDataSourceImpl implements HTTPDataSource {
       'User-Agent': userAgent,
     };
 
+    // Add cookies to headers
     if (cookies != null && cookies.isNotEmpty) {
       final cookieHeader = cookies.map((c) => '${c.name}=${c.value}').join('; ');
       headers['Cookie'] = cookieHeader;
@@ -61,19 +61,19 @@ class HttpDataSourceImpl implements HTTPDataSource {
     return response.bodyBytes;
   }
 
+  /// Convenience GET with no parameters.
+  Future<Uint8List> httpGet({
+    required Uri url,
+    List<FACookie>? cookies,
+  }) {
+    return httpData(url: url, cookies: cookies);
+  }
+
   String _encodeFormData(Map<String, String> data) {
     return data.entries
         .map((e) =>
             '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
         .join('&');
-  }
-
-  @override
-  Future<Uint8List> httpGet({
-    required Uri url,
-    List<Cookie>? cookies,
-  }) {
-    return httpData(url: url, cookies: cookies);
   }
 
   /// Close the underlying HTTP client.

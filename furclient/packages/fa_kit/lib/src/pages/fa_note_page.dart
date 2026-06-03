@@ -49,8 +49,7 @@ class FANotePage {
     final dateEl = document.querySelector('span.popup_date, span.date, time');
     if (dateEl != null) {
       naturalDatetime = dateEl.text.trim();
-      final ts =
-          dateEl.attributes['title'] ?? dateEl.attributes['datetime'] ?? '';
+      final ts = dateEl.attributes['title'] ?? dateEl.attributes['datetime'] ?? '';
       if (ts.isNotEmpty) {
         datetime = DateTime.tryParse(ts) ?? DateTime.now();
       }
@@ -64,21 +63,21 @@ class FANotePage {
     // Strip the warning block for clean message
     final warningEl = messageEl?.querySelector('div.warning, .note-warning');
     if (warningEl != null) {
-      htmlMessageWithoutWarning =
-          messageEl!.innerHtml.replaceFirst(warningEl.outerHtml, '').trim();
+      htmlMessageWithoutWarning = messageEl!.innerHtml
+          .replaceFirst(warningEl.outerHtml, '').trim();
     }
 
     // Answer key and placeholder for replies
     String? answerKey;
     String? answerPlaceholderMessage;
-    final answerKeyInput = document.querySelector('input[name="key"]') ??
+    final answerKeyInput =
+        document.querySelector('input[name="key"]') ??
         document.querySelector('input[name="answer_key"]');
     if (answerKeyInput != null) {
       answerKey = answerKeyInput.attributes['value'];
     }
 
-    final placeholderInput =
-        document.querySelector('input[name="answer_placeholder"]');
+    final placeholderInput = document.querySelector('input[name="answer_placeholder"]');
     if (placeholderInput != null) {
       answerPlaceholderMessage = placeholderInput.attributes['value'];
     }

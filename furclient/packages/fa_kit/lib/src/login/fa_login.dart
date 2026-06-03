@@ -1,9 +1,7 @@
-import 'dart:io';
-
-import '../pages/fa_urls.dart';
 import '../session/fa_session.dart';
 import '../session/http_data_source.dart';
 import '../session/online_fa_session.dart';
+import '../pages/fa_urls.dart';
 
 /// Login manager for FurAffinity.
 ///
@@ -30,7 +28,7 @@ class FALoginManager {
   /// final session = await FALoginManager.makeSession(cookies: cookies);
   /// ```
   static Future<OnlineFASession?> makeSession({
-    required List<Cookie> cookies,
+    required List<FACookie> cookies,
     HTTPDataSource? dataSource,
   }) async {
     return OnlineFASession.fromCookies(
@@ -49,7 +47,7 @@ class FALoginManager {
   }
 
   /// Validate that a cookie list contains a valid "a" session cookie.
-  bool hasValidSessionCookie(List<Cookie> cookies) {
+  bool hasValidSessionCookie(List<FACookie> cookies) {
     return cookies.any((c) => c.name == 'a' && c.value.isNotEmpty);
   }
 }
@@ -102,7 +100,7 @@ class FALoginWebViewPlaceholder {
   static const String sessionCookieName = 'a';
 
   /// Check if a set of cookies contains a valid session.
-  static bool hasSessionCookie(List<Cookie> cookies) {
+  static bool hasSessionCookie(List<FACookie> cookies) {
     return cookies
         .any((c) => c.name == sessionCookieName && c.value.isNotEmpty);
   }

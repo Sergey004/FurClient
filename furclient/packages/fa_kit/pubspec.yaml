@@ -12,6 +12,7 @@ dependencies:
   path_provider: ^2.1.2
   collection: ^1.18.0
   crypto: ^3.0.3
+  intl: any
 
 dev_dependencies:
   lints: ^4.0.0

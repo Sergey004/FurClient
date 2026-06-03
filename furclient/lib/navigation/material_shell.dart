@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import '../theme/theme_provider.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
+import '../services/search_history.dart';
 import '../screens/gallery_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
+import '../main.dart' show themeProvider;
 
 class MaterialShell extends StatefulWidget {
   final FAClient client;
@@ -29,43 +32,62 @@ class _MaterialShellState extends State<MaterialShell> {
   int _currentIndex = 0;
   bool _sfwMode = false;
 
-  static const _navItems = [
-    _NavItem(
-      icon: Icons.photo_library_outlined,
-      selectedIcon: Icons.photo_library,
-      label: 'Gallery',
-      accent: AppColors.fluentCyan,
-    ),
-    _NavItem(
-      icon: Icons.search_outlined,
-      selectedIcon: Icons.search,
-      label: 'Search',
-      accent: AppColors.materialGreen,
-    ),
-    _NavItem(
-      icon: Icons.notifications_outlined,
-      selectedIcon: Icons.notifications,
-      label: 'Notifications',
-      accent: AppColors.cupertinoPurple,
-    ),
-    _NavItem(
-      icon: Icons.person_outline,
-      selectedIcon: Icons.person,
-      label: 'Profile',
-      accent: AppColors.materialLavender,
-    ),
-    _NavItem(
-      icon: Icons.settings_outlined,
-      selectedIcon: Icons.settings,
-      label: 'Settings',
-      accent: AppColors.textMuted,
-    ),
-  ];
+  /// Nav items use M3 color roles when in M3 mode, fall back to AppColors
+  /// in Original mode.
+  List<_NavItemData> get _navItems {
+    final cs = Theme.of(context).colorScheme;
+    final isM3 = themeProvider.mode != AppThemeMode.original;
+    return [
+      _NavItemData(
+        icon: Icons.photo_library_outlined,
+        selectedIcon: Icons.photo_library,
+        label: 'Gallery',
+        accent: isM3 ? cs.primary : AppColors.fluentCyan,
+      ),
+      _NavItemData(
+        icon: Icons.search_outlined,
+        selectedIcon: Icons.search,
+        label: 'Search',
+        accent: isM3 ? cs.tertiary : AppColors.materialGreen,
+      ),
+      _NavItemData(
+        icon: Icons.notifications_outlined,
+        selectedIcon: Icons.notifications,
+        label: 'Notifications',
+        accent: isM3 ? cs.secondary : AppColors.cupertinoPurple,
+      ),
+      _NavItemData(
+        icon: Icons.person_outline,
+        selectedIcon: Icons.person,
+        label: 'Profile',
+        accent: isM3 ? cs.tertiary : AppColors.materialLavender,
+      ),
+      _NavItemData(
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings,
+        label: 'Settings',
+        accent: isM3 ? cs.outline : AppColors.textMuted,
+      ),
+    ];
+  }
 
   @override
   void initState() {
     super.initState();
     _loadSfwMode();
+    SearchHistory.externalQuery.addListener(_onExternalSearch);
+  }
+
+  void _onExternalSearch() {
+    if (SearchHistory.externalQuery.value != null && mounted) {
+      setState(() => _currentIndex = 1);
+    }
+  }
+
+  @override
+  void dispose() {
+    SearchHistory.externalQuery.removeListener(_onExternalSearch);
+    super.dispose();
   }
 
   Future<void> _loadSfwMode() async {
@@ -110,14 +132,14 @@ class _MaterialShellState extends State<MaterialShell> {
 
   Widget _buildDesktopLayout(List<Widget> screens) {
     final isExtended = MediaQuery.of(context).size.width >= 1000;
-    final currentAccent = _navItems[_currentIndex].accent;
+    final items = _navItems;
+    final currentAccent = items[_currentIndex].accent;
 
     return Scaffold(
       body: Row(
         children: [
           Container(
             decoration: const BoxDecoration(
-              color: AppColors.bgCard,
               border: Border(
                 right: BorderSide(color: AppColors.border, width: 1),
               ),
@@ -127,6 +149,7 @@ class _MaterialShellState extends State<MaterialShell> {
               onDestinationSelected: (index) =>
                   setState(() => _currentIndex = index),
               extended: isExtended,
+              backgroundColor: Colors.transparent, // M3: inherit from theme
               leading: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: isExtended
@@ -140,17 +163,15 @@ class _MaterialShellState extends State<MaterialShell> {
                               color: currentAccent,
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
-                              letterSpacing: -0.5,
                             ),
                           ),
                         ],
                       )
                     : Icon(Icons.pets, color: currentAccent, size: 28),
               ),
-              indicatorColor: currentAccent.withValues(alpha: 0.15),
-              destinations: _navItems.map((item) {
+              destinations: items.map((item) {
                 return NavigationRailDestination(
-                  icon: Icon(item.icon, color: AppColors.textMuted),
+                  icon: Icon(item.icon),
                   selectedIcon: Icon(item.selectedIcon, color: currentAccent),
                   label: Text(item.label),
                 );
@@ -164,47 +185,43 @@ class _MaterialShellState extends State<MaterialShell> {
   }
 
   Widget _buildMobileLayout(List<Widget> screens) {
+    final items = _navItems;
+    final currentAccent = items[_currentIndex].accent;
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         children: screens,
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.bgCard,
-          border: Border(
-            top: BorderSide(color: AppColors.border, width: 1),
-          ),
-        ),
-        child: NavigationBar(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (index) =>
-              setState(() => _currentIndex = index),
-          backgroundColor: AppColors.bgCard,
-          indicatorColor:
-              _navItems[_currentIndex].accent.withValues(alpha: 0.15),
-          height: 64,
-          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-          destinations: _navItems.map((item) {
-            return NavigationDestination(
-              icon: Icon(item.icon, size: 22),
-              selectedIcon: Icon(item.selectedIcon, size: 24),
-              label: item.label,
-            );
-          }).toList(),
-        ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) =>
+            setState(() => _currentIndex = index),
+        // Let M3 theme handle background/indicator colors automatically
+        backgroundColor: cs.surfaceContainer,
+        indicatorColor: currentAccent.withValues(alpha: 0.15),
+        height: 64,
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        destinations: items.map((item) {
+          return NavigationDestination(
+            icon: Icon(item.icon, size: 22),
+            selectedIcon: Icon(item.selectedIcon, size: 24),
+            label: item.label,
+          );
+        }).toList(),
       ),
     );
   }
 }
 
-class _NavItem {
+class _NavItemData {
   final IconData icon;
   final IconData selectedIcon;
   final String label;
   final Color accent;
 
-  const _NavItem({
+  const _NavItemData({
     required this.icon,
     required this.selectedIcon,
     required this.label,

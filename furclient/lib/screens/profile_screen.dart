@@ -90,12 +90,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     final p = _profile!;
+    final c = Palette.of(context);
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppBreakpoints.desktop;
 
     return RefreshIndicator(
       color: AppColors.materialLavender,
-      backgroundColor: AppColors.bgCard,
+      backgroundColor: c.bgCard,
       onRefresh: _loadProfile,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -144,6 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildDesktopSidebar(FAUser p) {
+    final c = Palette.of(context);
     return SizedBox(
       width: 240,
       child: Column(
@@ -156,11 +158,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.bg, width: 4),
+                    border: Border.all(color: c.bg, width: 4),
                   ),
                   child: CircleAvatar(
                     radius: 56,
-                    backgroundColor: AppColors.bgInput,
+                    backgroundColor: c.bgInput,
                     child: p.avatarUrl.isNotEmpty
                         ? FAImage(
                             url: p.avatarUrl,
@@ -181,8 +183,8 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                 Text(
                   p.displayName,
-                  style: const TextStyle(
-                      color: AppColors.text,
+                  style: TextStyle(
+                      color: c.text,
                       fontSize: 22,
                       fontWeight: FontWeight.w700),
                   textAlign: TextAlign.center,
@@ -256,6 +258,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
 
   Widget _buildHeader(FAUser p) {
+    final c = Palette.of(context);
     return Transform.translate(
       offset: const Offset(0, -40),
       child: Padding(
@@ -266,11 +269,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                     Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.bg, width: 4),
+                        border: Border.all(color: c.bg, width: 4),
                       ),
                       child: CircleAvatar(
                         radius: 44,
-                        backgroundColor: AppColors.bgInput,
+                        backgroundColor: c.bgInput,
                         child: p.avatarUrl.isNotEmpty
                             ? FAImage(
                                 url: p.avatarUrl,
@@ -295,8 +298,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                 children: [
                   Text(
                     p.displayName,
-                    style: const TextStyle(
-                        color: AppColors.text,
+                    style: TextStyle(
+                        color: c.text,
                         fontSize: 22,
                         fontWeight: FontWeight.w700),
                   ),
@@ -317,15 +320,16 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildWatchButton(FAUser p) {
+    final c = Palette.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color:
-            p.isWatching ? AppColors.bgInput : AppColors.materialLavenderDark,
+            p.isWatching ? c.bgInput : AppColors.materialLavenderDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
             color:
-                p.isWatching ? AppColors.border : AppColors.materialLavender),
+                p.isWatching ? c.border : AppColors.materialLavender),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -333,14 +337,14 @@ class _ProfileScreenState extends State<ProfileScreen>
           Icon(
             p.isWatching ? Icons.visibility : Icons.visibility_off,
             size: 16,
-            color: p.isWatching ? AppColors.textDim : Colors.white,
+            color: p.isWatching ? c.textDim : Colors.white,
           ),
           const SizedBox(width: 6),
           Text(
             p.isWatching ? 'Watching' : 'Watch',
             style: TextStyle(
               fontSize: 14,
-              color: p.isWatching ? AppColors.textDim : Colors.white,
+              color: p.isWatching ? c.textDim : Colors.white,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -356,7 +360,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         crossAxisCount: crossAxisCount,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 2.0,
+        childAspectRatio: 1.6,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
         children: [
@@ -376,6 +380,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _statCard(IconData icon, String value, String label, Color color) {
+    final c = Palette.of(context);
     return Container(
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.06),
@@ -386,10 +391,10 @@ class _ProfileScreenState extends State<ProfileScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, color: color, size: 18),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(value,
-              style: const TextStyle(
-                  color: AppColors.text,
+              style: TextStyle(
+                  color: c.text,
                   fontSize: 16,
                   fontWeight: FontWeight.w700)),
           Text(label,
@@ -401,14 +406,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildBio(FAUser p) {
+    final c = Palette.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('About',
+          Text('About',
               style: TextStyle(
-                  color: AppColors.text,
+                  color: c.text,
                   fontSize: 16,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
@@ -416,14 +422,14 @@ class _ProfileScreenState extends State<ProfileScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.bgCard,
+              color: c.bgCard,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: c.border),
             ),
             child: Text(
               p.description,
-              style: const TextStyle(
-                  color: AppColors.textDim, fontSize: 14, height: 1.6),
+              style: TextStyle(
+                  color: c.textDim, fontSize: 14, height: 1.6),
             ),
           ),
         ],
@@ -432,14 +438,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildLinks(FAUser p) {
+    final c = Palette.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Quick Links',
+          Text('Quick Links',
               style: TextStyle(
-                  color: AppColors.text,
+                  color: c.text,
                   fontSize: 16,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
@@ -455,6 +462,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _linkTile(IconData icon, String title, String url, Color color) {
+    final c = Palette.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -462,23 +470,28 @@ class _ProfileScreenState extends State<ProfileScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.1)),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: Icon(icon, color: color, size: 22),
-        title: Text(title,
-            style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 15,
-                fontWeight: FontWeight.w500)),
-        trailing: const Icon(Icons.chevron_right,
-            color: AppColors.textMuted, size: 20),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => _LinkPlaceholder(title: title, url: url),
-            ),
-          );
-        },
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: Icon(icon, color: color, size: 22),
+          title: Text(title,
+              style: TextStyle(
+                  color: c.text,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500)),
+          trailing: Icon(Icons.chevron_right,
+              color: c.textMuted, size: 20),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => _LinkPlaceholder(title: title, url: url),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

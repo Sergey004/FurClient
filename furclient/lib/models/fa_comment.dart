@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:html/parser.dart' as html_parser;
 
 class FAComment {
@@ -6,6 +7,7 @@ class FAComment {
   final String avatarUrl;
   final String text;
   final String time;
+  final int indentLevel;
 
   FAComment({
     required this.id,
@@ -13,6 +15,7 @@ class FAComment {
     required this.avatarUrl,
     required this.text,
     required this.time,
+    this.indentLevel = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -31,108 +34,67 @@ class FAComment {
         time: json['time'] as String? ?? '',
       );
 
+  /// Parse comments — 1:1 copy of fa_kit logic, mapped to FAComment model.
   static List<FAComment> parseComments(String htmlString) {
     final document = html_parser.parse(htmlString);
     final comments = <FAComment>[];
+    final commentElements = document.querySelectorAll(
+        'div.comment-container, div.comment, li.comment');
 
-    // FA comment selectors — try multiple strategies
-    // Strategy 1: div[id^="cid-"] — each comment has an id like cid-123456
-    var commentEls = document.querySelectorAll('div[id^="cid-"]');
+    debugPrint('=== parseComments: found ${commentElements.length} comment elements');
 
-    // Strategy 2: .comment-ancestor > .comment
-    if (commentEls.isEmpty) {
-      commentEls = document.querySelectorAll('section.comments-list .comment');
-    }
-
-    // Strategy 3: any element with class "comment" inside the comments section
-    if (commentEls.isEmpty) {
-      final section = document.querySelector('section[id^="comments"]') ??
-          document.querySelector('.comments-section') ??
-          document.querySelector('#comments');
-      if (section != null) {
-        commentEls = section.querySelectorAll('.comment');
-      }
-    }
-
-    // Strategy 4: broadest — any .comment on the page
-    if (commentEls.isEmpty) {
-      commentEls = document.querySelectorAll('.comment');
-    }
-
-    for (final el in commentEls) {
+    for (final commentEl in commentElements) {
       try {
-        // ID
-        final id = el.id.replaceFirst('cid-', '');
+        // Skip hidden comments
+        final hiddenText = commentEl.querySelector('.comment-hidden, .hidden-comment');
+        if (hiddenText != null) continue;
 
-        // Author — try multiple selectors
-        String author = 'Anonymous';
-        final authorLink = el.querySelector('a.comment-username') ??
-            el.querySelector('.comment-date a[href*="/user/"]') ??
-            el.querySelector('a[href*="/user/"]');
-        if (authorLink != null) {
-          author = authorLink.text.trim();
-          if (author.isEmpty) {
-            final href = authorLink.attributes['href'] ?? '';
-            final m = RegExp(r'/user/([^/]+)/').firstMatch(href);
-            author = m?.group(1) ?? 'Anonymous';
-          }
+        // cid from outerHtml
+        final cidMatch = RegExp(r'cid=(\d+)').firstMatch(commentEl.outerHtml);
+        final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
+
+        // Indentation
+        final indentEl = commentEl.querySelector('.comment-indentation, .comment-avatar');
+        int indentation = 0;
+        if (indentEl != null) {
+          final widthAttr = indentEl.attributes['width'] ??
+              indentEl.attributes['data-indentation'] ?? '0';
+          indentation = (double.tryParse(widthAttr) ?? 0).toInt() ~/ 16;
         }
 
-        // Avatar — try multiple selectors
-        String avatarUrl = '';
-        final avatarEl = el.querySelector('.comment-avatar img') ??
-            el.querySelector('img.avatar') ??
-            el.querySelector('img');
-        if (avatarEl != null) {
-          avatarUrl = avatarEl.attributes['src'] ?? '';
-          if (avatarUrl.startsWith('//')) avatarUrl = 'https:$avatarUrl';
-        }
+        // Author username
+        final authorLink = commentEl.querySelector('a.comment-username, a[href*="/user/"]');
+        final author = authorLink != null
+            ? (RegExp(r'/user/([^/]+)/').firstMatch(
+                authorLink.attributes['href'] ?? '')?.group(1) ?? '')
+            : '';
 
-        // Comment text — try multiple selectors
-        String text = '';
-        final contentEl = el.querySelector('.comment-content') ??
-            el.querySelector('.comment-text') ??
-            el.querySelector('.comment-body .text') ??
-            el.querySelector('div[class*="comment"] div[class*="content"]') ??
-            el.querySelector('div[class*="comment"] p');
-        if (contentEl != null) {
-          text = contentEl.text.trim();
-        }
-        // Last resort: get all text from the comment, minus author/date
-        if (text.isEmpty) {
-          final bodyEl = el.querySelector('.comment-body');
-          if (bodyEl != null) {
-            // Remove date/author parts to get just the text
-            text = bodyEl.text.trim();
-          } else {
-            text = el.text.trim();
-          }
-        }
+        // Date
+        final dateEl = commentEl.querySelector('span.comment-date, span.popup_date');
+        final time = dateEl?.attributes['title'] ??
+            dateEl?.attributes['datetime'] ??
+            dateEl?.text.trim() ?? '';
 
-        // Date — try multiple selectors
-        String time = '';
-        final dateEl = el.querySelector('.comment-date .popup_date') ??
-            el.querySelector('span.popup_date') ??
-            el.querySelector('.comment-date') ??
-            el.querySelector('time');
-        if (dateEl != null) {
-          time = dateEl.attributes['title'] ?? dateEl.text.trim();
-        }
+        // Comment text
+        final messageEl = commentEl.querySelector('div.comment-text, div.comment_message');
+        final text = messageEl?.text.trim() ?? '';
 
-        if (text.isNotEmpty) {
+        if (text.isNotEmpty || cid > 0) {
           comments.add(FAComment(
-            id: id,
-            author: author,
-            avatarUrl: avatarUrl,
+            id: cid > 0 ? '$cid' : '',
+            author: author.isNotEmpty ? author : 'Anonymous',
+            avatarUrl: '',
             text: text,
             time: time,
+            indentLevel: indentation,
           ));
         }
       } catch (e) {
-        // Skip malformed comments
+        debugPrint('=== parseComments skip: $e');
       }
     }
 
+    debugPrint('=== parseComments: parsed ${comments.length} comments');
     return comments;
   }
 }

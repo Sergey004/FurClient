@@ -10,6 +10,7 @@ import '../utils/platform_utils.dart';
 import '../utils/fa_image_loader.dart';
 import '../widgets/fullscreen_image_viewer.dart';
 import '../services/download_service.dart';
+import '../services/search_history.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
 
@@ -87,6 +88,12 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
         ),
       ),
     );
+  }
+
+  void _navigateToSearch(String query) {
+    // Go back to main shell and trigger search in the Search tab
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    SearchHistory.triggerSearch(query);
   }
 
   Future<void> _toggleFavorite() async {
@@ -577,19 +584,23 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               spacing: 6,
               runSpacing: 6,
               children: sub.tags.map((tag) {
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.materialLavenderBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    tag,
-                    style: const TextStyle(
-                      color: AppColors.materialLavender,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                return GestureDetector(
+                  onTap: () => _navigateToSearch(tag),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.materialLavenderBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.materialLavender.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      tag,
+                      style: const TextStyle(
+                        color: AppColors.materialLavender,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 );
@@ -686,33 +697,37 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   }
 
   Widget _buildComment(FAComment comment) {
+    // Indent replies visually (max 4 levels, 24px each)
+    final indent = (comment.indentLevel.clamp(0, 4)) * 24.0;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(
+        bottom: 16,
+        left: indent,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: AppColors.bgInput,
-              child: comment.avatarUrl.isNotEmpty
-                  ? FAImage(
-                      url: comment.avatarUrl,
-                      width: 36,
-                      height: 36,
-                      fit: BoxFit.cover,
-                      errorWidget: const Icon(
-                        Icons.person,
-                        size: 18,
-                        color: AppColors.textMuted,
-                      ),
-                    )
-                  : const Icon(
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.bgInput,
+            child: comment.avatarUrl.isNotEmpty
+                ? FAImage(
+                    url: comment.avatarUrl,
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                    errorWidget: const Icon(
                       Icons.person,
                       size: 18,
                       color: AppColors.textMuted,
                     ),
-            ),
-
+                  )
+                : const Icon(
+                    Icons.person,
+                    size: 18,
+                    color: AppColors.textMuted,
+                  ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -720,12 +735,19 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      comment.author,
-                      style: const TextStyle(
-                        color: AppColors.text,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                    GestureDetector(
+                      onTap: comment.author.isNotEmpty && comment.author != 'Anonymous'
+                          ? () => _navigateToProfile(comment.author)
+                          : null,
+                      child: Text(
+                        comment.author,
+                        style: TextStyle(
+                          color: comment.author.isNotEmpty && comment.author != 'Anonymous'
+                              ? AppColors.fluentCyan
+                              : AppColors.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),

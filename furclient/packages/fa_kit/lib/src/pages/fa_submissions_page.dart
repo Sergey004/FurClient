@@ -83,7 +83,6 @@ class FASubmissionsPage implements FAPage {
           displayAuthor: displayAuthor,
         ));
       } catch (_) {
-        // Skip malformed entries
         submissions.add(null);
       }
     }
@@ -121,7 +120,6 @@ class FASubmissionsPage implements FAPage {
   }
 
   static String? _extractAuthorFromFigure(dom.Element figure) {
-    // Try to find author from various locations in the figure element
     final authorLink = figure.querySelector('a[href*="/user/"]');
     if (authorLink != null) {
       final href = authorLink.attributes['href'] ?? '';
@@ -139,5 +137,3 @@ class FASubmissionsPage implements FAPage {
     return null;
   }
 }
-
-

@@ -136,16 +136,12 @@ abstract class FASession {
   // ── Users ──
   Future<FAUser> userForUrl(Uri url);
   Future<FAUser> toggleWatch(FAUser user);
-
-  /// Fetch watchlist with explicit parameters.
+  Future<FAWatchlist> watchlistForUrl(Uri url);
   Future<FAWatchlist> watchlist({
     required String username,
     required int page,
     required FAWatchDirection direction,
   });
-
-  /// Fetch watchlist by parsing a URL (convenience method).
-  Future<FAWatchlist> watchlistForUrl(Uri url);
 
   // ── Convenience Methods ──
   Future<FAUserGalleryLike> galleryLikeForUser(String username) =>
@@ -162,12 +158,4 @@ abstract class FASession {
 
   Future<FAUser> userForName(String username) =>
       userForUrl(Uri.parse(FAURLs.userUrl(username)));
-
-  /// Convenience: fetch favorites for a user.
-  Future<FAUserGalleryLike> favoritesForUser(String username) =>
-      galleryLikeForUrl(Uri.parse(FAURLs.favoritesUrl(username)));
-
-  /// Convenience: fetch scraps for a user.
-  Future<FAUserGalleryLike> scrapsForUser(String username) =>
-      galleryLikeForUrl(Uri.parse(FAURLs.galleryUrl(username)));
 }

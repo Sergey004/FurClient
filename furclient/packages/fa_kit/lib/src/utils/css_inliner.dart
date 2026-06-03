@@ -18,13 +18,9 @@ class CSSInliner {
         _cacheExpiry = cacheExpiry ?? const Duration(hours: 24);
 
   /// Inline CSS link tags in the given HTML string.
-  ///
-  /// Replaces `<link href="...ui_theme_*.css">` tags with `<style>` blocks
-  /// containing the actual CSS content.
   Future<String> inlineCSS(String html) async {
-    // Find all CSS link tags
     final linkPattern = RegExp(
-      r'<link\s+[^>]*href="([^"]*ui_theme_[^"]*\.css)"[^>]*/?\s*>',
+      r'''<link\s+[^>]*href="([^"]*ui_theme_[^"]*\.css)"[^>]*/?\s*>''',
       caseSensitive: false,
     );
 
@@ -45,14 +41,13 @@ class CSSInliner {
     final fullUrl = Uri.parse(
         cssUrl.startsWith('http') ? cssUrl : 'https://www.furaffinity.net$cssUrl');
 
-    // Check cache
     final cached = _cache[fullUrl.toString()];
     if (cached != null && !cached.isExpired) {
       return cached.content;
     }
 
     try {
-      final data = await _dataSource.httpGet(url: fullUrl);
+      final data = await _dataSource.httpData(url: fullUrl);
       final css = utf8.decode(data);
 
       _cache[fullUrl.toString()] = _CachedCSS(
@@ -66,7 +61,6 @@ class CSSInliner {
     }
   }
 
-  /// Clear the CSS cache.
   void clearCache() {
     _cache.clear();
   }
@@ -86,19 +80,21 @@ extension FAHtmlUtils on String {
   /// Fix relative links to absolute FA URLs.
   String fixingLinks() {
     String result = this;
+    // Fix href="/" and href="/path" to absolute URLs
     result = result.replaceAllMapped(
-      RegExp(r"""(href|src)=["'](/[^"']*)["']"""),
-      (match) {
-        final attr = match.group(1)!;
-        final path = match.group(2)!;
+      RegExp(r'''(href|src)=["'](/[^\s"']*)["']'''),
+      (m) {
+        final attr = m.group(1)!;
+        final path = m.group(2)!;
         return '$attr="https://www.furaffinity.net$path"';
       },
     );
+    // Fix // URLs
     result = result.replaceAllMapped(
-      RegExp(r"""(href|src)=["']//([^"']*)["']"""),
-      (match) {
-        final attr = match.group(1)!;
-        final url = match.group(2)!;
+      RegExp(r'''(href|src)=["']//([^\s"']*)["']'''),
+      (m) {
+        final attr = m.group(1)!;
+        final url = m.group(2)!;
         return '$attr="https://$url"';
       },
     );
@@ -107,8 +103,7 @@ extension FAHtmlUtils on String {
 
   /// Wrap HTML fragment in a self-contained document with CSS links.
   String selfContainedFAHtmlSubmission({FATheme theme = FATheme.light}) {
-    return '''
-<!DOCTYPE html>
+    return '''<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -123,8 +118,7 @@ extension FAHtmlUtils on String {
 
   /// Wrap comment HTML in a self-contained document.
   String selfContainedFAHtmlComment({FATheme theme = FATheme.light}) {
-    return '''
-<!DOCTYPE html>
+    return '''<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -142,8 +136,7 @@ extension FAHtmlUtils on String {
 
   /// Wrap user description HTML in a self-contained document.
   String selfContainedFAHtmlUserDescription({FATheme theme = FATheme.light}) {
-    return '''
-<!DOCTYPE html>
+    return '''<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -158,8 +151,8 @@ extension FAHtmlUtils on String {
   /// Switch CSS theme in the HTML.
   String usingTheme(FATheme theme) {
     return replaceAllMapped(
-      RegExp(r'ui_theme_(light|dark)\.css'),
-      (match) => 'ui_theme_${theme == FATheme.dark ? "dark" : "light"}.css',
+      RegExp(r'''ui_theme_(light|dark)\.css'''),
+      (m) => 'ui_theme_${theme == FATheme.dark ? "dark" : "light"}.css',
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SearchHistory {
@@ -32,5 +33,14 @@ class SearchHistory {
 
   Future<void> clear() async {
     await _prefs?.remove(_key);
+  }
+
+  /// Bridge for external search triggers (e.g. tag tap from submission detail).
+  /// Set a query → shells switch to Search tab → SearchScreen picks it up.
+  static final ValueNotifier<String?> externalQuery = ValueNotifier(null);
+
+  /// Trigger a search from outside the SearchScreen (e.g. tag tap).
+  static void triggerSearch(String query) {
+    externalQuery.value = query;
   }
 }

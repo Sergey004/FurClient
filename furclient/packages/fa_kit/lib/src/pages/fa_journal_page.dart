@@ -54,8 +54,7 @@ class FAJournalPage implements FAPage {
         document.querySelector('time');
     if (dateEl != null) {
       naturalDatetime = dateEl.text.trim();
-      final ts =
-          dateEl.attributes['title'] ?? dateEl.attributes['datetime'] ?? '';
+      final ts = dateEl.attributes['title'] ?? dateEl.attributes['datetime'] ?? '';
       if (ts.isNotEmpty) {
         datetime = DateTime.tryParse(ts) ?? DateTime.now();
       }
@@ -69,13 +68,12 @@ class FAJournalPage implements FAPage {
 
     // Comments (reuse same logic as submission comments)
     final comments = <FAPageComment>[];
-    final commentElements = document
-        .querySelectorAll('div.comment-container, div.comment, li.comment');
+    final commentElements = document.querySelectorAll(
+        'div.comment-container, div.comment, li.comment');
 
     for (final commentEl in commentElements) {
       try {
-        final hiddenText =
-            commentEl.querySelector('.comment-hidden, .hidden-comment');
+        final hiddenText = commentEl.querySelector('.comment-hidden, .hidden-comment');
         if (hiddenText != null) {
           final cidMatch = RegExp(r'cid=(\d+)').firstMatch(commentEl.outerHtml);
           final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
@@ -90,32 +88,26 @@ class FAJournalPage implements FAPage {
         final cidMatch = RegExp(r'cid=(\d+)').firstMatch(commentEl.outerHtml);
         final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
 
-        final indentEl =
-            commentEl.querySelector('.comment-indentation, .comment-avatar');
+        final indentEl = commentEl.querySelector('.comment-indentation, .comment-avatar');
         int indentation = 0;
         if (indentEl != null) {
           final widthAttr = indentEl.attributes['width'] ?? '0';
           indentation = (double.tryParse(widthAttr) ?? 0).toInt() ~/ 16;
         }
 
-        final cAuthorLink =
-            commentEl.querySelector('a.comment-username, a[href*="/user/"]');
+        final cAuthorLink = commentEl.querySelector('a.comment-username, a[href*="/user/"]');
         final cAuthor = cAuthorLink != null
-            ? (RegExp(r'/user/([^/]+)/')
-                    .firstMatch(cAuthorLink.attributes['href'] ?? '')
-                    ?.group(1) ??
-                '')
+            ? (RegExp(r'/user/([^/]+)/').firstMatch(
+                cAuthorLink.attributes['href'] ?? '')?.group(1) ?? '')
             : '';
         final cDisplayAuthor = cAuthorLink?.text.trim() ?? '';
 
-        final cDateEl =
-            commentEl.querySelector('span.comment-date, span.popup_date');
+        final cDateEl = commentEl.querySelector('span.comment-date, span.popup_date');
         final cNaturalDatetime = cDateEl?.text.trim() ?? '';
         final cDatetimeAttr = cDateEl?.attributes['title'] ?? '';
         final cDatetime = DateTime.tryParse(cDatetimeAttr) ?? DateTime.now();
 
-        final messageEl =
-            commentEl.querySelector('div.comment-text, div.comment_message');
+        final messageEl = commentEl.querySelector('div.comment-text, div.comment_message');
         final htmlMessage = messageEl?.innerHtml ?? '';
 
         comments.add(FAVisiblePageComment(

@@ -202,7 +202,7 @@ class FAClient {
     debugPrint('=== HTTP ${response.statusCode} — not a CF challenge');
   }
 
-  Future<String> _getHtml(String url) async {
+  Future<String> _getHtml(String url, {bool waitForAjax = false}) async {
     await _ensureInitialized();
 
     // Use enhanced client for CDN URLs
@@ -248,7 +248,7 @@ class FAClient {
       // the same WebViewEnvironment and can solve CF automatically.
       debugPrint('=== Dio blocked by CF, falling back to WebView for $url');
       try {
-        return await _fetchHtmlWithWebView(url);
+        return await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
       } catch (e) {
         debugPrint('=== WebView fallback failed for $url: $e');
         rethrow;
@@ -260,9 +260,10 @@ class FAClient {
   }
 
   /// Fetch HTML using HeadlessInAppWebView.
+  /// If [waitForAjax] is true, waits extra time for JS to load comments.
   /// Shares the same WebViewEnvironment as the login WebView, so it has
   /// the same cookies and can pass CF Turnstile (same TLS fingerprint).
-  Future<String> _fetchHtmlWithWebView(String url) async {
+  Future<String> _fetchHtmlWithWebView(String url, {bool waitForAjax = false}) async {
     final completer = Completer<String>();
     HeadlessInAppWebView? headless;
     int solveAttempts = 0;
@@ -303,7 +304,19 @@ class FAClient {
           }
 
           if (!completer.isCompleted) {
-            completer.complete(html);
+            // For submission pages, wait for JS to load comments via AJAX
+            if (waitForAjax) {
+              await Future.delayed(const Duration(seconds: 3));
+              final ajaxHtml = await controller.getHtml() ?? '';
+              debugPrint('=== WebView fetch (after AJAX wait): ${ajaxHtml.length}B');
+              if (ajaxHtml.length > html.length) {
+                completer.complete(ajaxHtml);
+              } else {
+                completer.complete(html);
+              }
+            } else {
+              completer.complete(html);
+            }
           }
         } catch (e) {
           debugPrint('=== WebView fetch onLoadStop error: $e');
@@ -473,7 +486,8 @@ class FAClient {
   Future<({Submission? submission, List<FAComment> comments})>
       getSubmissionWithComments(String id) async {
     final url = FAUrls.viewSubmission(id);
-    final html = await _getHtml(url);
+    // waitForAjax: comments load via JavaScript, need extra wait
+    final html = await _getHtml(url, waitForAjax: true);
     // Debug: dump comment section HTML to see real structure
     final commentStart = html.indexOf('comment');
     if (commentStart > 0) {
@@ -487,6 +501,11 @@ class FAClient {
     final submission = Submission.parseSubmissionDetails(html, id);
     final comments = FAComment.parseComments(html);
     debugPrint('=== getSubmissionWithComments: ${comments.length} comments parsed');
+    // Dump first comment for debug
+    if (comments.isNotEmpty) {
+      final c = comments.first;
+      debugPrint('=== First comment: id=${c.id}, author=${c.author}, text=${c.text.length}chars, time=${c.time}, indent=${c.indentLevel}');
+    }
     return (submission: submission, comments: comments);
   }
 

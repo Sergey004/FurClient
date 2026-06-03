@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:fa_kit/fa_kit.dart';
 
 /// Example: How to use FAKit in a Flutter/Dart application.
@@ -21,8 +20,8 @@ void main() async {
   //
   // For this example, assume you have cookies:
   final cookies = [
-    Cookie('a', 'your-session-cookie-value'),
-    Cookie('b', 'another-cookie-value'),
+    FACookie(name: 'a', value: 'your-session-cookie-value'),
+    FACookie(name: 'b', value: 'another-cookie-value'),
   ];
 
   final session = await OnlineFASession.fromCookies(cookies: cookies);

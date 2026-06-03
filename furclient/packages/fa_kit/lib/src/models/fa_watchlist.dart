@@ -14,18 +14,6 @@ class FAWatchlist {
     this.nextPageUrl,
   });
 
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FAWatchlist &&
-          currentUser == other.currentUser &&
-          watchDirection == other.watchDirection &&
-          users == other.users &&
-          nextPageUrl == other.nextPageUrl;
-
-  @override
-  int get hashCode => Object.hash(currentUser, watchDirection, users, nextPageUrl);
-
   /// Create from a parsed watchlist page.
   factory FAWatchlist.fromPage(FAWatchlistPage page) {
     return FAWatchlist(
@@ -62,14 +50,4 @@ class FAWatchlistUserModel {
   final String displayName;
 
   FAWatchlistUserModel({required this.name, required this.displayName});
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FAWatchlistUserModel &&
-          name == other.name &&
-          displayName == other.displayName;
-
-  @override
-  int get hashCode => Object.hash(name, displayName);
 }
