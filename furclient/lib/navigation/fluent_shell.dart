@@ -30,7 +30,8 @@ class FluentShell extends StatefulWidget {
 class _FluentShellState extends State<FluentShell> {
   int _currentIndex = 0;
   bool _sfwMode = false;
-  bool _isCompactMode = false;
+
+  final _searchController = fluent.TextEditingController();
 
   @override
   void initState() {
@@ -39,16 +40,17 @@ class _FluentShellState extends State<FluentShell> {
     SearchHistory.externalQuery.addListener(_onExternalSearch);
   }
 
+  @override
+  void dispose() {
+    SearchHistory.externalQuery.removeListener(_onExternalSearch);
+    _searchController.dispose();
+    super.dispose();
+  }
+
   void _onExternalSearch() {
     if (SearchHistory.externalQuery.value != null && mounted) {
       setState(() => _currentIndex = 1);
     }
-  }
-
-  @override
-  void dispose() {
-    SearchHistory.externalQuery.removeListener(_onExternalSearch);
-    super.dispose();
   }
 
   Future<void> _loadSfwMode() async {
@@ -61,6 +63,14 @@ class _FluentShellState extends State<FluentShell> {
 
   void _onSfwModeChanged(bool value) {
     setState(() => _sfwMode = value);
+  }
+
+  void _onSearchSubmitted(String query) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    SearchHistory.triggerSearch(trimmed);
+    _searchController.clear();
+    if (mounted) setState(() => _currentIndex = 1);
   }
 
   Future<void> _confirmLogout() async {
@@ -94,22 +104,31 @@ class _FluentShellState extends State<FluentShell> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    _isCompactMode = width < 640;
+    final isCompact = width < 640;
 
     return fluent.NavigationView(
+      // ── Title bar with drag support via fluent_ui TitleBar callbacks ──
+      // fluent.TitleBar uses a GestureDetector internally and fires
+      // onDragStarted / onDoubleTap when the user drags/double-taps
+      // empty areas. We wire them to window_manager for native move.
       titleBar: fluent.TitleBar(
         isBackButtonVisible: false,
-        icon: Icon(fluent.FluentIcons.photo2,
-            size: 16,
-            color: fluent.FluentTheme.of(context).accentColor),
-        title: Text(
-          'FurClient',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+        icon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(fluent.FluentIcons.photo2, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              'FurClient',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
-        captionControls: _isCompactMode
+        title: isCompact ? null : _buildTitleSearch(),
+        captionControls: isCompact
             ? null
             : SizedBox(
                 width: 138,
@@ -119,6 +138,16 @@ class _FluentShellState extends State<FluentShell> {
                   backgroundColor: fluent.Colors.transparent,
                 ),
               ),
+        // ← fluent TitleBar's built-in drag callbacks → window_manager
+        onDragStarted: () => windowManager.startDragging(),
+        onDoubleTap: () async {
+          final isMax = await windowManager.isMaximized();
+          if (isMax) {
+            windowManager.restore();
+          } else {
+            windowManager.maximize();
+          }
+        },
       ),
       pane: fluent.NavigationPane(
         selected: _currentIndex,
@@ -151,8 +180,9 @@ class _FluentShellState extends State<FluentShell> {
                   children: [
                     fluent.Text(
                       widget.session.username,
-                      style:
-                          fluent.FluentTheme.of(context).typography.bodyStrong,
+                      style: fluent.FluentTheme.of(context)
+                          .typography
+                          .bodyStrong,
                       overflow: TextOverflow.ellipsis,
                     ),
                     fluent.Text(
@@ -226,6 +256,31 @@ class _FluentShellState extends State<FluentShell> {
             onTap: _confirmLogout,
           ),
         ],
+      ),
+    );
+  }
+
+  /// Search box for the title bar center area.
+  Widget _buildTitleSearch() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16),
+        child: SizedBox(
+          width: 280,
+          height: 30,
+          child: fluent.TextBox(
+            controller: _searchController,
+            placeholder: 'Search FurAffinity...',
+            prefix: const Padding(
+              padding: EdgeInsets.only(left: 8, right: 4),
+              child: Icon(fluent.FluentIcons.search, size: 14),
+            ),
+            onSubmitted: _onSearchSubmitted,
+            style: const TextStyle(fontSize: 13),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          ),
+        ),
       ),
     );
   }

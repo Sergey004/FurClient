@@ -22,12 +22,12 @@ namespace {
 #define DWMWA_WINDOW_CORNER_PREFERENCE 33
 #endif
 
-enum DWM_WINDOW_CORNER_PREFERENCE {
-  DWMWCP_DEFAULT = 0,
-  DWMWCP_DONOTROUND = 1,
-  DWMWCP_ROUND = 2,
-  DWMWCP_ROUNDSMALL = 3,
-};
+/// DWMWCP_ROUND value (2). Do NOT define as enum — the Windows SDK already
+/// defines DWM_WINDOW_CORNER_PREFERENCE as an enum, and #ifndef cannot detect
+/// enum members, only macros. Using a plain int avoids C2872 ambiguity.
+#ifndef DWMWCP_ROUND
+#define DWMWCP_ROUND 2
+#endif
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 

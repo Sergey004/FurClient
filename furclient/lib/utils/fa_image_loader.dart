@@ -215,22 +215,28 @@ class _FAImageState extends State<FAImage> {
 }
 
 /// Аватар пользователя FA.
+/// Supports custom avatar URL or falls back to FA CDN patterns.
 class FAAvatar extends StatelessWidget {
   final String username;
   final double size;
+  final String? avatarUrl; // custom URL — if provided, used instead of CDN fallback
 
   const FAAvatar({
     super.key,
     required this.username,
     this.size = 40,
+    this.avatarUrl,
   });
 
   @override
   Widget build(BuildContext context) {
-    final avatarUrl = 'https://a.furaffinity.net/$username.gif';
+    // Use custom URL if provided, otherwise fall back to legacy GIF
+    final url = (avatarUrl != null && avatarUrl!.isNotEmpty)
+        ? avatarUrl!
+        : 'https://a.furaffinity.net/$username.gif';
     return ClipOval(
       child: FAImage(
-        url: avatarUrl,
+        url: url,
         width: size,
         height: size,
         fit: BoxFit.cover,

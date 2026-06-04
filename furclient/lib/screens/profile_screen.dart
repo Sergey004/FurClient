@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -30,6 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     with AutomaticKeepAliveClientMixin {
   FAUser? _profile;
   bool _isLoading = true;
+  bool _isWatching = false;
   String? _error;
 
   @override
@@ -54,6 +56,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (mounted) {
         setState(() {
           _profile = profile;
+          _isWatching = profile?.isWatching ?? false;
           _isLoading = false;
         });
       }
@@ -64,6 +67,18 @@ class _ProfileScreenState extends State<ProfileScreen>
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _toggleWatch() async {
+    if (_profile == null) return;
+    final wasWatching = _isWatching;
+    setState(() => _isWatching = !wasWatching);
+    try {
+      await widget.client.toggleWatch(_username, wasWatching);
+    } catch (e) {
+      debugPrint('=== toggleWatch error: $e');
+      if (mounted) setState(() => _isWatching = wasWatching);
     }
   }
 
@@ -113,6 +128,10 @@ class _ProfileScreenState extends State<ProfileScreen>
         _buildHeader(p),
         const SizedBox(height: 16),
         _buildStats(p, crossAxisCount: 3),
+        if (p.commissions.hasInfo) ...[
+          const SizedBox(height: 20),
+          _buildCommissions(p),
+        ],
         if (p.description.isNotEmpty) ...[
           const SizedBox(height: 20),
           _buildBio(p),
@@ -155,30 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             offset: const Offset(0, -40),
             child: Column(
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: c.bg, width: 4),
-                  ),
-                  child: CircleAvatar(
-                    radius: 56,
-                    backgroundColor: c.bgInput,
-                    child: p.avatarUrl.isNotEmpty
-                        ? FAImage(
-                            url: p.avatarUrl,
-                            width: 112,
-                            height: 112,
-                            fit: BoxFit.cover,
-                            errorWidget: const Icon(
-                              Icons.person,
-                              color: AppColors.textMuted,
-                              size: 56,
-                            ),
-                          )
-                        : const Icon(Icons.person,
-                            color: AppColors.textMuted, size: 56),
-                  ),
-                 ),
+                _buildAvatarCircle(p, radius: 56),
                  const SizedBox(height: 12),
 
                 Text(
@@ -190,11 +186,22 @@ class _ProfileScreenState extends State<ProfileScreen>
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  '@${p.username}',
-                  style: const TextStyle(
-                      color: AppColors.materialLavender, fontSize: 14),
-                  textAlign: TextAlign.center,
+                GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: p.profileUrl));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Profile URL copied'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  child: Text(
+                    '@${p.username}',
+                    style: const TextStyle(
+                        color: AppColors.materialLavender, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _buildWatchButton(p),
@@ -214,6 +221,10 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (p.commissions.hasInfo) ...[
+            _buildCommissions(p),
+            const SizedBox(height: 20),
+          ],
           if (p.description.isNotEmpty) ...[
             _buildBio(p),
             const SizedBox(height: 20),
@@ -256,6 +267,50 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  Widget _buildAvatarCircle(FAUser p, {required double radius}) {
+    final c = Palette.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: c.bg, width: 4),
+      ),
+      child: CircleAvatar(
+        radius: radius,
+        backgroundColor: c.bgInput,
+        child: p.avatarUrl.isNotEmpty
+            ? FAImage(
+                url: p.avatarUrl,
+                width: radius * 2,
+                height: radius * 2,
+                fit: BoxFit.cover,
+                errorWidget: CircleAvatar(
+                  radius: radius,
+                  backgroundColor: c.bgInput,
+                  child: Text(
+                    p.username.isNotEmpty ? p.username[0].toUpperCase() : '?',
+                    style: TextStyle(
+                      color: AppColors.fluentCyan,
+                      fontSize: radius * 0.6,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              )
+            : CircleAvatar(
+                radius: radius,
+                backgroundColor: c.bgInput,
+                child: Text(
+                  p.username.isNotEmpty ? p.username[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    color: AppColors.fluentCyan,
+                    fontSize: radius * 0.6,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
 
   Widget _buildHeader(FAUser p) {
     final c = Palette.of(context);
@@ -266,30 +321,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: c.bg, width: 4),
-                      ),
-                      child: CircleAvatar(
-                        radius: 44,
-                        backgroundColor: c.bgInput,
-                        child: p.avatarUrl.isNotEmpty
-                            ? FAImage(
-                                url: p.avatarUrl,
-                                width: 88,
-                                height: 88,
-                                fit: BoxFit.cover,
-                                errorWidget: const Icon(
-                                  Icons.person,
-                                  color: AppColors.textMuted,
-                                  size: 44,
-                                ),
-                              )
-                            : const Icon(Icons.person,
-                                color: AppColors.textMuted, size: 44),
-                      ),
-                    ),
+            _buildAvatarCircle(p, radius: 44),
 
             const SizedBox(width: 16),
             Expanded(
@@ -304,10 +336,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                         fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    '@${p.username}',
-                    style: const TextStyle(
-                        color: AppColors.materialLavender, fontSize: 14),
+                  GestureDetector(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: p.profileUrl));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Profile URL copied'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      '@${p.username}',
+                      style: const TextStyle(
+                          color: AppColors.materialLavender, fontSize: 14),
+                    ),
                   ),
                 ],
               ),
@@ -321,34 +364,39 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildWatchButton(FAUser p) {
     final c = Palette.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color:
-            p.isWatching ? c.bgInput : AppColors.materialLavenderDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color:
-                p.isWatching ? c.border : AppColors.materialLavender),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            p.isWatching ? Icons.visibility : Icons.visibility_off,
-            size: 16,
-            color: p.isWatching ? c.textDim : Colors.white,
+    final watching = _isWatching;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _toggleWatch,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: watching ? c.bgInput : AppColors.materialLavenderDark,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: watching ? c.border : AppColors.materialLavender),
           ),
-          const SizedBox(width: 6),
-          Text(
-            p.isWatching ? 'Watching' : 'Watch',
-            style: TextStyle(
-              fontSize: 14,
-              color: p.isWatching ? c.textDim : Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                watching ? Icons.visibility : Icons.visibility_off,
+                size: 16,
+                color: watching ? c.textDim : Colors.white,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                watching ? 'Watching' : 'Watch',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: watching ? c.textDim : Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -370,8 +418,10 @@ class _ProfileScreenState extends State<ProfileScreen>
               AppColors.materialGreen),
           _statCard(Icons.favorite, '${p.stats.favorites}', 'Faves',
               AppColors.notifFave),
-          _statCard(Icons.comment, '${p.stats.comments}', 'Comments',
+          _statCard(Icons.people, '${p.stats.watchers}', 'Watchers',
               AppColors.materialLavender),
+          _statCard(Icons.comment, '${p.stats.comments}', 'Comments',
+              AppColors.fluentCyan),
           _statCard(Icons.book, '${p.stats.journals}', 'Journals',
               AppColors.notifJournal),
         ],
@@ -405,6 +455,213 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  // ── Commission Section ──────────────────────────────────────────────
+
+  Widget _buildCommissions(FAUser p) {
+    final c = Palette.of(context);
+    final comm = p.commissions;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: c.bgCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: c.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with status badge
+            Row(
+              children: [
+                const Icon(Icons.palette, color: AppColors.fluentCyan, size: 20),
+                const SizedBox(width: 8),
+                Text('Commissions',
+                    style: TextStyle(
+                        color: c.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600)),
+                if (comm.status.isNotEmpty) ...[
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: comm.isOpen
+                          ? AppColors.materialGreen.withValues(alpha: 0.15)
+                          : comm.status.toLowerCase().contains('trade')
+                              ? AppColors.materialLavenderBg
+                              : AppColors.danger.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      comm.status,
+                      style: TextStyle(
+                        color: comm.isOpen
+                            ? AppColors.materialGreen
+                            : comm.status.toLowerCase().contains('trade')
+                                ? AppColors.materialLavender
+                                : AppColors.danger,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Slots table
+            if (comm.slots.isNotEmpty) ...[
+              _buildCommissionSlots(comm),
+              const SizedBox(height: 12),
+            ],
+
+            // Notes (if there's meaningful text beyond status/slots)
+            if (comm.notes.length > 10 &&
+                comm.notes.toLowerCase() != comm.status.toLowerCase()) ...[
+              Text(
+                comm.notes,
+                style: TextStyle(
+                    color: c.textDim, fontSize: 14, height: 1.5),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // TOS link
+            if (comm.tosUrl.isNotEmpty)
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () {
+                    // Open TOS — navigate to journal page if available
+                    if (comm.tosUrl.contains('/journal/')) {
+                      // Could navigate to journal view, for now just show
+                      _openLink(comm.tosUrl, 'Terms of Service');
+                    } else {
+                      _openLink(comm.tosUrl, 'Terms of Service');
+                    }
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.description_outlined,
+                          color: AppColors.fluentCyan, size: 16),
+                      const SizedBox(width: 6),
+                      Text('View Terms of Service',
+                          style: const TextStyle(
+                              color: AppColors.fluentCyan,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              decoration: TextDecoration.underline)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommissionSlots(FACommissionInfo comm) {
+    final c = Palette.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: c.bgInput,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: c.border),
+      ),
+      child: Column(
+        children: [
+          // Header row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: c.bgCard,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+            ),
+            child: Row(
+              children: [
+                const Expanded(
+                    flex: 2,
+                    child: Text('Type',
+                        style: TextStyle(
+                            color: AppColors.textDim,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600))),
+                const Expanded(
+                    child: Text('Price',
+                        style: TextStyle(
+                            color: AppColors.textDim,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                        textAlign: TextAlign.right)),
+                if (comm.slots.any((s) => s.details.isNotEmpty))
+                  const SizedBox(width: 12),
+                if (comm.slots.any((s) => s.details.isNotEmpty))
+                  const Expanded(
+                      flex: 2,
+                      child: Text('Details',
+                          style: TextStyle(
+                              color: AppColors.textDim,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600))),
+              ],
+            ),
+          ),
+          // Slot rows
+          for (final slot in comm.slots)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                border: Border(
+                    top: BorderSide(color: c.border, width: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Text(slot.type,
+                        style: const TextStyle(
+                            color: AppColors.text, fontSize: 14))),
+                  Expanded(
+                    child: Text(slot.price,
+                        style: const TextStyle(
+                            color: AppColors.fluentCyan,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600),
+                        textAlign: TextAlign.right)),
+                  if (slot.details.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: Text(slot.details,
+                          style: const TextStyle(
+                              color: AppColors.textDim, fontSize: 13)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _openLink(String url, String title) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _LinkPlaceholder(title: title, url: url),
+      ),
+    );
+  }
+
+  // ── Bio Section ─────────────────────────────────────────────────────
+
   Widget _buildBio(FAUser p) {
     final c = Palette.of(context);
     return Padding(
@@ -437,6 +694,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  // ── Quick Links ────────────────────────────────────────────────────
+
   Widget _buildLinks(FAUser p) {
     final c = Palette.of(context);
     return Padding(
@@ -456,6 +715,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               AppColors.materialGreen),
           _linkTile(Icons.book, 'Journals', FAUrls.journals(p.username),
               AppColors.notifJournal),
+          _linkTile(Icons.person, 'User Page', FAUrls.user(p.username),
+              AppColors.materialLavender),
         ],
       ),
     );
@@ -484,13 +745,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   fontWeight: FontWeight.w500)),
           trailing: Icon(Icons.chevron_right,
               color: c.textMuted, size: 20),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => _LinkPlaceholder(title: title, url: url),
-              ),
-            );
-          },
+          onTap: () => _openLink(url, title),
         ),
       ),
     );
