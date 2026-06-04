@@ -464,6 +464,8 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Widget _buildMobileBody() {
     final currentMode = themeProvider.mode;
+    final p = Palette.of(context);
+    final cs = Theme.of(context).colorScheme;
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -478,10 +480,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                 const Icon(Icons.palette_outlined,
                     color: AppColors.materialLavender, size: 20),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text('Theme',
                       style: TextStyle(
-                          color: AppColors.text,
+                          color: p.text,
                           fontSize: 15,
                           fontWeight: FontWeight.w500)),
                 ),
@@ -500,19 +502,16 @@ class _SettingsScreenState extends State<SettingsScreen>
                   return ChoiceChip(
                     avatar: Icon(_themeIcon(m),
                         size: 16,
-                        color: active
-                            ? AppColors.text
-                            : AppColors.textMuted),
+                        color: active ? p.text : p.textDim),
                     label: Text(m.label),
                     selected: active,
-                    selectedColor: AppColors.materialLavenderBg,
                     onSelected: (_) => themeProvider.setMode(m),
                   );
                 }).toList(),
               ),
             ),
           ),
-          const Divider(height: 1, indent: 16, color: AppColors.border),
+          Divider(height: 1, indent: 16, color: p.border),
           _adaptiveSwitchTile(
             icon: Icons.shield_outlined,
             iconColor: AppColors.materialGreen,
@@ -521,7 +520,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             title: 'SFW Mode',
             subtitle: 'Blur NSFW content',
           ),
-          const Divider(height: 1, indent: 16, color: AppColors.border),
+          Divider(height: 1, indent: 16, color: p.border),
           _adaptiveSwitchTile(
             icon: Icons.download_outlined,
             iconColor: AppColors.fluentCyan,
@@ -533,7 +532,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             title: 'Auto-download on Fave',
             subtitle: 'Save image when favoriting',
           ),
-          const Divider(height: 1, indent: 16, color: AppColors.border),
+          Divider(height: 1, indent: 16, color: p.border),
           _adaptiveSwitchTile(
             icon: Icons.close_fullscreen_outlined,
             iconColor: AppColors.cupertinoPurple,
@@ -545,16 +544,15 @@ class _SettingsScreenState extends State<SettingsScreen>
             title: 'Auto-close on Fave',
             subtitle: 'Close submission view after favoriting',
           ),
-          const Divider(height: 1, indent: 16, color: AppColors.border),
+          Divider(height: 1, indent: 16, color: p.border),
           _imageQualityTile(),
         ]),
         const SizedBox(height: 24),
         _sectionHeader('ACCOUNT'),
         _card([
           ListTile(
-            leading:
-                const Icon(Icons.logout, color: AppColors.danger, size: 22),
-            title: const Text('Logout',
+            leading: const Icon(Icons.logout, color: AppColors.danger, size: 22),
+            title: Text('Logout',
                 style: TextStyle(
                     color: AppColors.danger,
                     fontSize: 15,
@@ -566,36 +564,34 @@ class _SettingsScreenState extends State<SettingsScreen>
         const SizedBox(height: 24),
         _sectionHeader('ABOUT'),
         _card([
-          const ListTile(
-            leading: Icon(Icons.pets, color: AppColors.accentLight, size: 22),
+          ListTile(
+            leading: Icon(Icons.pets, color: cs.primary, size: 22),
             title: Text('FurClient',
                 style: TextStyle(
-                    color: AppColors.text,
+                    color: p.text,
                     fontSize: 15,
                     fontWeight: FontWeight.w500)),
             subtitle: Text('A FurAffinity client',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                style: TextStyle(color: p.textMuted, fontSize: 13)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
-          const Divider(height: 1, indent: 56, color: AppColors.border),
-          const ListTile(
-            leading:
-                Icon(Icons.info_outline, color: AppColors.textDim, size: 22),
+          Divider(height: 1, indent: 56, color: p.border),
+          ListTile(
+            leading: Icon(Icons.info_outline, color: p.textDim, size: 22),
             title: Text('Version',
-                style: TextStyle(color: AppColors.text, fontSize: 15)),
+                style: TextStyle(color: p.text, fontSize: 15)),
             trailing: Text('1.0.0',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                style: TextStyle(color: p.textMuted, fontSize: 14)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
-          const Divider(height: 1, indent: 56, color: AppColors.border),
-          const ListTile(
-            leading:
-                Icon(Icons.code, color: AppColors.textDim, size: 22),
+          Divider(height: 1, indent: 56, color: p.border),
+          ListTile(
+            leading: Icon(Icons.code, color: p.textDim, size: 22),
             title: Text('Built with Flutter',
-                style: TextStyle(color: AppColors.text, fontSize: 15)),
+                style: TextStyle(color: p.text, fontSize: 15)),
             trailing: Text('3.x',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                style: TextStyle(color: p.textMuted, fontSize: 14)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
         ]),
         const SizedBox(height: 32),
@@ -605,6 +601,8 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Widget _buildDesktopBody() {
     final currentMode = themeProvider.mode;
+    final p = Palette.of(context);
+    final cs = Theme.of(context).colorScheme;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
@@ -637,20 +635,18 @@ class _SettingsScreenState extends State<SettingsScreen>
                             avatar: Icon(_themeIcon(m),
                                 size: 16,
                                 color: active
-                                    ? AppColors.text
-                                    : AppColors.textMuted),
+                                    ? p.text
+                                    : p.textDim),
                             label: Text(m.label),
                             selected: active,
-                            selectedColor:
-                                AppColors.materialLavenderBg,
                             onSelected: (_) => themeProvider.setMode(m),
                           );
                         }).toList(),
                       ),
                     ),
                   ),
-                  const Divider(
-                      height: 1, indent: 16, color: AppColors.border),
+                  Divider(
+                      height: 1, indent: 16, color: p.border),
                   _adaptiveSwitchTile(
                     icon: Icons.shield_outlined,
                     iconColor: AppColors.materialGreen,
@@ -659,8 +655,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'SFW Mode',
                     subtitle: 'Blur NSFW content',
                   ),
-                  const Divider(
-                      height: 1, indent: 16, color: AppColors.border),
+                  Divider(
+                      height: 1, indent: 16, color: p.border),
                   _adaptiveSwitchTile(
                     icon: Icons.download_outlined,
                     iconColor: AppColors.fluentCyan,
@@ -672,8 +668,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'Auto-download on Fave',
                     subtitle: 'Save image when favoriting',
                   ),
-                  const Divider(
-                      height: 1, indent: 16, color: AppColors.border),
+                  Divider(
+                      height: 1, indent: 16, color: p.border),
                   _adaptiveSwitchTile(
                     icon: Icons.close_fullscreen_outlined,
                     iconColor: AppColors.cupertinoPurple,
@@ -685,8 +681,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'Auto-close on Fave',
                     subtitle: 'Close submission view after favoriting',
                   ),
-                  const Divider(
-                      height: 1, indent: 16, color: AppColors.border),
+                  Divider(
+                      height: 1, indent: 16, color: p.border),
                   _imageQualityTile(),
                 ],
               ),
@@ -704,9 +700,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                             color: AppColors.danger,
                             fontSize: 15,
                             fontWeight: FontWeight.w500)),
-                    subtitle: const Text('Sign out and clear session',
+                    subtitle: Text('Sign out and clear session',
                         style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 13)),
+                            color: p.textMuted, fontSize: 13)),
                     onTap: _confirmLogout,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
@@ -717,41 +713,41 @@ class _SettingsScreenState extends State<SettingsScreen>
                 title: 'About',
                 icon: Icons.info_outline,
                 accent: AppColors.materialLavender,
-                children: const [
+                children: [
                   ListTile(
                     leading: Icon(Icons.pets,
-                        color: AppColors.accentLight, size: 22),
+                        color: cs.primary, size: 22),
                     title: Text('FurClient',
                         style: TextStyle(
-                            color: AppColors.text,
+                            color: p.text,
                             fontSize: 15,
                             fontWeight: FontWeight.w500)),
                     subtitle: Text('A FurAffinity client',
                         style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 13)),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                            color: p.textMuted, fontSize: 13)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
-                  Divider(height: 1, indent: 56, color: AppColors.border),
+                  Divider(height: 1, indent: 56, color: p.border),
                   ListTile(
                     leading: Icon(Icons.info_outline,
-                        color: AppColors.textDim, size: 22),
+                        color: p.textDim, size: 22),
                     title: Text('Version',
-                        style: TextStyle(color: AppColors.text, fontSize: 15)),
+                        style: TextStyle(color: p.text, fontSize: 15)),
                     trailing: Text('1.0.0',
                         style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 14)),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                            color: p.textMuted, fontSize: 14)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
-                  Divider(height: 1, indent: 56, color: AppColors.border),
+                  Divider(height: 1, indent: 56, color: p.border),
                   ListTile(
                     leading:
-                        Icon(Icons.code, color: AppColors.textDim, size: 22),
+                        Icon(Icons.code, color: p.textDim, size: 22),
                     title: Text('Built with Flutter',
-                        style: TextStyle(color: AppColors.text, fontSize: 15)),
+                        style: TextStyle(color: p.text, fontSize: 15)),
                     trailing: Text('3.x',
                         style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 14)),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                            color: p.textMuted, fontSize: 14)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
                 ],
               ),
@@ -844,6 +840,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     required String title,
     required String subtitle,
   }) {
+    final p = Palette.of(context);
     return SwitchListTile(
       value: value,
       onChanged: onChanged,
@@ -853,50 +850,51 @@ class _SettingsScreenState extends State<SettingsScreen>
           const SizedBox(width: 12),
           Expanded(
               child: Text(title,
-                  style: const TextStyle(color: AppColors.text, fontSize: 15))),
+                  style: TextStyle(color: p.text, fontSize: 15))),
         ],
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(left: 32),
         child: Text(subtitle,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+            style: TextStyle(color: p.textMuted, fontSize: 13)),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 
   Widget _imageQualityTile() {
+    final p = Palette.of(context);
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       title: Row(
-        children: const [
-          Icon(Icons.high_quality_outlined,
+        children: [
+          const Icon(Icons.high_quality_outlined,
               color: AppColors.materialLavender, size: 20),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Text('Image Quality',
-                style: TextStyle(color: AppColors.text, fontSize: 15)),
+                style: TextStyle(color: p.text, fontSize: 15)),
           ),
         ],
       ),
-      subtitle: const Padding(
-        padding: EdgeInsets.only(left: 32),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(left: 32),
         child: Text('Quality for full-size images',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+            style: TextStyle(color: p.textMuted, fontSize: 13)),
       ),
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.bgInput,
+          color: p.bgInput,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: p.border),
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             value: _imageQuality,
             isDense: true,
-            style: const TextStyle(color: AppColors.text, fontSize: 13),
-            dropdownColor: AppColors.bgCard,
+            style: TextStyle(color: p.text, fontSize: 13),
+            dropdownColor: p.bgCard,
             items: const [
               DropdownMenuItem(value: 'low', child: Text('Low')),
               DropdownMenuItem(value: 'medium', child: Text('Medium')),
