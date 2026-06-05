@@ -150,6 +150,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   }
 
   Future<void> _downloadImage() async {
+    final messenger = ScaffoldMessenger.of(context);
     final sub = _submission;
     if (sub == null || sub.imageUrl.isEmpty || _isDownloading) return;
     setState(() => _isDownloading = true);
@@ -162,7 +163,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       );
       if (mounted) {
         if (path != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             SnackBar(
               content: Text('Saved: ${path.split('/').last}'),
               duration: const Duration(seconds: 2),
@@ -170,7 +171,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             ),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             const SnackBar(
               content: Text('Download failed'),
               duration: Duration(seconds: 2),
@@ -182,7 +183,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     } catch (e) {
       debugPrint('=== downloadImage error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
             duration: const Duration(seconds: 2),
