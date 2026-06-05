@@ -300,7 +300,9 @@ class _SearchScreenState extends State<SearchScreen>
           _sortChip('Popular', 'popularityt'),
           const Spacer(),
           if (_sortBy != 'relevancyt')
-            GestureDetector(
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
               onTap: () => _toggleSortDirection(),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -326,8 +328,9 @@ class _SearchScreenState extends State<SearchScreen>
                     ),
                   ],
                 ),
+                ),
               ),
-            ),
+              ),
         ],
       ),
     );
@@ -335,7 +338,9 @@ class _SearchScreenState extends State<SearchScreen>
 
   Widget _sortChip(String label, String sortKey) {
     final active = _sortBy == sortKey;
-    return GestureDetector(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
       onTap: () {
         if (_sortBy == sortKey) return;
         setState(() => _sortBy = sortKey);
@@ -360,6 +365,7 @@ class _SearchScreenState extends State<SearchScreen>
             fontWeight: active ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
+      ),
       ),
     );
   }
@@ -480,7 +486,9 @@ class _SearchScreenState extends State<SearchScreen>
                   child: const Text('Clear All'),
                 )
               else
-                GestureDetector(
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
                   onTap: () async {
                     await _searchHistory.clear();
                     setState(() {});
@@ -494,7 +502,8 @@ class _SearchScreenState extends State<SearchScreen>
                     child: const Text('Clear All',
                         style: TextStyle(color: AppColors.textDim, fontSize: 12)),
                   ),
-                ),
+                  ),
+                  ),
             ],
           ),
         ),
@@ -515,7 +524,9 @@ class _SearchScreenState extends State<SearchScreen>
 
   Widget _buildRecentSearchItem(String term) {
     if (isWindows) {
-      return GestureDetector(
+      return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
         onTap: () {
           _searchController.text = term;
           _search(term);
@@ -530,15 +541,19 @@ class _SearchScreenState extends State<SearchScreen>
                 child: Text(term, style: const TextStyle(color: AppColors.textDim, fontSize: 14)),
               ),
               const SizedBox(width: 8),
-              GestureDetector(
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
                 onTap: () async {
                   await _searchHistory.remove(term);
                   setState(() {});
                 },
                 child: const Icon(Icons.close, color: AppColors.textMuted, size: 16),
+                ),
               ),
             ],
           ),
+        ),
         ),
       );
     }

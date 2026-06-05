@@ -230,7 +230,6 @@ class FAAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use custom URL if provided, otherwise fall back to legacy GIF
     final url = (avatarUrl != null && avatarUrl!.isNotEmpty)
         ? avatarUrl!
         : 'https://a.furaffinity.net/$username.gif';

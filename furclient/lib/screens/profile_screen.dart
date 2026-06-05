@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
-import '../services/fa_urls.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/fa_image_loader.dart';
+import 'user_content_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final FAClient client;
@@ -136,6 +137,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           const SizedBox(height: 20),
           _buildBio(p),
         ],
+        if (p.shouts.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _buildShouts(p),
+        ],
         const SizedBox(height: 20),
         _buildLinks(p),
         const SizedBox(height: 32),
@@ -227,6 +232,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           ],
           if (p.description.isNotEmpty) ...[
             _buildBio(p),
+            const SizedBox(height: 20),
+          ],
+          if (p.shouts.isNotEmpty) ...[
+            _buildShouts(p),
             const SizedBox(height: 20),
           ],
           _buildLinks(p),
@@ -536,15 +545,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
-                  onTap: () {
-                    // Open TOS — navigate to journal page if available
-                    if (comm.tosUrl.contains('/journal/')) {
-                      // Could navigate to journal view, for now just show
-                      _openLink(comm.tosUrl, 'Terms of Service');
-                    } else {
-                      _openLink(comm.tosUrl, 'Terms of Service');
-                    }
-                  },
+                  onTap: () => _launchUrl(comm.tosUrl),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -652,14 +653,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  void _openLink(String url, String title) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _LinkPlaceholder(title: title, url: url),
-      ),
-    );
-  }
-
   // ── Bio Section ─────────────────────────────────────────────────────
 
   Widget _buildBio(FAUser p) {
@@ -694,6 +687,153 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  // ── Shouts Section ──────────────────────────────────────────────────
+
+  Widget _buildShouts(FAUser p) {
+    final c = Palette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.forum_outlined,
+                  color: AppColors.fluentCyan, size: 20),
+              const SizedBox(width: 8),
+              Text('Shouts',
+                  style: TextStyle(
+                      color: c.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.materialGreenBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${p.shouts.length}',
+                  style: const TextStyle(
+                    color: AppColors.materialGreen,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: c.bgCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: c.border),
+            ),
+            child: Column(
+              children: p.shouts.map((s) => _buildShoutComment(s)).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShoutComment(FAComment shout) {
+    final isClickable = shout.author.isNotEmpty &&
+        shout.author != 'Anonymous' &&
+        shout.author.toLowerCase() != widget.session.username.toLowerCase();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: Palette.of(context).bgInput,
+            child: shout.avatarUrl.isNotEmpty
+                ? FAImage(
+                    url: shout.avatarUrl,
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.cover,
+                    errorWidget: const Icon(Icons.person,
+                        size: 16, color: AppColors.textMuted),
+                  )
+                : const Icon(Icons.person,
+                    size: 16, color: AppColors.textMuted),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    MouseRegion(
+                      cursor: isClickable
+                          ? SystemMouseCursors.click
+                          : SystemMouseCursors.basic,
+                      child: GestureDetector(
+                        onTap: isClickable
+                            ? () => _navigateToProfile(shout.author)
+                            : null,
+                        child: Text(
+                          shout.author,
+                          style: TextStyle(
+                            color: isClickable
+                                ? AppColors.fluentCyan
+                                : AppColors.text,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (shout.time.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        shout.time,
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  shout.text,
+                  style: const TextStyle(
+                    color: AppColors.textDim,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToProfile(String username) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProfileScreen(
+          client: widget.client,
+          session: widget.session,
+          targetUsername: username,
+        ),
+      ),
+    );
+  }
+
   // ── Quick Links ────────────────────────────────────────────────────
 
   Widget _buildLinks(FAUser p) {
@@ -709,60 +849,80 @@ class _ProfileScreenState extends State<ProfileScreen>
                   fontSize: 16,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          _linkTile(Icons.collections, 'Gallery', FAUrls.gallery(p.username),
-              AppColors.fluentCyan),
-          _linkTile(Icons.favorite, 'Favorites', FAUrls.favorites(p.username),
-              AppColors.materialGreen),
-          _linkTile(Icons.book, 'Journals', FAUrls.journals(p.username),
-              AppColors.notifJournal),
-          _linkTile(Icons.person, 'User Page', FAUrls.user(p.username),
-              AppColors.materialLavender),
+          _linkTile(Icons.collections, 'Gallery', AppColors.fluentCyan, () {
+            _navigateToContent(p.username, UserContentType.gallery, 'Gallery');
+          }),
+          _linkTile(Icons.favorite, 'Favorites', AppColors.materialGreen, () {
+            _navigateToContent(p.username, UserContentType.favorites, 'Favorites');
+          }),
+          _linkTile(Icons.book, 'Journals', AppColors.notifJournal, () {
+            _navigateToContent(p.username, UserContentType.journals, 'Journals');
+          }),
         ],
       ),
     );
   }
 
-  Widget _linkTile(IconData icon, String title, String url, Color color) {
+  Widget _linkTile(
+      IconData icon, String title, Color color, VoidCallback onTap) {
     final c = Palette.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.1)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: Icon(icon, color: color, size: 22),
-          title: Text(title,
-              style: TextStyle(
-                  color: c.text,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500)),
-          trailing: Icon(Icons.chevron_right,
-              color: c.textMuted, size: 20),
-          onTap: () => _openLink(url, title),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.1)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(title,
+                      style: TextStyle(
+                          color: c.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500)),
+                ),
+                Icon(Icons.chevron_right,
+                    color: c.textMuted, size: 20),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
-}
 
-class _LinkPlaceholder extends StatelessWidget {
-  final String title;
-  final String url;
-  const _LinkPlaceholder({required this.title, required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    return AdaptiveScaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(url, style: const TextStyle(color: AppColors.textDim))),
+  void _navigateToContent(
+      String username, UserContentType type, String title) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => UserContentScreen(
+          client: widget.client,
+          username: username,
+          contentType: type,
+          title: title,
+        ),
+      ),
     );
+  }
+
+  /// Open external URL in browser (used for TOS links).
+  Future<void> _launchUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('=== launchUrl error: $e');
+    }
   }
 }

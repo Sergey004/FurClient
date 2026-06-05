@@ -481,6 +481,25 @@ class FAClient {
     return Submission.parseSubmissionsPage(html);
   }
 
+  Future<List<Submission>> getUserFavorites(String username, {int page = 1}) async {
+    final url = '${FAUrls.favorites(username)}?page=$page';
+    final html = await _getHtml(url);
+    return Submission.parseSubmissionsPage(html);
+  }
+
+  Future<List<FAJournalPreview>> getUserJournals(String username, {int page = 1}) async {
+    final url = '${FAUrls.journals(username)}?page=$page';
+    final html = await _getHtml(url);
+    return FAJournalPreview.parseJournalsPage(html);
+  }
+
+  /// Fetch journal detail page and parse content + comments.
+  Future<FAJournal?> getJournal(String id) async {
+    final url = FAUrls.journal(id);
+    final html = await _getHtml(url);
+    return FAJournal.parseJournalPage(html, id);
+  }
+
   /// Fetch submission details + comments in a single HTML fetch.
   /// Avoids loading the same page twice through WebView.
   Future<({Submission? submission, List<FAComment> comments})>

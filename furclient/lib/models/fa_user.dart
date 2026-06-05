@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
+import 'fa_comment.dart';
 
 class FAUserStats {
   final int views;
@@ -109,6 +110,7 @@ class FAUser {
   final String watchUrl;
   final FACommissionInfo commissions;
   final String profileUrl;
+  final List<FAComment> shouts;
 
   FAUser({
     required this.username,
@@ -121,6 +123,7 @@ class FAUser {
     required this.watchUrl,
     this.commissions = const FACommissionInfo(),
     this.profileUrl = '',
+    this.shouts = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -133,6 +136,7 @@ class FAUser {
         'isWatching': isWatching,
         'watchUrl': watchUrl,
         'commissions': commissions.toJson(),
+        'shouts': shouts.map((s) => s.toJson()).toList(),
       };
 
   factory FAUser.fromJson(Map<String, dynamic> json) => FAUser(
@@ -155,16 +159,11 @@ class FAUser {
   /// FA serves avatars from multiple CDN paths. We try the page-parsed URL
   /// first; if not found, construct from known CDN patterns.
   ///
-  /// Known FA avatar URLs:
-  /// - `https://a.furaffinity.net/{username}.gif`  (legacy GIF, always exists)
-  /// - `https://a.furaffinity.net/{username}`        (redirects, may be PNG/JPEG)
-  /// - `t.furaffinity.net` CDN thumbnails
-  /// The GIF may be animated; the actual static avatar comes from the page HTML.
   static String buildAvatarUrl(String username, {String? pageAvatarUrl}) {
     if (pageAvatarUrl != null && pageAvatarUrl.isNotEmpty) {
       return pageAvatarUrl;
     }
-    // Legacy fallback — always works but may be animated GIF
+    // FA CDN — all avatars served as .gif (static PNG/JPEG use GIF URL too)
     return 'https://a.furaffinity.net/$username.gif';
   }
 
@@ -239,6 +238,9 @@ class FAUser {
     // ── Commission info ─────────────────────────────────────────────
     final commissions = _parseCommissions(document);
 
+    // ── Shouts (profile comments) ──────────────────────────────────
+    final shouts = _parseShouts(document, htmlString);
+
     debugPrint('=== parseUserPage: user=$username, display=$displayName');
     debugPrint('=== parseUserPage: avatar=$avatarUrl');
     debugPrint('=== parseUserPage: banner=${bannerUrl.isNotEmpty}');
@@ -247,6 +249,7 @@ class FAUser {
         '=== parseUserPage: stats: V=$views S=$submissions F=$favorites C=$comments J=$journals W=$watchers');
     debugPrint('=== parseUserPage: watching=$isWatching');
     debugPrint('=== parseUserPage: commissions.status=${commissions.status}, slots=${commissions.slots.length}');
+    debugPrint('=== parseUserPage: shouts=${shouts.length}');
 
     return FAUser(
       username: username,
@@ -268,14 +271,32 @@ class FAUser {
           : '',
       commissions: commissions,
       profileUrl: 'https://www.furaffinity.net/user/$username/',
+      shouts: shouts,
     );
   }
 
   // ── Avatar Parsing ────────────────────────────────────────────────────
 
-  /// Multi-strategy avatar URL extraction from user page HTML.
+  /// Parse avatar URL from user profile HTML.
+  ///
+  /// FA user pages contain MANY avatar images (shouts/guestbook comments at
+  /// the bottom each have their own avatar). We must ONLY look in the profile
+  /// header area, never in the shouts section.
+  ///
+  /// Strategy 1: Specific profile-header selectors
+  /// Strategy 2: Find img with username in its URL path (FA CDN pattern)
+  /// Strategy 3: Profile area images (excluding shout containers)
+  /// Fallback: Constructed CDN URL (always works)
   static String _parseAvatar(dom.Document document, String username) {
-    // Strategy 1: Known avatar selectors
+    // ── Remove shout/comment sections so they can't interfere ──
+    // FA uses div.comment-container, div.shout-container, section.comment-area
+    document.querySelectorAll(
+      'div.comment-container, div.shout-container, '
+      'section.comment-area, div.shouts, #shouts, '
+      'div[class*="comment-list"], div[class*="shout-list"]'
+    ).forEach((el) => el.remove());
+
+    // ── Strategy 1: Known profile-header avatar selectors ──
     const avatarSelectors = [
       'img[alt="Avatar"]',
       'img.user-avatar',
@@ -297,13 +318,27 @@ class FAUser {
       }
     }
 
-    // Strategy 2: Look for images inside the profile info section
-    // FA's classic layout: the profile area has a table with avatar in one cell
+    // ── Strategy 2: Find img whose URL contains the username ──
+    // FA CDN avatar URLs contain the username:
+    //   a.furaffinity.net/20250102/username.gif
+    //   a.furaffinity.net/username.gif
+    final allImgs = document.querySelectorAll('img');
+    for (final img in allImgs) {
+      final src = _resolveUrl(img.attributes['src'] ?? '');
+      if (src.isNotEmpty &&
+          src.toLowerCase().contains('/$username') &&
+          !src.contains('ref=') &&
+          !_isBannerImage(img)) {
+        return src;
+      }
+    }
+
+    // ── Strategy 3: First CDN image in profile area ──
     final profileAreas = document.querySelectorAll(
-        'div[class*="profile"], '
-        'section[class*="profile"], '
-        'table.user-page-table, '
-        'table[class*="user"]'
+      'div[class*="profile"], '
+      'section[class*="profile"], '
+      'table.user-page-table, '
+      'table[class*="user"]'
     );
     for (final area in profileAreas) {
       final imgs = area.querySelectorAll('img');
@@ -315,27 +350,8 @@ class FAUser {
       }
     }
 
-    // Strategy 3: Scan ALL images for a.furaffinity.net or t.furaffinity.net
-    // avatar URLs (these CDNs serve user avatars)
-    final allImgs = document.querySelectorAll('img');
-    for (final img in allImgs) {
-      final src = _resolveUrl(img.attributes['src'] ?? '');
-      if (src.isNotEmpty && _isAvatarLike(src)) {
-        return src;
-      }
-    }
-
-    // Strategy 4: Try to find avatar URL in page text/attributes
-    // Some FA layouts embed avatar URL in data attributes or CSS
-    final avatarDataEl = document.querySelector(
-        'img[data-avatar], [data-avatar-url], img[src*="a.furaffinity.net"], img[src*="t.furaffinity.net"]');
-    if (avatarDataEl != null) {
-      final src = _resolveUrl(avatarDataEl.attributes['src'] ?? '');
-      if (src.isNotEmpty) return src;
-    }
-
-    // Strategy 5: Fallback — legacy GIF URL (always works)
-    debugPrint('=== parseUserPage: avatar fallback to legacy GIF for $username');
+    // ── Fallback: Constructed CDN URL ──
+    debugPrint('=== parseUserPage: avatar fallback to GIF for $username');
     return 'https://a.furaffinity.net/$username.gif';
   }
 
@@ -611,5 +627,133 @@ class FAUser {
         .replaceAll(' ', '')
         .replaceAll('\u00A0', '');
     return int.tryParse(cleaned) ?? 0;
+  }
+
+  // ── Shouts Parsing ───────────────────────────────────────────────────
+
+  /// Parse shouts (profile comments) from user profile page HTML.
+  /// FAKit selectors: div.shout-container, div.comment, .shout
+  /// Shouts are flat (no threading), so we use indentLevel = 0 for all.
+  static List<FAComment> _parseShouts(dom.Document document, String htmlString) {
+    final shouts = <FAComment>[];
+
+    // Find the shouts section — try multiple selectors
+    dom.Element? shoutsSection;
+    for (final sel in [
+      '#shouts',
+      'div.shouts',
+      'section.shouts',
+      'div.shout-container',
+      '.shout-section',
+      'div[class*="shout"]',
+    ]) {
+      shoutsSection = document.querySelector(sel);
+      if (shoutsSection != null) break;
+    }
+
+    if (shoutsSection == null) {
+      // Fallback: find heading with "shout" and grab parent section
+      final headings = document.querySelectorAll('h2, h3, h4');
+      for (final h in headings) {
+        if (h.text.toLowerCase().contains('shout') ||
+            h.text.toLowerCase().contains('comment')) {
+          dom.Element? container = h.parent;
+          while (container != null) {
+            final tag = container.localName;
+            if (tag == 'div' || tag == 'section') {
+              shoutsSection = container;
+              break;
+            }
+            container = container.parent;
+          }
+          break;
+        }
+      }
+    }
+
+    if (shoutsSection == null) return shouts;
+
+    // Find individual shout elements
+    final shoutElements = shoutsSection.querySelectorAll(
+      'div.comment-container, '
+      'div.shout-container, '
+      'div.comment, '
+      'li.comment, '
+      '.shout',
+    );
+
+    for (final el in shoutElements) {
+      try {
+        // Skip hidden comments
+        if (el.querySelector('.comment-hidden, .hidden-comment') != null) {
+          continue;
+        }
+
+        // cid from outerHtml
+        final cidMatch = RegExp(r'cid[=-](\d+)').firstMatch(el.outerHtml);
+        final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
+
+        // Author
+        String author = '';
+        final authorLink = el.querySelector(
+            'a.comment-username, a.link-username, a[href*="/user/"]');
+        if (authorLink != null) {
+          author = RegExp(r'/user/([^/?#]+)/')
+                  .firstMatch(authorLink.attributes['href'] ?? '')
+                  ?.group(1) ??
+              authorLink.text.trim();
+        }
+
+        // Avatar
+        final avatarImg = el.querySelector(
+            '.comment-avatar img, .comment-avatar-col img, td.avatar img') ??
+            el.querySelector('img.avatar, img[class*="avatar"]');
+        final avatarUrl = _resolveUrl(avatarImg?.attributes['src'] ?? '');
+
+        // Date
+        final dateEl = el.querySelector(
+            'span.comment-date, span.popup_date, span.posted_date, '
+            'span.date, time');
+        final time = dateEl?.attributes['title'] ??
+            dateEl?.attributes['datetime'] ??
+            dateEl?.text.trim() ??
+            '';
+
+        // Text
+        String text = '';
+        final messageEl = el.querySelector(
+            'div.comment-text, div.comment_message, div.comment-content, '
+            'div.comment-body, .shout-text');
+        if (messageEl != null) {
+          text = messageEl.text.trim();
+        }
+        if (text.isEmpty) {
+          text = el.text.trim();
+          // Remove author and date from the raw text
+          if (author.isNotEmpty) {
+            text = text.replaceAll(author, '');
+          }
+          if (time.isNotEmpty) {
+            text = text.replaceAll(time, '');
+          }
+          text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+        }
+
+        if (text.isNotEmpty || cid > 0) {
+          shouts.add(FAComment(
+            id: cid > 0 ? '$cid' : '',
+            author: author.isNotEmpty ? author : 'Anonymous',
+            avatarUrl: avatarUrl,
+            text: text,
+            time: time,
+            indentLevel: 0, // Shouts are always flat
+          ));
+        }
+      } catch (e) {
+        debugPrint('=== parseShouts skip: $e');
+      }
+    }
+
+    return shouts;
   }
 }

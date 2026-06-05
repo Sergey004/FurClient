@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
+import 'package:window_manager/window_manager.dart';
+import '../widgets/caption_buttons.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -128,6 +130,15 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           );
         });
       }
+      if (mounted && !success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to toggle favorite'),
+            duration: Duration(seconds: 2),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('=== toggleFavorite error: $e');
     } finally {
@@ -201,8 +212,15 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     final isDesktop = width >= AppBreakpoints.desktop;
 
     if (isWindows) {
+      // On Windows: use a custom title bar so it persists when
+      // this screen is pushed on top of FluentShell
       return fluent.ScaffoldPage(
-        content: _buildBody(isDesktop),
+        content: Column(
+          children: [
+            _buildWindowTitleBar(),
+            Expanded(child: _buildBody(isDesktop)),
+          ],
+        ),
       );
     }
 
@@ -212,6 +230,51 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
         bottom: false,
         child: _buildBody(isDesktop),
       ),
+    );
+  }
+
+  /// Custom title bar for Windows — always visible, supports drag.
+  /// Uses the same pattern as FluentShell: fluent.TitleBar with onDragStarted.
+  Widget _buildWindowTitleBar() {
+    return fluent.TitleBar(
+      isBackButtonVisible: false,
+      icon: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).maybePop(),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(fluent.FluentIcons.back, size: 14),
+              SizedBox(width: 6),
+              Text('Back', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+      ),
+      title: _submission != null
+          ? Text(
+              _submission!.title,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
+            )
+          : const Text('Loading...', style: TextStyle(fontSize: 13)),
+      captionControls: SizedBox(
+        width: 138,
+        height: 46,
+        child: CaptionButtons(
+          brightness: fluent.FluentTheme.of(context).brightness,
+        ),
+      ),
+      onDragStarted: () => windowManager.startDragging(),
+      onDoubleTap: () async {
+        final isMax = await windowManager.isMaximized();
+        if (isMax) {
+          windowManager.restore();
+        } else {
+          windowManager.maximize();
+        }
+      },
     );
   }
 
@@ -253,57 +316,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   // ── Desktop layout ────────────────────────────────────────────────────────
 
   Widget _buildDesktopLayout(Submission sub) {
-    return Column(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Кнопка назад — только на desktop где нет AppBar
-        _buildDesktopTopBar(),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 3, child: _buildImageSection(sub)),
-              Container(width: 1, color: AppColors.border),
-              Expanded(flex: 2, child: _buildDetailsPanel(sub)),
-            ],
-          ),
-        ),
+        Expanded(flex: 3, child: _buildImageSection(sub)),
+        Container(width: 1, color: AppColors.border),
+        Expanded(flex: 2, child: _buildDetailsPanel(sub)),
       ],
-    );
-  }
-
-  Widget _buildDesktopTopBar() {
-    if (isWindows) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-        child: Row(
-          children: [
-            fluent.Button(
-              onPressed: () => Navigator.of(context).maybePop(),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  fluent.Icon(fluent.FluentIcons.back, size: 14),
-                  SizedBox(width: 6),
-                  fluent.Text('Back'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    // macOS / Linux desktop
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.arrow_back, color: AppColors.text),
-            tooltip: 'Back',
-          ),
-        ],
-      ),
     );
   }
 
@@ -408,36 +427,42 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          GestureDetector(
-            onTap: sub.author.isNotEmpty
-                ? () => _navigateToProfile(sub.author)
-                : null,
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: AppColors.bgInput,
-                  child: Text(
-                    sub.author.isNotEmpty
-                        ? sub.author[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(
-                      color: AppColors.fluentCyan,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+          // Author name — clickable with hover cursor
+          MouseRegion(
+            cursor: sub.author.isNotEmpty
+                ? SystemMouseCursors.click
+                : SystemMouseCursors.basic,
+            child: GestureDetector(
+              onTap: sub.author.isNotEmpty
+                  ? () => _navigateToProfile(sub.author)
+                  : null,
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: AppColors.bgInput,
+                    child: Text(
+                      sub.author.isNotEmpty
+                          ? sub.author[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        color: AppColors.fluentCyan,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  sub.author.isNotEmpty ? sub.author : 'Unknown',
-                  style: const TextStyle(
-                    color: AppColors.fluentCyan,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(width: 8),
+                  Text(
+                    sub.author.isNotEmpty ? sub.author : 'Unknown',
+                    style: const TextStyle(
+                      color: AppColors.fluentCyan,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -456,81 +481,87 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              // Download button
-              GestureDetector(
-                onTap: _isDownloading ? null : _downloadImage,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgInput,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: _isDownloading
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.fluentCyan,
+              // Download button — hover cursor
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _isDownloading ? null : _downloadImage,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgInput,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: _isDownloading
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.fluentCyan,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.download,
+                            size: 16,
+                            color: AppColors.textDim,
                           ),
-                        )
-                      : const Icon(
-                          Icons.download,
-                          size: 16,
-                          color: AppColors.textDim,
-                        ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              // Fave button
-              GestureDetector(
-                onTap: _isFaving ? null : _toggleFavorite,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: sub.isFavorite
-                        ? AppColors.notifFave.withValues(alpha: 0.15)
-                        : AppColors.bgInput,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
+              // Fave button — hover cursor
+              MouseRegion(
+                cursor: _isFaving ? SystemMouseCursors.wait : SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _isFaving ? null : _toggleFavorite,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
                       color: sub.isFavorite
-                          ? AppColors.notifFave
-                          : AppColors.border,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_isFaving)
-                        const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.notifFave,
-                          ),
-                        )
-                      else
-                        Icon(
-                          sub.isFavorite ? Icons.favorite : Icons.favorite_border,
-                          size: 16,
-                          color: sub.isFavorite
-                              ? AppColors.notifFave
-                              : AppColors.textDim,
-                        ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${sub.faves}',
-                        style: TextStyle(
-                          color: sub.isFavorite
-                              ? AppColors.notifFave
-                              : AppColors.text,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
+                          ? AppColors.notifFave.withValues(alpha: 0.15)
+                          : AppColors.bgInput,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: sub.isFavorite
+                            ? AppColors.notifFave
+                            : AppColors.border,
                       ),
-                    ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isFaving)
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.notifFave,
+                            ),
+                          )
+                        else
+                          Icon(
+                            sub.isFavorite ? Icons.favorite : Icons.favorite_border,
+                            size: 16,
+                            color: sub.isFavorite
+                                ? AppColors.notifFave
+                                : AppColors.textDim,
+                          ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${sub.faves}',
+                          style: TextStyle(
+                            color: sub.isFavorite
+                                ? AppColors.notifFave
+                                : AppColors.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -584,22 +615,25 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               spacing: 6,
               runSpacing: 6,
               children: sub.tags.map((tag) {
-                return GestureDetector(
-                  onTap: () => _navigateToSearch(tag),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.materialLavenderBg,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.materialLavender.withValues(alpha: 0.3)),
-                    ),
-                    child: Text(
-                      tag,
-                      style: const TextStyle(
-                        color: AppColors.materialLavender,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                return MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => _navigateToSearch(tag),
+                    child: Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.materialLavenderBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.materialLavender.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        tag,
+                        style: const TextStyle(
+                          color: AppColors.materialLavender,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),
@@ -699,6 +733,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   Widget _buildComment(FAComment comment) {
     // Indent replies visually (max 4 levels, 24px each)
     final indent = (comment.indentLevel.clamp(0, 4)) * 24.0;
+    final isClickable = comment.author.isNotEmpty && comment.author != 'Anonymous';
     return Padding(
       padding: EdgeInsets.only(
         bottom: 16,
@@ -735,18 +770,24 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               children: [
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: comment.author.isNotEmpty && comment.author != 'Anonymous'
-                          ? () => _navigateToProfile(comment.author)
-                          : null,
-                      child: Text(
-                        comment.author,
-                        style: TextStyle(
-                          color: comment.author.isNotEmpty && comment.author != 'Anonymous'
-                              ? AppColors.fluentCyan
-                              : AppColors.text,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                    // Comment author — clickable with hover cursor
+                    MouseRegion(
+                      cursor: isClickable
+                          ? SystemMouseCursors.click
+                          : SystemMouseCursors.basic,
+                      child: GestureDetector(
+                        onTap: isClickable
+                            ? () => _navigateToProfile(comment.author)
+                            : null,
+                        child: Text(
+                          comment.author,
+                          style: TextStyle(
+                            color: isClickable
+                                ? AppColors.fluentCyan
+                                : AppColors.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),

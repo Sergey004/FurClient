@@ -3,6 +3,7 @@ import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import '../models/models.dart';
+import '../widgets/caption_buttons.dart';
 import '../services/fa_client.dart';
 import '../services/search_history.dart';
 import '../screens/gallery_screen.dart';
@@ -133,9 +134,8 @@ class _FluentShellState extends State<FluentShell> {
             : SizedBox(
                 width: 138,
                 height: 46,
-                child: WindowCaption(
+                child: CaptionButtons(
                   brightness: fluent.FluentTheme.of(context).brightness,
-                  backgroundColor: fluent.Colors.transparent,
                 ),
               ),
         // ← fluent TitleBar's built-in drag callbacks → window_manager
@@ -262,24 +262,20 @@ class _FluentShellState extends State<FluentShell> {
 
   /// Search box for the title bar center area.
   Widget _buildTitleSearch() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 16),
-        child: SizedBox(
-          width: 280,
-          height: 30,
-          child: fluent.TextBox(
-            controller: _searchController,
-            placeholder: 'Search FurAffinity...',
-            prefix: const Padding(
-              padding: EdgeInsets.only(left: 8, right: 4),
-              child: Icon(fluent.FluentIcons.search, size: 14),
-            ),
-            onSubmitted: _onSearchSubmitted,
-            style: const TextStyle(fontSize: 13),
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+    return Center(
+      child: SizedBox(
+        width: 280,
+        height: 30,
+        child: fluent.TextBox(
+          controller: _searchController,
+          placeholder: 'Search FurAffinity...',
+          prefix: const Padding(
+            padding: EdgeInsets.only(left: 8, right: 4),
+            child: Icon(fluent.FluentIcons.search, size: 14),
           ),
+          onSubmitted: _onSearchSubmitted,
+          style: const TextStyle(fontSize: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         ),
       ),
     );

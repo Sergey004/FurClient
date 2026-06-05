@@ -1,6 +1,18 @@
+import 'package:flutter/foundation.dart';
 import 'package:html/parser.dart' as html_parser;
 
 import '../services/fa_urls.dart';
+
+/// Strips commas, spaces and NBSP from a number string, then parses it.
+/// FA renders numbers like "12,345" or "1&nbsp;234" which int.parse can't handle.
+int _parseInt(String raw) {
+  final cleaned = raw
+      .replaceAll(',', '')
+      .replaceAll(' ', '')
+      .replaceAll('\u00A0', '')
+      .trim();
+  return int.tryParse(cleaned) ?? 0;
+}
 
 class Submission {
   final String id;
@@ -94,8 +106,7 @@ class Submission {
       if (id.isEmpty) continue;
 
       // iOS: figure b u a img
-      final img = fig.querySelector('b u a img') ??
-          fig.querySelector('img');
+      final img = fig.querySelector('b u a img') ?? fig.querySelector('img');
       var imageUrl = img?.attributes['src'] ?? '';
       if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
 
@@ -112,10 +123,12 @@ class Submission {
         author = authorMatch?.group(1) ?? captionLinks[1].text.trim();
       }
 
-      final isAdult = fig.querySelector('[data-rating="adult"]') != null || fig.classes.contains('r-adult');
-    final isMature = fig.querySelector('[data-rating="mature"]') != null || fig.classes.contains('r-mature');
-    final isNsfw = isAdult || isMature;
-    final rating = isAdult ? 'adult' : isMature ? 'mature' : 'general';
+      final isAdult =
+          fig.querySelector('[data-rating="adult"]') != null || fig.classes.contains('r-adult');
+      final isMature =
+          fig.querySelector('[data-rating="mature"]') != null || fig.classes.contains('r-mature');
+      final isNsfw = isAdult || isMature;
+      final rating = isAdult ? 'adult' : isMature ? 'mature' : 'general';
 
       submissions.add(Submission(
         id: id,
@@ -140,14 +153,16 @@ class Submission {
     return submissions;
   }
 
-  static Submission? parseSubmissionDetails(String htmlString, String submissionId) {
+  static Submission? parseSubmissionDetails(
+      String htmlString, String submissionId) {
     final document = html_parser.parse(htmlString);
 
     // iOS: div.submission-area img#submissionImg — data-preview-src / data-fullview-src
     final imgEl = document.querySelector('div.submission-area img#submissionImg');
     var imageUrl = imgEl?.attributes['data-fullview-src'] ??
         imgEl?.attributes['data-preview-src'] ??
-        imgEl?.attributes['src'] ?? '';
+        imgEl?.attributes['src'] ??
+        '';
     if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
 
     // iOS: div.submission-title h2
@@ -172,9 +187,9 @@ class Submission {
     final viewsEl = document.querySelector('div[title="Views"] div');
     final favesEl = document.querySelector('div[title="Favorites"] div');
     final commentsEl = document.querySelector('div[title="Comments"] div');
-    views = int.tryParse(viewsEl?.text.trim() ?? '') ?? 0;
-    faves = int.tryParse(favesEl?.text.trim() ?? '') ?? 0;
-    comments = int.tryParse(commentsEl?.text.trim() ?? '') ?? 0;
+    views = _parseInt(viewsEl?.text.trim() ?? '');
+    faves = _parseInt(favesEl?.text.trim() ?? '');
+    comments = _parseInt(commentsEl?.text.trim() ?? '');
 
     // iOS: span.tags span[data-tag-name]
     final tagEls = document.querySelectorAll('div.submission-tags div span.tags');
@@ -190,33 +205,65 @@ class Submission {
     final ratingEl = document.querySelector('[class*="c-contentRating"]');
     final ratingText = ratingEl?.text.trim() ?? '';
     final isNsfw = ratingText == 'Adult' || ratingText == 'Mature';
-    final rating = ratingText == 'Adult' ? 'adult' : ratingText == 'Mature' ? 'mature' : 'general';
+    final rating =
+        ratingText == 'Adult' ? 'adult' : ratingText == 'Mature' ? 'mature' : 'general';
 
     // iOS: span.popup_date
     final dateEl = document.querySelector('span.popup_date');
     final date = dateEl?.attributes['title'] ?? dateEl?.text.trim() ?? '';
 
-    // Parse favorite button: look for /fav/ID/ or /unfav/ID/ link
+    // ── Parse favorite button: multi-strategy ──
     bool isFavorite = false;
     String favoriteUrl = '';
-    final favLinks = document.querySelectorAll('a[href*="/unfav/"], a[href*="/fav/"]');
+
+    // Strategy 1: Standard <a href="/fav/..."> or <a href="/unfav/..."> links
+    final favLinks = document.querySelectorAll(
+        'a[href*="/unfav/"], a[href*="/fav/"]');
     if (favLinks.isNotEmpty) {
-      // The first matching link is the active action
-      final favHref = favLinks.first.attributes['href'] ?? '';
-      if (favHref.contains('/unfav/')) {
-        isFavorite = true;
-        favoriteUrl = favHref;
-      } else if (favHref.contains('/fav/')) {
-        isFavorite = false;
-        favoriteUrl = favHref;
+      for (final link in favLinks) {
+        final href = link.attributes['href'] ?? '';
+        if (href.contains('/unfav/')) {
+          isFavorite = true;
+          favoriteUrl = href;
+          break;
+        } else if (href.contains('/fav/')) {
+          isFavorite = false;
+          favoriteUrl = href;
+          break;
+        }
       }
     }
-    // Fallback: check for button elements too
+
+    // Strategy 2: Form action (FA may use <form action="/fav/ID/">)
     if (favoriteUrl.isEmpty) {
-      final favBtns = document.querySelectorAll('button[data-action="fav"], button[data-action="unfav"]');
+      final favForms = document.querySelectorAll('form[action*="/fav/"], form[action*="/unfav/"]');
+      if (favForms.isNotEmpty) {
+        final action = favForms.first.attributes['action'] ?? '';
+        if (action.contains('/unfav/')) {
+          isFavorite = true;
+          favoriteUrl = action;
+        } else if (action.contains('/fav/')) {
+          favoriteUrl = action;
+        }
+        // Look for hidden key input
+        final keyInput = favForms.first.querySelector('input[name="key"]');
+        if (keyInput != null && favoriteUrl.isNotEmpty) {
+          final key = keyInput.attributes['value'] ?? '';
+          if (key.isNotEmpty && !favoriteUrl.contains('key=')) {
+            favoriteUrl += '?key=$key';
+          }
+        }
+      }
+    }
+
+    // Strategy 3: Button data-action
+    if (favoriteUrl.isEmpty) {
+      final favBtns = document.querySelectorAll(
+          'button[data-action="fav"], button[data-action="unfav"]');
       if (favBtns.isNotEmpty) {
         final action = favBtns.first.attributes['data-action'] ?? '';
-        final sid = favBtns.first.attributes['data-id'] ?? submissionId;
+        final sid =
+            favBtns.first.attributes['data-id'] ?? submissionId;
         if (action == 'unfav') {
           isFavorite = true;
           favoriteUrl = '/unfav/$sid/';
@@ -225,6 +272,36 @@ class Submission {
         }
       }
     }
+
+    // Strategy 4: .favorite-button / .fav-button class
+    if (favoriteUrl.isEmpty) {
+      final favBtn =
+          document.querySelector('a.favorite-button, a.fav-button, button.favorite-button');
+      if (favBtn != null) {
+        final href = favBtn.attributes['href'] ?? '';
+        final onClick = favBtn.attributes['onclick'] ?? '';
+        if (href.isNotEmpty) {
+          isFavorite = href.contains('/unfav/') || href.contains('/remove/') || favBtn.classes.contains('active');
+          favoriteUrl = href;
+        } else if (onClick.isNotEmpty) {
+          // Extract URL from onclick like: location.href='/fav/123456/'
+          final onClickMatch = RegExp(r'''['"](/(?:un)?fav/\d+/?)['"]''').firstMatch(onClick);
+          if (onClickMatch != null) {
+            favoriteUrl = onClickMatch.group(1)!;
+            isFavorite = favoriteUrl.contains('/unfav/');
+          }
+        }
+      }
+    }
+
+    // Strategy 5: Last resort — construct URL from submission ID
+    if (favoriteUrl.isEmpty && submissionId.isNotEmpty) {
+      debugPrint('=== parseSubmissionDetails: no fav link found, constructing fallback URL');
+      favoriteUrl = '/fav/$submissionId/';
+    }
+
+    debugPrint(
+        '=== parseSubmissionDetails: favUrl=$favoriteUrl isFavorite=$isFavorite');
 
     return Submission(
       id: submissionId,
