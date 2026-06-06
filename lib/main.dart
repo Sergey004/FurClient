@@ -216,7 +216,7 @@ class _FurClientAppState extends State<FurClientApp> {
               theme = AppTheme.darkTheme;
             } else if (!isMobile && darkDynamic != null) {
               theme = AppTheme.buildFromDynamicColor(darkDynamic);
-            } else if (darkDynamic != null) {
+            } else if (darkDynamic != null && lightDynamic != null) {
               theme = AppTheme.buildFromDynamicColor(darkDynamic);
               lightTheme = AppTheme.buildTheme(
                 lightDynamic.copyWith(
