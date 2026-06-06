@@ -129,7 +129,7 @@ class _GalleryScreenState extends State<GalleryScreen>
 
   void _navigateToDetail(Submission submission) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      adaptiveRoute(
         builder: (_) => SubmissionDetailScreen(
           client: widget.client,
           submissionId: submission.id,
@@ -237,8 +237,7 @@ class _GalleryScreenState extends State<GalleryScreen>
             const Text('No submissions found',
                 style: TextStyle(color: AppColors.textDim, fontSize: 16)),
             const SizedBox(height: 8),
-            TextButton(
-                onPressed: _loadSubmissions, child: const Text('Refresh')),
+            AdaptiveButton(label: 'Refresh', onPressed: _loadSubmissions),
           ],
         ),
       );

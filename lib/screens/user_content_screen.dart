@@ -148,7 +148,7 @@ class _UserContentScreenState extends State<UserContentScreen> {
 
   void _navigateToDetail(Submission submission) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      adaptiveRoute(
         builder: (_) => SubmissionDetailScreen(
           client: widget.client,
           submissionId: submission.id,
@@ -160,7 +160,7 @@ class _UserContentScreenState extends State<UserContentScreen> {
 
   void _navigateToJournal(FAJournalPreview journal) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      adaptiveRoute(
         builder: (_) => JournalDetailScreen(
           client: widget.client,
           journalId: journal.id,
@@ -221,21 +221,14 @@ class _UserContentScreenState extends State<UserContentScreen> {
               Text('No submissions found',
                   style: TextStyle(color: AppColors.textDim, fontSize: 16)),
               const SizedBox(height: 8),
-              TextButton(
-                onPressed: _loadContent,
-                child: const Text('Refresh'),
-              ),
+              AdaptiveButton(label: 'Refresh', onPressed: _loadContent),
             ],
           ),
         ),
       );
     }
 
-    return RefreshIndicator(
-      color: AppColors.fluentCyan,
-      backgroundColor: AppColors.bgCard,
-      onRefresh: _onRefresh,
-      child: LayoutBuilder(
+    return LayoutBuilder(
         builder: (context, constraints) {
           final crossAxisCount = _getCrossAxisCount(constraints.maxWidth);
           final isDesktop = constraints.maxWidth >= AppBreakpoints.desktop;
@@ -255,7 +248,7 @@ class _UserContentScreenState extends State<UserContentScreen> {
                 return const Padding(
                   padding: EdgeInsets.all(16),
                   child: Center(
-                      child: CircularProgressIndicator(strokeWidth: 2)),
+                      child: AdaptiveProgress(strokeWidth: 2)),
                 );
               }
               return SubmissionCard(
@@ -288,21 +281,14 @@ class _UserContentScreenState extends State<UserContentScreen> {
               Text('No journals found',
                   style: TextStyle(color: AppColors.textDim, fontSize: 16)),
               const SizedBox(height: 8),
-              TextButton(
-                onPressed: _loadContent,
-                child: const Text('Refresh'),
-              ),
+              AdaptiveButton(label: 'Refresh', onPressed: _loadContent),
             ],
           ),
         ),
       );
     }
 
-    return RefreshIndicator(
-      color: AppColors.fluentCyan,
-      backgroundColor: AppColors.bgCard,
-      onRefresh: _onRefresh,
-      child: ListView.separated(
+    return ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _journals.length,
         separatorBuilder: (_, __) =>

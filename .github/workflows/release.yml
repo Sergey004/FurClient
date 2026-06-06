@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  FLUTTER_VERSION: "3.24.0"
+  JAVA_VERSION: "17"
+  DOTNET_VERSION: "8.0.x"
+
+jobs:
+  # ─── Build & Release Android APK ────────────────────────────────
+  release-android:
+    name: Release Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: "gradle"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build APK (release)
+        run: flutter build apk --release
+
+      - name: Build App Bundle (release)
+        run: flutter build appbundle --release
+
+      - name: Rename artifacts
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk \
+            furclient-${{ github.ref_name }}-android.apk
+          mv build/app/outputs/bundle/release/app-release.aab \
+            furclient-${{ github.ref_name }}-android.aab
+
+      - name: Upload Android to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            furclient-${{ github.ref_name }}-android.apk
+            furclient-${{ github.ref_name }}-android.aab
+          generate_release_notes: true
+
+  # ─── Build & Release Windows (Velopack) ──────────────────────
+  release-windows:
+    name: Release Windows
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install Velopack CLI
+        run: dotnet tool install --global vpk
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Windows (release)
+        run: flutter build windows --release
+
+      - name: Pack with Velopack
+        shell: pwsh
+        run: |
+          vpk pack `
+            -e build/windows/x64/runner/Release/furclient.exe `
+            -c build/windows/x64/runner/Release `
+            -o velopack-output `
+            --channelUrl "https://github.com/${{ github.repository }}/releases/latest/download/RELEASES" `
+            --packId "furclient" `
+            --packVersion "${{ github.ref_name }}"
+
+      - name: Upload Velopack assets to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: velopack-output/*
+          generate_release_notes: true

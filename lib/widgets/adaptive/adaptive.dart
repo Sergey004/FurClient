@@ -4,3 +4,4 @@ export 'adaptive_text_field.dart';
 export 'adaptive_progress.dart';
 export 'adaptive_card.dart';
 export 'adaptive_switch.dart';
+export 'adaptive_route.dart';

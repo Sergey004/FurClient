@@ -64,7 +64,7 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
 
   void _navigateToProfile(String username) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      adaptiveRoute(
         builder: (_) => ProfileScreen(
           client: widget.client,
           session: widget.client.session!,

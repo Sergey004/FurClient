@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/cdn_loader.dart';
+import '../widgets/adaptive/adaptive.dart';
 
 /// CDN Image Loader with unified CDNLoader backend
 ///
@@ -66,7 +67,7 @@ class CDNImageLoader {
           return placeholder ?? const SizedBox(
             width: 50,
             height: 50,
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: AdaptiveProgress()),
           );
         }
 

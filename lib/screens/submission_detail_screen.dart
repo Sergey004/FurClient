@@ -80,7 +80,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
   void _navigateToProfile(String username) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      adaptiveRoute(
         builder: (_) => ProfileScreen(
           client: widget.client,
           session: widget.client.session!,
@@ -479,10 +479,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                     border: Border.all(color: AppColors.border),
                   ),
                   child: _isDownloading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 14,
                           height: 14,
-                          child: CircularProgressIndicator(
+                          child: AdaptiveProgress(
                             strokeWidth: 2,
                             color: AppColors.fluentCyan,
                           ),
@@ -515,10 +515,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_isFaving)
-                        const SizedBox(
+                        SizedBox(
                           width: 14,
                           height: 14,
-                          child: CircularProgressIndicator(
+                          child: AdaptiveProgress(
                             strokeWidth: 2,
                             color: AppColors.notifFave,
                           ),

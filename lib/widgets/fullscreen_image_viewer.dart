@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:io' as io;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:extended_image/extended_image.dart';
 import '../utils/webview_image_fetcher.dart';
 import '../utils/cookie_store.dart';
+import '../utils/platform_utils.dart';
 
 /// Fullscreen image viewer powered by extended_image.
 /// Zoom, pan, double-tap, slide-to-dismiss.
@@ -141,9 +143,7 @@ class FullscreenImageViewer extends StatelessWidget {
         Navigator.of(context).pop();
         return true;
       },
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Stack(
+      child: Stack(
           fit: StackFit.expand,
           children: [
             // Image with zoom/pan
@@ -152,9 +152,11 @@ class FullscreenImageViewer extends StatelessWidget {
                 future: loadImageBytes(imageUrl),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white54),
+                    return Center(
+                      child: isWindows
+                          ? const fluent.ProgressRing()
+                          : const CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white54),
                     );
                   }
                   final bytes = snapshot.data;
@@ -223,13 +225,14 @@ class FullscreenImageViewer extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
                   child: Row(
                     children: [
-                      Material(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(20),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(20),
+                      GestureDetector(
                           onTap: () => Navigator.of(context).pop(),
-                          child: const Padding(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white12,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Padding(
                             padding: EdgeInsets.all(8),
                             child: Icon(Icons.close,
                                 color: Colors.white, size: 22),

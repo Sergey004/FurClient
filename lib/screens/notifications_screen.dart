@@ -66,7 +66,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     final viewMatch = RegExp(r'/view/(\d+)').firstMatch(notification.url);
     if (viewMatch != null) {
       Navigator.of(context).push(
-        MaterialPageRoute(
+        adaptiveRoute(
           builder: (_) => SubmissionDetailScreen(
             client: widget.client,
             submissionId: viewMatch.group(1)!,
@@ -80,7 +80,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     final journalMatch = RegExp(r'/journal/(\d+)').firstMatch(notification.url);
     if (journalMatch != null) {
       Navigator.of(context).push(
-        MaterialPageRoute(
+        adaptiveRoute(
           builder: (_) => JournalDetailScreen(
             client: widget.client,
             journalId: journalMatch.group(1)!,
@@ -94,7 +94,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     final userMatch = RegExp(r'/user/([a-zA-Z][a-zA-Z0-9_]+)/').firstMatch(notification.url);
     if (userMatch != null) {
       Navigator.of(context).push(
-        MaterialPageRoute(
+        adaptiveRoute(
           builder: (_) => ProfileScreen(
             client: widget.client,
             session: widget.client.session!,
@@ -167,8 +167,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             const Text('No notifications',
                 style: TextStyle(color: AppColors.textDim, fontSize: 16)),
             const SizedBox(height: 8),
-            TextButton(
-                onPressed: _loadNotifications, child: const Text('Refresh')),
+            AdaptiveButton(label: 'Refresh', onPressed: _loadNotifications),
           ],
         ),
       );

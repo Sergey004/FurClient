@@ -166,7 +166,7 @@ class _SearchScreenState extends State<SearchScreen>
 
   void _navigateToDetail(Submission submission) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      adaptiveRoute(
         builder: (_) => SubmissionDetailScreen(
           client: widget.client,
           submissionId: submission.id,

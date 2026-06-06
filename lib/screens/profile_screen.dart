@@ -490,7 +490,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   void _openUserContent(String username, UserContentType contentType) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      adaptiveRoute(
         builder: (_) => UserContentScreen(
           client: widget.client,
           username: username,

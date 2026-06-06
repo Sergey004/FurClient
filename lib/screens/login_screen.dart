@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' show min;
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
@@ -10,6 +11,7 @@ import '../services/auth_service.dart';
 import '../services/fa_urls.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/cookie_manager.dart';
+import '../utils/platform_utils.dart';
 import '../main.dart' show webViewEnvironment;
 
 // Типы для работы с куки из разных источников
@@ -788,6 +790,16 @@ class _LoginScreenState extends State<LoginScreen>
     final width = MediaQuery.of(context).size.width;
     final isDesktopWidth = width >= AppBreakpoints.desktop;
 
+    if (isWindows) {
+      return Container(
+        color: AppColors.bg,
+        child: SafeArea(
+          child: _showWebView
+              ? _buildWebView(isDesktopWidth)
+              : _buildLoginForm(isDesktopWidth),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
@@ -818,17 +830,26 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ),
                   ),
-                  TextButton(
-                    onPressed: _cancelLogin,
-                    child: const Text('Cancel'),
-                  ),
+                  if (isWindows)
+                    fluent.Button(
+                      onPressed: _cancelLogin,
+                      child: const Text('Cancel'),
+                    )
+                  else
+                    TextButton(
+                      onPressed: _cancelLogin,
+                      child: const Text('Cancel'),
+                    ),
                 ],
               ),
             ),
-            const LinearProgressIndicator(
-              color: AppColors.fluentCyan,
-              backgroundColor: AppColors.bgInput,
-            ),
+            if (isWindows)
+              const fluent.ProgressBar(value: null)
+            else
+              const LinearProgressIndicator(
+                color: AppColors.fluentCyan,
+                backgroundColor: AppColors.bgInput,
+              ),
             Expanded(
               child: InAppWebView(
                 webViewEnvironment: webViewEnvironment,
@@ -910,18 +931,30 @@ class _LoginScreenState extends State<LoginScreen>
           Positioned.fill(
             child: Container(
               color: Colors.black54,
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 12),
-                    Text(
-                      'Completing login...',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ],
-                ),
+              child: Center(
+                child: isWindows
+                    ? const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          fluent.ProgressRing(),
+                          SizedBox(height: 12),
+                          Text(
+                            'Completing login...',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      )
+                    : const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 12),
+                          Text(
+                            'Completing login...',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
               ),
             ),
           ),

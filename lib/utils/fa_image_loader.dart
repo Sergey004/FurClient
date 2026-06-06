@@ -201,7 +201,7 @@ class _FAImageState extends State<FAImage> {
     return Container(
       color: const Color(0xFF1A1A1A),
       child: const Center(
-        child: CircularProgressIndicator(strokeWidth: 2),
+        child: AdaptiveProgress(strokeWidth: 2),
       ),
     );
   }

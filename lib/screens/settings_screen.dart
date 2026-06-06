@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_selector/file_selector.dart';
 import '../theme/app_theme.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../services/fa_client.dart';
+import '../utils/platform_utils.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool sfwMode;
@@ -63,9 +65,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _onSfwToggle(bool value) async {
     setState(() => _sfwMode = value);
     widget.onSfwModeChanged(value);
-    // Save to SharedPreferences
     await _saveSetting('sfw_mode', value);
-    // Sync with FA website
     if (widget.client != null) {
       debugPrint('=== SettingsScreen: Syncing SFW toggle with FA website...');
       await widget.client!.toggleSiteSfwMode();
@@ -73,35 +73,60 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   void _confirmLogout() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border),
-        ),
-        title: const Text('Logout', style: TextStyle(color: AppColors.text)),
-        content: const Text(
-          'Are you sure you want to logout? You will need to sign in again.',
-          style: TextStyle(color: AppColors.textDim),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+    if (isWindows) {
+      fluent.showDialog(
+        context: context,
+        builder: (context) => fluent.ContentDialog(
+          title: const Text('Logout'),
+          content: const Text(
+            'Are you sure you want to logout? You will need to sign in again.',
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              widget.onLogout();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
-            child: const Text('Logout'),
+          actions: [
+            fluent.Button(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            fluent.FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onLogout();
+              },
+              child: const Text('Logout'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.bgCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppColors.border),
           ),
-        ],
-      ),
-    );
+          title: const Text('Logout', style: TextStyle(color: AppColors.text)),
+          content: const Text(
+            'Are you sure you want to logout? You will need to sign in again.',
+            style: TextStyle(color: AppColors.textDim),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onLogout();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+              child: const Text('Logout'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override
@@ -155,104 +180,43 @@ class _SettingsScreenState extends State<SettingsScreen>
             subtitle: 'Close submission view after favoriting',
           ),
           const Divider(height: 1, indent: 16, color: AppColors.border),
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            title: Row(
-              children: [
-                const Icon(Icons.high_quality_outlined, color: AppColors.materialLavender, size: 20),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text('Image Quality',
-                      style: TextStyle(color: AppColors.text, fontSize: 15)),
-                ),
-              ],
-            ),
-            subtitle: const Padding(
-              padding: EdgeInsets.only(left: 32),
-              child: Text('Quality for full-size images',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-            ),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.bgInput,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _imageQuality,
-                  isDense: true,
-                  style: const TextStyle(color: AppColors.text, fontSize: 13),
-                  dropdownColor: AppColors.bgCard,
-                  items: const [
-                    DropdownMenuItem(value: 'low', child: Text('Low')),
-                    DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                    DropdownMenuItem(value: 'high', child: Text('High')),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) {
-                      setState(() => _imageQuality = v);
-                      _saveSetting('image_quality', v);
-                    }
-                  },
-                ),
-              ),
-            ),
-          ),
+          _buildImageQualityTile(),
         ]),
         const SizedBox(height: 24),
         _sectionHeader('DOWNLOADS'),
-        _card([
-          _buildDownloadFolderTile(),
-        ]),
+        _card([_buildDownloadFolderTile()]),
         const SizedBox(height: 24),
         _sectionHeader('ACCOUNT'),
         _card([
-          ListTile(
-            leading:
-                const Icon(Icons.logout, color: AppColors.danger, size: 22),
-            title: const Text('Logout',
-                style: TextStyle(
-                    color: AppColors.danger,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500)),
+          _actionTile(
+            icon: Icons.logout,
+            color: AppColors.danger,
+            title: 'Logout',
             onTap: _confirmLogout,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
         ]),
         const SizedBox(height: 24),
         _sectionHeader('ABOUT'),
         _card([
-          const ListTile(
-            leading: Icon(Icons.pets, color: AppColors.accentLight, size: 22),
-            title: Text('FurClient',
-                style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500)),
-            subtitle: Text('A FurAffinity client',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16),
+          _infoTile(
+            icon: Icons.pets,
+            iconColor: AppColors.accentLight,
+            title: 'FurClient',
+            subtitle: 'A FurAffinity client',
           ),
           const Divider(height: 1, indent: 56, color: AppColors.border),
-          const ListTile(
-            leading:
-                Icon(Icons.info_outline, color: AppColors.textDim, size: 22),
-            title: Text('Version',
-                style: TextStyle(color: AppColors.text, fontSize: 15)),
-            trailing: Text('1.0.0',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16),
+          _infoTile(
+            icon: Icons.info_outline,
+            iconColor: AppColors.textDim,
+            title: 'Version',
+            trailing: '1.0.0',
           ),
           const Divider(height: 1, indent: 56, color: AppColors.border),
-          const ListTile(
-            leading: Icon(Icons.code, color: AppColors.textDim, size: 22),
-            title: Text('Built with Flutter',
-                style: TextStyle(color: AppColors.text, fontSize: 15)),
-            trailing: Text('3.x',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16),
+          _infoTile(
+            icon: Icons.code,
+            iconColor: AppColors.textDim,
+            title: 'Built with Flutter',
+            trailing: '3.x',
           ),
         ]),
         const SizedBox(height: 32),
@@ -310,51 +274,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     subtitle: 'Close submission view after favoriting',
                   ),
                   const Divider(height: 1, indent: 16, color: AppColors.border),
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    title: Row(
-                      children: [
-                        const Icon(Icons.high_quality_outlined, color: AppColors.materialLavender, size: 20),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text('Image Quality',
-                              style: TextStyle(color: AppColors.text, fontSize: 15)),
-                        ),
-                      ],
-                    ),
-                    subtitle: const Padding(
-                      padding: EdgeInsets.only(left: 32),
-                      child: Text('Quality for full-size images',
-                          style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-                    ),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgInput,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _imageQuality,
-                          isDense: true,
-                          style: const TextStyle(color: AppColors.text, fontSize: 13),
-                          dropdownColor: AppColors.bgCard,
-                          items: const [
-                            DropdownMenuItem(value: 'low', child: Text('Low')),
-                            DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                            DropdownMenuItem(value: 'high', child: Text('High')),
-                          ],
-                          onChanged: (v) {
-                            if (v != null) {
-                              setState(() => _imageQuality = v);
-                              _saveSetting('image_quality', v);
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
+                  _buildImageQualityTile(),
                 ],
               ),
               const SizedBox(height: 20),
@@ -362,9 +282,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 title: 'Downloads',
                 icon: Icons.folder_outlined,
                 accent: AppColors.fluentCyan,
-                children: [
-                  _buildDownloadFolderTile(),
-                ],
+                children: [_buildDownloadFolderTile()],
               ),
               const SizedBox(height: 20),
               _desktopSection(
@@ -372,19 +290,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                 icon: Icons.person,
                 accent: AppColors.fluentCyan,
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.logout,
-                        color: AppColors.danger, size: 22),
-                    title: const Text('Logout',
-                        style: TextStyle(
-                            color: AppColors.danger,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500)),
-                    subtitle: const Text('Sign out and clear session',
-                        style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 13)),
+                  _actionTile(
+                    icon: Icons.logout,
+                    color: AppColors.danger,
+                    title: 'Logout',
+                    subtitle: 'Sign out and clear session',
                     onTap: _confirmLogout,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
                 ],
               ),
@@ -393,41 +304,26 @@ class _SettingsScreenState extends State<SettingsScreen>
                 title: 'About',
                 icon: Icons.info_outline,
                 accent: AppColors.materialLavender,
-                children: const [
-                  ListTile(
-                    leading: Icon(Icons.pets,
-                        color: AppColors.accentLight, size: 22),
-                    title: Text('FurClient',
-                        style: TextStyle(
-                            color: AppColors.text,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500)),
-                    subtitle: Text('A FurAffinity client',
-                        style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 13)),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  _infoTile(
+                    icon: Icons.pets,
+                    iconColor: AppColors.accentLight,
+                    title: 'FurClient',
+                    subtitle: 'A FurAffinity client',
                   ),
-                  Divider(height: 1, indent: 56, color: AppColors.border),
-                  ListTile(
-                    leading: Icon(Icons.info_outline,
-                        color: AppColors.textDim, size: 22),
-                    title: Text('Version',
-                        style: TextStyle(color: AppColors.text, fontSize: 15)),
-                    trailing: Text('1.0.0',
-                        style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 14)),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                  const Divider(height: 1, indent: 56, color: AppColors.border),
+                  _infoTile(
+                    icon: Icons.info_outline,
+                    iconColor: AppColors.textDim,
+                    title: 'Version',
+                    trailing: '1.0.0',
                   ),
-                  Divider(height: 1, indent: 56, color: AppColors.border),
-                  ListTile(
-                    leading:
-                        Icon(Icons.code, color: AppColors.textDim, size: 22),
-                    title: Text('Built with Flutter',
-                        style: TextStyle(color: AppColors.text, fontSize: 15)),
-                    trailing: Text('3.x',
-                        style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 14)),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                  const Divider(height: 1, indent: 56, color: AppColors.border),
+                  _infoTile(
+                    icon: Icons.code,
+                    iconColor: AppColors.textDim,
+                    title: 'Built with Flutter',
+                    trailing: '3.x',
                   ),
                 ],
               ),
@@ -437,6 +333,243 @@ class _SettingsScreenState extends State<SettingsScreen>
       ),
     );
   }
+
+  // ── Shared tile helpers (no Material widgets) ──────────────────────
+
+  /// Info row — icon + title + optional subtitle + optional trailing text.
+  Widget _infoTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    String? subtitle,
+    String? trailing,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 22),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        color: AppColors.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500)),
+                if (subtitle != null)
+                  Text(subtitle,
+                      style: const TextStyle(
+                          color: AppColors.textMuted, fontSize: 13)),
+              ],
+            ),
+          ),
+          if (trailing != null)
+            Text(trailing,
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  /// Action row — icon + title + optional subtitle, tappable.
+  Widget _actionTile({
+    required IconData icon,
+    required Color color,
+    required String title,
+    String? subtitle,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          color: color,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500)),
+                  if (subtitle != null)
+                    Text(subtitle,
+                        style: const TextStyle(
+                            color: AppColors.textMuted, fontSize: 13)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Image quality tile with platform-conditional dropdown.
+  Widget _buildImageQualityTile() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.high_quality_outlined,
+              color: AppColors.materialLavender, size: 20),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Image Quality',
+                    style:
+                        TextStyle(color: AppColors.text, fontSize: 15)),
+                SizedBox(height: 2),
+                Text('Quality for full-size images',
+                    style:
+                        TextStyle(color: AppColors.textMuted, fontSize: 13)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (isWindows)
+            SizedBox(
+              width: 120,
+              child: fluent.ComboBox<String>(
+                value: _imageQuality,
+                isExpanded: true,
+                items: ['low', 'medium', 'high']
+                    .map((e) => fluent.ComboBoxItem<String>(
+                          value: e,
+                          child: Text(e == 'low'
+                              ? 'Low'
+                              : e == 'medium'
+                                  ? 'Medium'
+                                  : 'High'),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() => _imageQuality = v);
+                    _saveSetting('image_quality', v);
+                  }
+                },
+              ),
+            )
+          else
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.bgInput,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _imageQuality,
+                  isDense: true,
+                  style: const TextStyle(color: AppColors.text, fontSize: 13),
+                  dropdownColor: AppColors.bgCard,
+                  items: const [
+                    DropdownMenuItem(value: 'low', child: Text('Low')),
+                    DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                    DropdownMenuItem(value: 'high', child: Text('High')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() => _imageQuality = v);
+                      _saveSetting('image_quality', v);
+                    }
+                  },
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Download folder tile — no Material/InkWell.
+  Widget _buildDownloadFolderTile() {
+    final displayPath =
+        _customDownloadPath.isEmpty ? 'Default' : _customDownloadPath;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.folder_outlined,
+              color: AppColors.fluentCyan, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Download Folder',
+                    style:
+                        TextStyle(color: AppColors.text, fontSize: 15)),
+                const SizedBox(height: 2),
+                Text(
+                  displayPath,
+                  style: TextStyle(
+                    color: _customDownloadPath.isEmpty
+                        ? AppColors.textMuted
+                        : AppColors.textDim,
+                    fontSize: 13,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (_customDownloadPath.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                setState(() => _customDownloadPath = '');
+                _saveSetting('custom_download_path', '');
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child:
+                    Icon(Icons.close, size: 16, color: AppColors.textDim),
+              ),
+            ),
+          GestureDetector(
+            onTap: _pickFolder,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.bgInput,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.edit, size: 14, color: AppColors.fluentCyan),
+                  SizedBox(width: 4),
+                  Text('Change',
+                      style:
+                          TextStyle(color: AppColors.fluentCyan, fontSize: 13)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Section helpers ──────────────────────────────────────────────────
 
   Widget _sectionHeader(String text) {
     return Padding(
@@ -461,10 +594,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: Column(children: children),
-      ),
+      child: Column(children: children),
     );
   }
 
@@ -495,86 +625,6 @@ class _SettingsScreenState extends State<SettingsScreen>
         const SizedBox(height: 8),
         _card(children),
       ],
-    );
-  }
-
-  Widget _buildDownloadFolderTile() {
-    final displayPath = _customDownloadPath.isEmpty
-        ? 'Default'
-        : _customDownloadPath;
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      title: Row(
-        children: [
-          const Icon(Icons.folder_outlined, color: AppColors.fluentCyan, size: 20),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text('Download Folder',
-                style: TextStyle(color: AppColors.text, fontSize: 15)),
-          ),
-        ],
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(left: 32),
-        child: Text(
-          Platform.isWindows
-              ? displayPath
-              : displayPath,
-          style: TextStyle(
-            color: _customDownloadPath.isEmpty
-                ? AppColors.textMuted
-                : AppColors.textDim,
-            fontSize: 13,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_customDownloadPath.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.close, size: 16, color: AppColors.textDim),
-              tooltip: 'Reset to default',
-              onPressed: () {
-                setState(() => _customDownloadPath = '');
-                _saveSetting('custom_download_path', '');
-              },
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.bgInput,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _pickFolder,
-                borderRadius: BorderRadius.circular(8),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.edit, size: 14, color: AppColors.fluentCyan),
-                      SizedBox(width: 4),
-                      Text('Change',
-                          style: TextStyle(color: AppColors.fluentCyan, fontSize: 13)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      onTap: _pickFolder,
     );
   }
 
