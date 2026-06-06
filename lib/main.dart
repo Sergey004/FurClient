@@ -11,11 +11,13 @@ import 'package:cronet_http/cronet_http.dart';
 import 'package:cupertino_http/cupertino_http.dart';
 import 'services/auth_service.dart';
 import 'services/fa_client.dart';
+import 'services/update_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/cookie_manager.dart';
 import 'screens/login_screen.dart';
 import 'navigation/adaptive_shell.dart';
 import 'utils/platform_utils.dart';
+import 'package:upgrader/upgrader.dart';
 import 'utils/fa_image_proxy.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -82,6 +84,7 @@ class FurClientApp extends StatefulWidget {
 class _FurClientAppState extends State<FurClientApp> {
   final AuthService _authService = AuthService();
   final FAClient _client = FAClient();
+  final UpdateService _updateService = UpdateService();
   bool _isLoggedIn = false;
   bool _isRestoringSession = true;
 
@@ -95,6 +98,11 @@ class _FurClientAppState extends State<FurClientApp> {
     try {
       debugPrint('=== _initApp: Starting application initialization');
       await _client.init();
+
+      // Windows: start update checker in background
+      if (isWindows) {
+        _updateService.init();
+      }
       debugPrint('=== _initApp: FAClient initialized');
       await _authService.loadSavedSession();
       debugPrint(
@@ -161,6 +169,12 @@ class _FurClientAppState extends State<FurClientApp> {
   }
 
   @override
+  void dispose() {
+    _updateService.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (isWindows) {
       return _buildFluentApp();
@@ -208,7 +222,9 @@ class _FurClientAppState extends State<FurClientApp> {
                 title: 'FurClient',
                 debugShowCheckedModeBanner: false,
                 theme: desktopTheme,
-                home: _buildHome(),
+                home: UpgradeAlert(
+                  child: _buildHome(),
+                ),
               );
             },
           );
@@ -218,7 +234,9 @@ class _FurClientAppState extends State<FurClientApp> {
           title: 'FurClient',
           debugShowCheckedModeBanner: false,
           theme: theme,
-          home: _buildHome(),
+          home: UpgradeAlert(
+            child: _buildHome(),
+          ),
         );
       },
     );

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:fa_kit/fa_kit.dart';
 import 'webview_image_fetcher.dart';
 import '../utils/cookie_store.dart';
+import '../widgets/adaptive/adaptive_progress.dart';
 
 
 /// FA-специфичный виджет для загрузки изображений.

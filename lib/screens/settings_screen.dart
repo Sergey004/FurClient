@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +5,7 @@ import 'package:file_selector/file_selector.dart';
 import '../theme/app_theme.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../services/fa_client.dart';
+import '../services/update_service.dart';
 import '../utils/platform_utils.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -33,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _autoCloseOnFave = true;
   String _imageQuality = 'high'; // low, medium, high
   String _customDownloadPath = '';
+  final UpdateService _updateService = UpdateService();
 
   @override
   bool get wantKeepAlive => true;
@@ -41,7 +42,14 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     _sfwMode = widget.sfwMode;
+    _updateService.init();
     _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    _updateService.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSettings() async {
@@ -212,6 +220,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             trailing: '1.0.0',
           ),
           const Divider(height: 1, indent: 56, color: AppColors.border),
+          _buildUpdateTile(),
+          const Divider(height: 1, indent: 56, color: AppColors.border),
           _infoTile(
             icon: Icons.code,
             iconColor: AppColors.textDim,
@@ -318,6 +328,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'Version',
                     trailing: '1.0.0',
                   ),
+                  const Divider(height: 1, indent: 56, color: AppColors.border),
+                  _buildUpdateTile(),
                   const Divider(height: 1, indent: 56, color: AppColors.border),
                   _infoTile(
                     icon: Icons.code,
@@ -640,6 +652,134 @@ class _SettingsScreenState extends State<SettingsScreen>
     } catch (e) {
       debugPrint('=== Settings: Folder picker error: $e');
     }
+  }
+
+  /// Update check tile — version + check/download button.
+  Widget _buildUpdateTile() {
+    return ListenableBuilder(
+      listenable: _updateService,
+      builder: (context, _) {
+        final status = _updateService.status;
+        final version = _updateService.currentVersion ?? '...';
+        final latest = _updateService.latestVersion;
+
+        Color iconColor = AppColors.textDim;
+        String subtitle = 'v$version';
+
+        if (status == UpdateStatus.checking) {
+          iconColor = AppColors.fluentCyan;
+          subtitle = 'Checking...';
+        } else if (status == UpdateStatus.available) {
+          iconColor = AppColors.materialGreen;
+          subtitle = 'v$version \u2192 v$latest available!';
+        } else if (status == UpdateStatus.downloading) {
+          iconColor = AppColors.fluentCyan;
+          final pct = (_updateService.downloadProgress * 100).toInt();
+          subtitle = 'Downloading... $pct%';
+        } else if (status == UpdateStatus.installing) {
+          iconColor = AppColors.materialGreen;
+          subtitle = 'Installing...';
+        } else if (status == UpdateStatus.upToDate) {
+          iconColor = AppColors.materialGreen;
+          subtitle = 'v$version \u2014 up to date';
+        } else if (status == UpdateStatus.error) {
+          iconColor = AppColors.danger;
+          subtitle = _updateService.errorMessage ?? 'Update check failed';
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.system_update_outlined, color: iconColor, size: 22),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Update',
+                        style: TextStyle(
+                            color: AppColors.text,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        style: TextStyle(
+                            color: status == UpdateStatus.error
+                                ? AppColors.danger
+                                : AppColors.textMuted,
+                            fontSize: 13)),
+                    if (status == UpdateStatus.downloading)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: _updateService.downloadProgress,
+                            backgroundColor: AppColors.bgInput,
+                            valueColor:
+                                const AlwaysStoppedAnimation(AppColors.fluentCyan),
+                            minHeight: 4,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (status == UpdateStatus.idle ||
+                  status == UpdateStatus.upToDate ||
+                  status == UpdateStatus.error)
+                GestureDetector(
+                  onTap: () => _updateService.checkForUpdate(),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgInput,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh, size: 14, color: AppColors.fluentCyan),
+                        SizedBox(width: 4),
+                        Text('Check',
+                            style: TextStyle(
+                                color: AppColors.fluentCyan, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                )
+              else if (status == UpdateStatus.available)
+                GestureDetector(
+                  onTap: () => _updateService.downloadAndInstall(),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.materialGreen,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.download, size: 14, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text('Update',
+                            style: TextStyle(
+                                color: Colors.white, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _adaptiveSwitchTile({

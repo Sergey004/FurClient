@@ -144,8 +144,6 @@ class _UserContentScreenState extends State<UserContentScreen> {
     }
   }
 
-  Future<void> _onRefresh() async => _loadContent();
-
   void _navigateToDetail(Submission submission) {
     Navigator.of(context).push(
       adaptiveRoute(
@@ -261,8 +259,7 @@ class _UserContentScreenState extends State<UserContentScreen> {
             },
           );
         },
-      ),
-    );
+      );
   }
 
   // ── Journals list ───────────────────────────────────────────────────
@@ -289,15 +286,14 @@ class _UserContentScreenState extends State<UserContentScreen> {
     }
 
     return ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _journals.length,
-        separatorBuilder: (_, __) =>
-            const Divider(color: AppColors.border, height: 1),
-        itemBuilder: (context, index) {
-          final j = _journals[index];
-          return _journalTile(j);
-        },
-      ),
+      padding: const EdgeInsets.all(16),
+      itemCount: _journals.length,
+      separatorBuilder: (_, __) =>
+          const Divider(color: AppColors.border, height: 1),
+      itemBuilder: (context, index) {
+        final j = _journals[index];
+        return _journalTile(j);
+      },
     );
   }
 

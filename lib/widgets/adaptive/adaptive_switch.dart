@@ -19,9 +19,7 @@ class AdaptiveSwitch extends StatelessWidget {
     if (isWindows) {
       return fluent.ToggleSwitch(
         checked: value,
-        onChanged: (v) {
-          if (v != null) onChanged?.call(v);
-        },
+        onChanged: onChanged,
       );
     }
     return Switch(

@@ -144,8 +144,8 @@ class FullscreenImageViewer extends StatelessWidget {
         return true;
       },
       child: Stack(
-          fit: StackFit.expand,
-          children: [
+        fit: StackFit.expand,
+        children: [
             // Image with zoom/pan
             Center(
               child: FutureBuilder<Uint8List?>(
@@ -226,13 +226,13 @@ class FullscreenImageViewer extends StatelessWidget {
                   child: Row(
                     children: [
                       GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white12,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Padding(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white12,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Padding(
                             padding: EdgeInsets.all(8),
                             child: Icon(Icons.close,
                                 color: Colors.white, size: 22),
@@ -279,8 +279,7 @@ class FullscreenImageViewer extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
