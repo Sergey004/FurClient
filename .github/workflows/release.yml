@@ -51,7 +51,7 @@ jobs:
             furclient-${{ github.ref_name }}-android.aab
 
       - name: Upload Android to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             furclient-${{ github.ref_name }}-android.apk
@@ -103,7 +103,7 @@ jobs:
             --packVersion "${{ github.ref_name }}"
 
       - name: Upload Velopack assets to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: velopack-output/*
           generate_release_notes: true
