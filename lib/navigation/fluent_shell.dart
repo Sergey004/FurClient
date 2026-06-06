@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../services/search_history.dart';
+import '../theme/theme_provider.dart';
 import '../screens/gallery_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/notifications_screen.dart';
@@ -14,12 +15,14 @@ class FluentShell extends StatefulWidget {
   final FAClient client;
   final UserSession session;
   final VoidCallback onLogout;
+  final ThemeProvider themeProvider;
 
   const FluentShell({
     super.key,
     required this.client,
     required this.session,
     required this.onLogout,
+    required this.themeProvider,
   });
 
   @override
@@ -186,6 +189,7 @@ class _FluentShellState extends State<FluentShell> {
               onSfwModeChanged: _onSfwModeChanged,
               onLogout: widget.onLogout,
               client: widget.client,
+              themeProvider: widget.themeProvider,
             ),
           ),
         ],

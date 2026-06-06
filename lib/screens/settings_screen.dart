@@ -7,12 +7,14 @@ import '../widgets/adaptive/adaptive.dart';
 import '../services/fa_client.dart';
 import '../services/update_service.dart';
 import '../utils/platform_utils.dart';
+import '../theme/theme_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool sfwMode;
   final ValueChanged<bool> onSfwModeChanged;
   final VoidCallback onLogout;
   final FAClient? client;
+  final ThemeProvider themeProvider;
 
   const SettingsScreen({
     super.key,
@@ -20,6 +22,7 @@ class SettingsScreen extends StatefulWidget {
     required this.onSfwModeChanged,
     required this.onLogout,
     this.client,
+    required this.themeProvider,
   });
 
   @override
@@ -153,6 +156,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
+        _sectionHeader('APPEARANCE'),
+        _card([_buildThemeTile()]),
+        const SizedBox(height: 24),
         _sectionHeader('CONTENT'),
         _card([
           _adaptiveSwitchTile(
@@ -246,6 +252,13 @@ class _SettingsScreenState extends State<SettingsScreen>
               Text('Settings',
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 24),
+              _desktopSection(
+                title: 'Appearance',
+                icon: Icons.palette_outlined,
+                accent: AppColors.cupertinoPurple,
+                children: [_buildThemeTile()],
+              ),
+              const SizedBox(height: 20),
               _desktopSection(
                 title: 'Content',
                 icon: Icons.tune,
@@ -772,6 +785,88 @@ class _SettingsScreenState extends State<SettingsScreen>
                             style: TextStyle(
                                 color: Colors.white, fontSize: 13)),
                       ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Theme selection tile — System / Light / Dark / Original.
+  Widget _buildThemeTile() {
+    return ListenableBuilder(
+      listenable: widget.themeProvider,
+      builder: (context, _) {
+        final current = widget.themeProvider.mode;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              const Icon(Icons.palette_outlined,
+                  color: AppColors.cupertinoPurple, size: 22),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Theme',
+                        style: TextStyle(
+                            color: AppColors.text,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 2),
+                    Text('App appearance mode',
+                        style: const TextStyle(
+                            color: AppColors.textMuted, fontSize: 13)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (isWindows)
+                SizedBox(
+                  width: 130,
+                  child: fluent.ComboBox<AppThemeMode>(
+                    value: current,
+                    isExpanded: true,
+                    items: AppThemeMode.values
+                        .map((e) => fluent.ComboBoxItem<AppThemeMode>(
+                              value: e,
+                              child: Text(e.label),
+                            ))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) widget.themeProvider.setMode(v);
+                    },
+                  ),
+                )
+              else
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgInput,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<AppThemeMode>(
+                      value: current,
+                      isDense: true,
+                      style: const TextStyle(
+                          color: AppColors.text, fontSize: 13),
+                      dropdownColor: AppColors.bgCard,
+                      items: AppThemeMode.values
+                          .map((e) => DropdownMenuItem(
+                                value: e,
+                                child: Text(e.label),
+                              ))
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) widget.themeProvider.setMode(v);
+                      },
                     ),
                   ),
                 ),

@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../services/search_history.dart';
+import '../theme/theme_provider.dart';
 import '../screens/gallery_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/notifications_screen.dart';
@@ -14,12 +15,14 @@ class MaterialShell extends StatefulWidget {
   final FAClient client;
   final UserSession session;
   final VoidCallback onLogout;
+  final ThemeProvider themeProvider;
 
   const MaterialShell({
     super.key,
     required this.client,
     required this.session,
     required this.onLogout,
+    required this.themeProvider,
   });
 
   @override
@@ -105,6 +108,7 @@ class _MaterialShellState extends State<MaterialShell> {
         onSfwModeChanged: _onSfwModeChanged,
         onLogout: widget.onLogout,
         client: widget.client,
+        themeProvider: widget.themeProvider,
       ),
     ];
   }

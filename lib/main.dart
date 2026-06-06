@@ -13,6 +13,7 @@ import 'services/auth_service.dart';
 import 'services/fa_client.dart';
 import 'services/update_service.dart';
 import 'theme/app_theme.dart';
+import 'theme/theme_provider.dart';
 import 'utils/cookie_manager.dart';
 import 'screens/login_screen.dart';
 import 'navigation/adaptive_shell.dart';
@@ -85,6 +86,7 @@ class _FurClientAppState extends State<FurClientApp> {
   final AuthService _authService = AuthService();
   final FAClient _client = FAClient();
   final UpdateService _updateService = UpdateService();
+  final ThemeProvider _themeProvider = ThemeProvider();
   bool _isLoggedIn = false;
   bool _isRestoringSession = true;
 
@@ -171,6 +173,7 @@ class _FurClientAppState extends State<FurClientApp> {
   @override
   void dispose() {
     _updateService.dispose();
+    _themeProvider.dispose();
     super.dispose();
   }
 
@@ -197,46 +200,71 @@ class _FurClientAppState extends State<FurClientApp> {
   }
 
   Widget _buildMaterialApp() {
-    return DynamicColorBuilder(
-      builder: (lightDynamic, darkDynamic) {
-        final ThemeData theme;
-        if (!isMobile && darkDynamic == null) {
-          theme = AppTheme.darkTheme;
-        } else if (darkDynamic != null) {
-          theme = AppTheme.buildFromDynamicColor(darkDynamic);
-        } else {
-          theme = AppTheme.darkTheme;
-        }
+    return ListenableBuilder(
+      listenable: _themeProvider,
+      builder: (context, _) {
+        final themeMode = _themeProvider.themeMode;
+        final useSystemAccent = _themeProvider.useSystemAccent;
 
-        if (!isMobile) {
-          return SystemThemeBuilder(
-            builder: (context, systemAccent) {
-              final ThemeData desktopTheme;
-              if (darkDynamic != null) {
-                desktopTheme = AppTheme.buildFromDynamicColor(darkDynamic);
-              } else {
-                desktopTheme =
-                    AppTheme.buildFromSystemAccent(systemAccent.accent);
-              }
-              return MaterialApp(
-                title: 'FurClient',
-                debugShowCheckedModeBanner: false,
-                theme: desktopTheme,
-                home: UpgradeAlert(
-                  child: _buildHome(),
+        return DynamicColorBuilder(
+          builder: (lightDynamic, darkDynamic) {
+            ThemeData theme;
+            ThemeData? lightTheme;
+
+            if (!useSystemAccent) {
+              // Original mode — hardcoded dark cyan
+              theme = AppTheme.darkTheme;
+            } else if (!isMobile && darkDynamic != null) {
+              theme = AppTheme.buildFromDynamicColor(darkDynamic);
+            } else if (darkDynamic != null) {
+              theme = AppTheme.buildFromDynamicColor(darkDynamic);
+              lightTheme = AppTheme.buildTheme(
+                lightDynamic.copyWith(
+                  surface: lightDynamic.surface,
+                  onSurface: lightDynamic.onSurface,
                 ),
               );
-            },
-          );
-        }
+            } else {
+              theme = AppTheme.darkTheme;
+            }
 
-        return MaterialApp(
-          title: 'FurClient',
-          debugShowCheckedModeBanner: false,
-          theme: theme,
-          home: UpgradeAlert(
-            child: _buildHome(),
-          ),
+            if (!isMobile) {
+              return SystemThemeBuilder(
+                builder: (context, systemAccent) {
+                  final ThemeData desktopTheme;
+                  if (!useSystemAccent) {
+                    desktopTheme = AppTheme.darkTheme;
+                  } else if (darkDynamic != null) {
+                    desktopTheme = AppTheme.buildFromDynamicColor(darkDynamic);
+                  } else {
+                    desktopTheme =
+                        AppTheme.buildFromSystemAccent(systemAccent.accent);
+                  }
+                  return MaterialApp(
+                    title: 'FurClient',
+                    debugShowCheckedModeBanner: false,
+                    themeMode: themeMode,
+                    theme: lightTheme ?? desktopTheme,
+                    darkTheme: desktopTheme,
+                    home: UpgradeAlert(
+                      child: _buildHome(),
+                    ),
+                  );
+                },
+              );
+            }
+
+            return MaterialApp(
+              title: 'FurClient',
+              debugShowCheckedModeBanner: false,
+              themeMode: themeMode,
+              theme: lightTheme ?? theme,
+              darkTheme: theme,
+              home: UpgradeAlert(
+                child: _buildHome(),
+              ),
+            );
+          },
         );
       },
     );
@@ -286,6 +314,7 @@ class _FurClientAppState extends State<FurClientApp> {
           client: _client,
           session: session,
           onLogout: _onLogout,
+          themeProvider: _themeProvider,
         );
       }
     }

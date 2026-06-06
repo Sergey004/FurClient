@@ -54,7 +54,7 @@ class AppBreakpoints {
 
 class AppTheme {
   static ThemeData get darkTheme {
-    return _buildTheme(const ColorScheme.dark(
+    return buildTheme(const ColorScheme.dark(
       primary: AppColors.fluentCyanDark,
       onPrimary: Colors.white,
       secondary: AppColors.materialLavenderDark,
@@ -67,14 +67,14 @@ class AppTheme {
   }
 
   static ThemeData buildFromDynamicColor(ColorScheme darkDynamic) {
-    return _buildTheme(darkDynamic.copyWith(
+    return buildTheme(darkDynamic.copyWith(
       surface: darkDynamic.surface,
       onSurface: darkDynamic.onSurface,
     ));
   }
 
   static ThemeData buildFromSystemAccent(Color accent) {
-    return _buildTheme(ColorScheme.dark(
+    return buildTheme(ColorScheme.dark(
       primary: accent,
       onPrimary: Colors.white,
       secondary: AppColors.materialLavenderDark,
@@ -86,7 +86,7 @@ class AppTheme {
     ));
   }
 
-  static ThemeData _buildTheme(ColorScheme colorScheme) {
+  static ThemeData buildTheme(ColorScheme colorScheme) {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
