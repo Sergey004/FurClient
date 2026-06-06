@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
-import '../services/fa_urls.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/fa_image_loader.dart';
+import 'user_content_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final FAClient client;
@@ -356,7 +356,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         crossAxisCount: crossAxisCount,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-         childAspectRatio: 1.8,
+        childAspectRatio: 2.2,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
         children: [
@@ -443,61 +443,60 @@ class _ProfileScreenState extends State<ProfileScreen>
                   fontSize: 16,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          _linkTile(Icons.collections, 'Gallery', FAUrls.gallery(p.username),
-              AppColors.fluentCyan),
-          _linkTile(Icons.favorite, 'Favorites', FAUrls.favorites(p.username),
-              AppColors.materialGreen),
-          _linkTile(Icons.book, 'Journals', FAUrls.journals(p.username),
-              AppColors.notifJournal),
+          _linkTile(Icons.collections, 'Gallery', AppColors.fluentCyan,
+              () => _openUserContent(p.username, UserContentType.gallery)),
+          _linkTile(Icons.favorite, 'Favorites', AppColors.materialGreen,
+              () => _openUserContent(p.username, UserContentType.favorites)),
+          _linkTile(Icons.book, 'Journals', AppColors.notifJournal,
+              () => _openUserContent(p.username, UserContentType.journals)),
         ],
       ),
     );
   }
 
-  Widget _linkTile(IconData icon, String title, String url, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.1)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: Icon(icon, color: color, size: 22),
-        title: Text(title,
-            style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 15,
-                fontWeight: FontWeight.w500)),
-        trailing: const Icon(Icons.chevron_right,
-            color: AppColors.textMuted, size: 20),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => _LinkPlaceholder(title: title, url: url),
-            ),
-          );
-        },
-      ),
+  Widget _linkTile(IconData icon, String title, Color color, VoidCallback onTap) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.1)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(title,
+                    style: const TextStyle(
+                        color: AppColors.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500)),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: AppColors.textMuted, size: 20),
+            ],
+          ),
+        ),
       ),
     );
   }
-}
 
-class _LinkPlaceholder extends StatelessWidget {
-  final String title;
-  final String url;
-  const _LinkPlaceholder({required this.title, required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    return AdaptiveScaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(url, style: const TextStyle(color: AppColors.textDim))),
+  void _openUserContent(String username, UserContentType contentType) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => UserContentScreen(
+          client: widget.client,
+          username: username,
+          contentType: contentType,
+        ),
+      ),
     );
   }
 }

@@ -100,3 +100,8 @@ git add .
 git commit -m "description"
 git push
 git pull
+```
+
+## Note for FA Stuff
+
+If this app is causing any interference with the servers, I'll stop “developing” it right away.

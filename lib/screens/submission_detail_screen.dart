@@ -136,21 +136,50 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
     // Auto-download on fave
     if (success && mounted) {
-      final prefs = await SharedPreferences.getInstance();
-      final autoDownload = prefs.getBool('auto_download_on_fave') ?? false;
-      if (autoDownload) {
-        await _downloadImage();
-      }
-      // Auto-close on fave (check mounted again after async download)
-      final autoClose = prefs.getBool('auto_close_on_fave') ?? true;
-      if (autoClose && mounted) {
-        Navigator.of(context).maybePop();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final autoDownload = prefs.getBool('auto_download_on_fave') ?? false;
+        if (autoDownload) {
+          await _downloadImage();
+        }
+        // Auto-close on fave (check mounted again after async download)
+        final autoClose = prefs.getBool('auto_close_on_fave') ?? true;
+        if (autoClose && mounted) {
+          Navigator.of(context).maybePop();
+        }
+      } catch (e) {
+        debugPrint('=== post-fave auto actions error: $e');
       }
     }
   }
 
+  void _showMessage(String message, Color color) {
+    try {
+      if (isWindows) {
+        fluent.displayInfoBar(context, builder: (_, close) {
+          return fluent.InfoBar(
+            title: Text(message),
+            severity: color == AppColors.materialGreen
+                ? fluent.InfoBarSeverity.success
+                : fluent.InfoBarSeverity.error,
+            onClose: close,
+          );
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            duration: const Duration(seconds: 2),
+            backgroundColor: color,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('=== _showMessage error: $e');
+    }
+  }
+
   Future<void> _downloadImage() async {
-    final messenger = ScaffoldMessenger.of(context);
     final sub = _submission;
     if (sub == null || sub.imageUrl.isEmpty || _isDownloading) return;
     setState(() => _isDownloading = true);
@@ -163,33 +192,15 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       );
       if (mounted) {
         if (path != null) {
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text('Saved: ${path.split('/').last}'),
-              duration: const Duration(seconds: 2),
-              backgroundColor: AppColors.materialGreen,
-            ),
-          );
+          _showMessage('Saved: ${path.split('/').last}', AppColors.materialGreen);
         } else {
-          messenger.showSnackBar(
-            const SnackBar(
-              content: Text('Download failed'),
-              duration: Duration(seconds: 2),
-              backgroundColor: AppColors.danger,
-            ),
-          );
+          _showMessage('Download failed', AppColors.danger);
         }
       }
     } catch (e) {
       debugPrint('=== downloadImage error: $e');
       if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            duration: const Duration(seconds: 2),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+        _showMessage('Error: $e', AppColors.danger);
       }
     } finally {
       if (mounted) setState(() => _isDownloading = false);

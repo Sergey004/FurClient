@@ -7,6 +7,8 @@ import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/fa_image_loader.dart';
 import 'submission_detail_screen.dart';
+import 'journal_detail_screen.dart';
+import 'profile_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   final FAClient client;
@@ -58,18 +60,49 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   }
 
   void _onNotificationTap(FANotification notification) {
-    if (notification.url.isNotEmpty) {
-      final viewMatch = RegExp(r'/view/(\d+)').firstMatch(notification.url);
-      if (viewMatch != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => SubmissionDetailScreen(
-              client: widget.client,
-              submissionId: viewMatch.group(1)!,
-            ),
+    if (notification.url.isEmpty) return;
+
+    // Submission: /view/123456/
+    final viewMatch = RegExp(r'/view/(\d+)').firstMatch(notification.url);
+    if (viewMatch != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SubmissionDetailScreen(
+            client: widget.client,
+            submissionId: viewMatch.group(1)!,
           ),
-        );
-      }
+        ),
+      );
+      return;
+    }
+
+    // Journal: /journal/123456/
+    final journalMatch = RegExp(r'/journal/(\d+)').firstMatch(notification.url);
+    if (journalMatch != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => JournalDetailScreen(
+            client: widget.client,
+            journalId: journalMatch.group(1)!,
+          ),
+        ),
+      );
+      return;
+    }
+
+    // User profile: /user/username/
+    final userMatch = RegExp(r'/user/([a-zA-Z][a-zA-Z0-9_]+)/').firstMatch(notification.url);
+    if (userMatch != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ProfileScreen(
+            client: widget.client,
+            session: widget.client.session!,
+            targetUsername: userMatch.group(1)!,
+          ),
+        ),
+      );
+      return;
     }
   }
 
@@ -161,8 +194,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   Widget _buildNotificationTile(FANotification notif) {
     final color = _typeColor(notif.type);
 
-    return InkWell(
+    return GestureDetector(
       onTap: () => _onNotificationTap(notif),
+      behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(

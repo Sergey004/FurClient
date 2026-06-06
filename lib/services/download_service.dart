@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/webview_image_fetcher.dart';
 
@@ -131,9 +132,34 @@ class DownloadService {
     }
   }
 
-  /// Get base download directory: /storage/emulated/0/Download/furaffinity
-  /// Falls back to app-specific directories if public Downloads not writable.
+  /// Get base download directory.
+  /// If user chose a custom folder in Settings, use that.
+  /// Otherwise falls back to platform defaults.
   Future<String> _getBaseDir() async {
+    // Check for custom download path set in Settings
+    final prefs = await SharedPreferences.getInstance();
+    final customPath = prefs.getString('custom_download_path');
+    if (customPath != null && customPath.isNotEmpty) {
+      try {
+        final dir = Directory(customPath);
+        if (!dir.existsSync()) {
+          dir.createSync(recursive: true);
+        }
+        // Test write
+        final testFile = File('$customPath/.write_test');
+        testFile.writeAsStringSync('test');
+        testFile.deleteSync();
+        final furDir = Directory('$customPath/furaffinity');
+        if (!furDir.existsSync()) {
+          furDir.createSync(recursive: true);
+        }
+        debugPrint('=== DownloadService: Using custom path: ${furDir.path}');
+        return furDir.path;
+      } catch (e) {
+        debugPrint('=== DownloadService: Custom path not writable: $e');
+      }
+    }
+
     if (Platform.isAndroid) {
       // Try public Downloads/furaffinity
       const publicBase = '/storage/emulated/0/Download/furaffinity';

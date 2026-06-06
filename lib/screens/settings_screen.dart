@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_selector/file_selector.dart';
 import '../theme/app_theme.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../services/fa_client.dart';
@@ -28,6 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _autoDownloadOnFave = false;
   bool _autoCloseOnFave = true;
   String _imageQuality = 'high'; // low, medium, high
+  String _customDownloadPath = '';
 
   @override
   bool get wantKeepAlive => true;
@@ -46,6 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         _autoDownloadOnFave = prefs.getBool('auto_download_on_fave') ?? false;
         _autoCloseOnFave = prefs.getBool('auto_close_on_fave') ?? true;
         _imageQuality = prefs.getString('image_quality') ?? 'high';
+        _customDownloadPath = prefs.getString('custom_download_path') ?? '';
       });
     }
   }
@@ -196,6 +200,11 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ),
           ),
+        ]),
+        const SizedBox(height: 24),
+        _sectionHeader('DOWNLOADS'),
+        _card([
+          _buildDownloadFolderTile(),
         ]),
         const SizedBox(height: 24),
         _sectionHeader('ACCOUNT'),
@@ -350,6 +359,15 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
               const SizedBox(height: 20),
               _desktopSection(
+                title: 'Downloads',
+                icon: Icons.folder_outlined,
+                accent: AppColors.fluentCyan,
+                children: [
+                  _buildDownloadFolderTile(),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _desktopSection(
                 title: 'Account',
                 icon: Icons.person,
                 accent: AppColors.fluentCyan,
@@ -443,7 +461,10 @@ class _SettingsScreenState extends State<SettingsScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
-      child: Column(children: children),
+      child: Material(
+        color: Colors.transparent,
+        child: Column(children: children),
+      ),
     );
   }
 
@@ -477,6 +498,100 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  Widget _buildDownloadFolderTile() {
+    final displayPath = _customDownloadPath.isEmpty
+        ? 'Default'
+        : _customDownloadPath;
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      title: Row(
+        children: [
+          const Icon(Icons.folder_outlined, color: AppColors.fluentCyan, size: 20),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text('Download Folder',
+                style: TextStyle(color: AppColors.text, fontSize: 15)),
+          ),
+        ],
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(left: 32),
+        child: Text(
+          Platform.isWindows
+              ? displayPath
+              : displayPath,
+          style: TextStyle(
+            color: _customDownloadPath.isEmpty
+                ? AppColors.textMuted
+                : AppColors.textDim,
+            fontSize: 13,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_customDownloadPath.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.close, size: 16, color: AppColors.textDim),
+              tooltip: 'Reset to default',
+              onPressed: () {
+                setState(() => _customDownloadPath = '');
+                _saveSetting('custom_download_path', '');
+              },
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.bgInput,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _pickFolder,
+                borderRadius: BorderRadius.circular(8),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.edit, size: 14, color: AppColors.fluentCyan),
+                      SizedBox(width: 4),
+                      Text('Change',
+                          style: TextStyle(color: AppColors.fluentCyan, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      onTap: _pickFolder,
+    );
+  }
+
+  Future<void> _pickFolder() async {
+    try {
+      final result = await getDirectoryPath(
+        confirmButtonText: 'Select Folder',
+      );
+      if (result != null && result.isNotEmpty) {
+        setState(() => _customDownloadPath = result);
+        await _saveSetting('custom_download_path', result);
+      }
+    } catch (e) {
+      debugPrint('=== Settings: Folder picker error: $e');
+    }
+  }
+
   Widget _adaptiveSwitchTile({
     required IconData icon,
     required Color iconColor,
@@ -485,25 +600,13 @@ class _SettingsScreenState extends State<SettingsScreen>
     required String title,
     required String subtitle,
   }) {
-    return SwitchListTile(
+    return AdaptiveSwitchTile(
+      icon: icon,
+      iconColor: iconColor,
       value: value,
       onChanged: onChanged,
-      title: Row(
-        children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Text(title,
-                  style: const TextStyle(color: AppColors.text, fontSize: 15))),
-        ],
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(left: 32),
-        child: Text(subtitle,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
-      ),
-      activeThumbColor: AppColors.fluentCyanDark,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      title: title,
+      subtitle: subtitle,
     );
   }
 }
