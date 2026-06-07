@@ -32,7 +32,7 @@ class UpdateService extends ChangeNotifier {
   String? get currentVersion => _currentVersion;
 
   /// GitHub repo in `owner/repo` format. Change to match your repo.
-  static const String _repo = 'your-username/furclient';
+  static const String _repo = 'Sergey004/furclient';
 
   /// Initialise — loads current version, runs a silent background check.
   Future<void> init() async {
