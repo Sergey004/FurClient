@@ -93,7 +93,19 @@ class _FurClientAppState extends State<FurClientApp> {
   @override
   void initState() {
     super.initState();
+    _themeProvider.addListener(_onThemeChanged);
     _initApp();
+  }
+
+  void _onThemeChanged() {
+    final isDark = _themeProvider.mode == AppThemeMode.dark ||
+        _themeProvider.mode == AppThemeMode.original;
+    if (_themeProvider.mode == AppThemeMode.system) {
+      AppTheme.setSystemOverlay();
+    } else {
+      AppTheme.setSystemOverlay(dark: isDark);
+    }
+    setState(() {});
   }
 
   Future<void> _initApp() async {
@@ -172,6 +184,7 @@ class _FurClientAppState extends State<FurClientApp> {
 
   @override
   void dispose() {
+    _themeProvider.removeListener(_onThemeChanged);
     _updateService.dispose();
     _themeProvider.dispose();
     super.dispose();
@@ -186,16 +199,43 @@ class _FurClientAppState extends State<FurClientApp> {
   }
 
   Widget _buildFluentApp() {
-    final accent = SystemTheme.accentColor.accent;
-    final fluentTheme = accent != Colors.transparent
-        ? AppTheme.fluentFromSystemAccent(accent)
-        : AppTheme.fluentDarkTheme;
+    return ListenableBuilder(
+      listenable: _themeProvider,
+      builder: (context, _) {
+        final mode = _themeProvider.mode;
+        final accent = AppTheme.systemAccent;
 
-    return fluent.FluentApp(
-      title: 'FurClient',
-      debugShowCheckedModeBanner: false,
-      theme: fluentTheme,
-      home: _buildHome(),
+        fluent.FluentThemeData theme;
+        fluent.FluentThemeData? darkTheme;
+
+        switch (mode) {
+          case AppThemeMode.system:
+            theme = AppTheme.fluentLightTheme(accent: accent);
+            darkTheme = AppTheme.fluentFromSystemAccent(accent);
+            break;
+          case AppThemeMode.light:
+            theme = AppTheme.fluentLightTheme(accent: accent);
+            darkTheme = null;
+            break;
+          case AppThemeMode.dark:
+            theme = AppTheme.fluentDarkTheme;
+            darkTheme = AppTheme.fluentFromSystemAccent(accent);
+            break;
+          case AppThemeMode.original:
+            theme = AppTheme.fluentDarkTheme;
+            darkTheme = AppTheme.fluentDarkTheme;
+            break;
+        }
+
+        return fluent.FluentApp(
+          title: 'FurClient',
+          debugShowCheckedModeBanner: false,
+          themeMode: _themeProvider.themeMode,
+          theme: theme,
+          darkTheme: darkTheme,
+          home: _buildHome(),
+        );
+      },
     );
   }
 
@@ -203,66 +243,63 @@ class _FurClientAppState extends State<FurClientApp> {
     return ListenableBuilder(
       listenable: _themeProvider,
       builder: (context, _) {
-        final themeMode = _themeProvider.themeMode;
-        final useSystemAccent = _themeProvider.useSystemAccent;
+        final mode = _themeProvider.mode;
+
+        // Original: always dark, no system colour injection
+        if (mode == AppThemeMode.original) {
+          return MaterialApp(
+            title: 'FurClient',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.darkTheme,
+            home: UpgradeAlert(child: _buildHome()),
+          );
+        }
 
         return DynamicColorBuilder(
           builder: (lightDynamic, darkDynamic) {
+            final accent = AppTheme.systemAccent;
             ThemeData theme;
-            ThemeData? lightTheme;
+            ThemeData? darkTheme;
 
-            if (!useSystemAccent) {
-              // Original mode — hardcoded dark cyan
-              theme = AppTheme.darkTheme;
-            } else if (!isMobile && darkDynamic != null) {
-              theme = AppTheme.buildFromDynamicColor(darkDynamic);
-            } else if (darkDynamic != null && lightDynamic != null) {
-              theme = AppTheme.buildFromDynamicColor(darkDynamic);
-              lightTheme = AppTheme.buildTheme(
-                lightDynamic.copyWith(
-                  surface: lightDynamic.surface,
-                  onSurface: lightDynamic.onSurface,
-                ),
-              );
-            } else {
-              theme = AppTheme.darkTheme;
-            }
-
-            if (!isMobile) {
-              return SystemThemeBuilder(
-                builder: (context, systemAccent) {
-                  final ThemeData desktopTheme;
-                  if (!useSystemAccent) {
-                    desktopTheme = AppTheme.darkTheme;
-                  } else if (darkDynamic != null) {
-                    desktopTheme = AppTheme.buildFromDynamicColor(darkDynamic);
-                  } else {
-                    desktopTheme =
-                        AppTheme.buildFromSystemAccent(systemAccent.accent);
-                  }
-                  return MaterialApp(
-                    title: 'FurClient',
-                    debugShowCheckedModeBanner: false,
-                    themeMode: themeMode,
-                    theme: lightTheme ?? desktopTheme,
-                    darkTheme: desktopTheme,
-                    home: UpgradeAlert(
-                      child: _buildHome(),
-                    ),
-                  );
-                },
-              );
+            switch (mode) {
+              case AppThemeMode.system:
+                if (lightDynamic != null && darkDynamic != null) {
+                  theme = AppTheme.buildLightFromDynamic(lightDynamic);
+                  darkTheme = AppTheme.buildFromDynamicColor(darkDynamic);
+                } else {
+                  theme = AppTheme.buildLightTheme(accent: accent);
+                  darkTheme = AppTheme.buildFromSystemAccent(accent);
+                }
+                break;
+              case AppThemeMode.light:
+                if (lightDynamic != null) {
+                  theme = AppTheme.buildLightFromDynamic(lightDynamic);
+                } else {
+                  theme = AppTheme.buildLightTheme(accent: accent);
+                }
+                darkTheme = null;
+                break;
+              case AppThemeMode.dark:
+                if (darkDynamic != null) {
+                  darkTheme = AppTheme.buildFromDynamicColor(darkDynamic);
+                } else {
+                  darkTheme = AppTheme.buildFromSystemAccent(accent);
+                }
+                theme = darkTheme;
+                break;
+              case AppThemeMode.original:
+                theme = AppTheme.darkTheme;
+                darkTheme = null;
+                break;
             }
 
             return MaterialApp(
               title: 'FurClient',
               debugShowCheckedModeBanner: false,
-              themeMode: themeMode,
-              theme: lightTheme ?? theme,
-              darkTheme: theme,
-              home: UpgradeAlert(
-                child: _buildHome(),
-              ),
+              themeMode: _themeProvider.themeMode,
+              theme: theme,
+              darkTheme: darkTheme,
+              home: UpgradeAlert(child: _buildHome()),
             );
           },
         );
