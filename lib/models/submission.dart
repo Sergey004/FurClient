@@ -94,8 +94,7 @@ class Submission {
       if (id.isEmpty) continue;
 
       // iOS: figure b u a img
-      final img = fig.querySelector('b u a img') ??
-          fig.querySelector('img');
+      final img = fig.querySelector('b u a img') ?? fig.querySelector('img');
       var imageUrl = img?.attributes['src'] ?? '';
       if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
 
@@ -112,10 +111,16 @@ class Submission {
         author = authorMatch?.group(1) ?? captionLinks[1].text.trim();
       }
 
-      final isAdult = fig.querySelector('[data-rating="adult"]') != null || fig.classes.contains('r-adult');
-    final isMature = fig.querySelector('[data-rating="mature"]') != null || fig.classes.contains('r-mature');
-    final isNsfw = isAdult || isMature;
-    final rating = isAdult ? 'adult' : isMature ? 'mature' : 'general';
+      final isAdult = fig.querySelector('[data-rating="adult"]') != null ||
+          fig.classes.contains('r-adult');
+      final isMature = fig.querySelector('[data-rating="mature"]') != null ||
+          fig.classes.contains('r-mature');
+      final isNsfw = isAdult || isMature;
+      final rating = isAdult
+          ? 'adult'
+          : isMature
+              ? 'mature'
+              : 'general';
 
       submissions.add(Submission(
         id: id,
@@ -140,14 +145,17 @@ class Submission {
     return submissions;
   }
 
-  static Submission? parseSubmissionDetails(String htmlString, String submissionId) {
+  static Submission? parseSubmissionDetails(
+      String htmlString, String submissionId) {
     final document = html_parser.parse(htmlString);
 
     // iOS: div.submission-area img#submissionImg — data-preview-src / data-fullview-src
-    final imgEl = document.querySelector('div.submission-area img#submissionImg');
+    final imgEl =
+        document.querySelector('div.submission-area img#submissionImg');
     var imageUrl = imgEl?.attributes['data-fullview-src'] ??
         imgEl?.attributes['data-preview-src'] ??
-        imgEl?.attributes['src'] ?? '';
+        imgEl?.attributes['src'] ??
+        '';
     if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
 
     // iOS: div.submission-title h2
@@ -177,7 +185,8 @@ class Submission {
     comments = int.tryParse(commentsEl?.text.trim() ?? '') ?? 0;
 
     // iOS: span.tags span[data-tag-name]
-    final tagEls = document.querySelectorAll('div.submission-tags div span.tags');
+    final tagEls =
+        document.querySelectorAll('div.submission-tags div span.tags');
     final tags = tagEls
         .map((e) {
           final tagBlock = e.querySelector('[data-tag-name]');
@@ -190,7 +199,11 @@ class Submission {
     final ratingEl = document.querySelector('[class*="c-contentRating"]');
     final ratingText = ratingEl?.text.trim() ?? '';
     final isNsfw = ratingText == 'Adult' || ratingText == 'Mature';
-    final rating = ratingText == 'Adult' ? 'adult' : ratingText == 'Mature' ? 'mature' : 'general';
+    final rating = ratingText == 'Adult'
+        ? 'adult'
+        : ratingText == 'Mature'
+            ? 'mature'
+            : 'general';
 
     // iOS: span.popup_date
     final dateEl = document.querySelector('span.popup_date');
@@ -199,7 +212,8 @@ class Submission {
     // Parse favorite button: look for /fav/ID/ or /unfav/ID/ link
     bool isFavorite = false;
     String favoriteUrl = '';
-    final favLinks = document.querySelectorAll('a[href*="/unfav/"], a[href*="/fav/"]');
+    final favLinks =
+        document.querySelectorAll('a[href*="/unfav/"], a[href*="/fav/"]');
     if (favLinks.isNotEmpty) {
       // The first matching link is the active action
       final favHref = favLinks.first.attributes['href'] ?? '';
@@ -213,7 +227,8 @@ class Submission {
     }
     // Fallback: check for button elements too
     if (favoriteUrl.isEmpty) {
-      final favBtns = document.querySelectorAll('button[data-action="fav"], button[data-action="unfav"]');
+      final favBtns = document.querySelectorAll(
+          'button[data-action="fav"], button[data-action="unfav"]');
       if (favBtns.isNotEmpty) {
         final action = favBtns.first.attributes['data-action'] ?? '';
         final sid = favBtns.first.attributes['data-id'] ?? submissionId;

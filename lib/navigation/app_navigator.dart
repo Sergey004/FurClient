@@ -80,10 +80,15 @@ class _AppNavigatorState extends State<AppNavigator> {
 
   List<Widget> _buildScreens() {
     return [
-      GalleryScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
-      SearchScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+      GalleryScreen(
+          client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+      SearchScreen(
+          client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
       NotificationsScreen(client: widget.client, onLogout: widget.onLogout),
-      ProfileScreen(client: widget.client, session: widget.session, onLogout: widget.onLogout),
+      ProfileScreen(
+          client: widget.client,
+          session: widget.session,
+          onLogout: widget.onLogout),
       SettingsScreen(
         sfwMode: _sfwMode,
         onSfwModeChanged: _onSfwModeChanged,

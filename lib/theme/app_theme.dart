@@ -301,8 +301,7 @@ class AppTheme {
       // ── Navigation rail (desktop side bar) ─────────────────────────────────
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: colorScheme.surfaceContainerLow,
-        selectedIconTheme:
-            IconThemeData(color: colorScheme.primary, size: 24),
+        selectedIconTheme: IconThemeData(color: colorScheme.primary, size: 24),
         unselectedIconTheme:
             IconThemeData(color: colorScheme.onSurfaceVariant, size: 22),
         selectedLabelTextStyle: TextStyle(
@@ -324,10 +323,10 @@ class AppTheme {
       chipTheme: ChipThemeData(
         backgroundColor: colorScheme.surfaceContainerHighest,
         selectedColor: colorScheme.secondaryContainer,
-        labelStyle: TextStyle(
-            color: colorScheme.onSurfaceVariant, fontSize: 13),
-        secondaryLabelStyle: TextStyle(
-            color: colorScheme.onSecondaryContainer, fontSize: 13),
+        labelStyle:
+            TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+        secondaryLabelStyle:
+            TextStyle(color: colorScheme.onSecondaryContainer, fontSize: 13),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
@@ -351,8 +350,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(28),
-          borderSide:
-              BorderSide(color: colorScheme.primary, width: 2),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -644,8 +642,7 @@ class AppTheme {
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: dark.bgCard,
         selectedIconTheme: IconThemeData(color: dark.primary, size: 24),
-        unselectedIconTheme:
-            IconThemeData(color: dark.textMuted, size: 22),
+        unselectedIconTheme: IconThemeData(color: dark.textMuted, size: 22),
         selectedLabelTextStyle: TextStyle(
           color: dark.primary,
           fontSize: 11,
@@ -814,8 +811,7 @@ class AppTheme {
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
       statusBarBrightness: dark ? Brightness.dark : Brightness.light,
-      systemNavigationBarColor:
-          dark ? AppColors.bgCard : AppColors.lightBgCard,
+      systemNavigationBarColor: dark ? AppColors.bgCard : AppColors.lightBgCard,
       systemNavigationBarIconBrightness:
           dark ? Brightness.light : Brightness.dark,
     ));

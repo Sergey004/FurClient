@@ -73,8 +73,7 @@ class OnlineSession implements FASession {
       );
 
   @override
-  Future<Submission> getSubmission(String url) =>
-      _cachedRequest(
+  Future<Submission> getSubmission(String url) => _cachedRequest(
         'submission_$url',
         () async {
           final html = await _fetch(Uri.parse(url));
@@ -96,8 +95,7 @@ class OnlineSession implements FASession {
       );
 
   @override
-  Future<List<Comment>> getComments(String url) =>
-      _cachedRequest(
+  Future<List<Comment>> getComments(String url) => _cachedRequest(
         'comments_$url',
         () async {
           final html = await _fetch(Uri.parse(url));

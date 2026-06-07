@@ -38,15 +38,17 @@ class FAComment {
   static List<FAComment> parseComments(String htmlString) {
     final document = html_parser.parse(htmlString);
     final comments = <FAComment>[];
-    final commentElements = document.querySelectorAll(
-        'div.comment-container, div.comment, li.comment');
+    final commentElements = document
+        .querySelectorAll('div.comment-container, div.comment, li.comment');
 
-    debugPrint('=== parseComments: found ${commentElements.length} comment elements');
+    debugPrint(
+        '=== parseComments: found ${commentElements.length} comment elements');
 
     for (final commentEl in commentElements) {
       try {
         // Skip hidden comments
-        final hiddenText = commentEl.querySelector('.comment-hidden, .hidden-comment');
+        final hiddenText =
+            commentEl.querySelector('.comment-hidden, .hidden-comment');
         if (hiddenText != null) continue;
 
         // cid from outerHtml
@@ -54,29 +56,37 @@ class FAComment {
         final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
 
         // Indentation
-        final indentEl = commentEl.querySelector('.comment-indentation, .comment-avatar');
+        final indentEl =
+            commentEl.querySelector('.comment-indentation, .comment-avatar');
         int indentation = 0;
         if (indentEl != null) {
           final widthAttr = indentEl.attributes['width'] ??
-              indentEl.attributes['data-indentation'] ?? '0';
+              indentEl.attributes['data-indentation'] ??
+              '0';
           indentation = (double.tryParse(widthAttr) ?? 0).toInt() ~/ 16;
         }
 
         // Author username
-        final authorLink = commentEl.querySelector('a.comment-username, a[href*="/user/"]');
+        final authorLink =
+            commentEl.querySelector('a.comment-username, a[href*="/user/"]');
         final author = authorLink != null
-            ? (RegExp(r'/user/([^/]+)/').firstMatch(
-                authorLink.attributes['href'] ?? '')?.group(1) ?? '')
+            ? (RegExp(r'/user/([^/]+)/')
+                    .firstMatch(authorLink.attributes['href'] ?? '')
+                    ?.group(1) ??
+                '')
             : '';
 
         // Date
-        final dateEl = commentEl.querySelector('span.comment-date, span.popup_date');
+        final dateEl =
+            commentEl.querySelector('span.comment-date, span.popup_date');
         final time = dateEl?.attributes['title'] ??
             dateEl?.attributes['datetime'] ??
-            dateEl?.text.trim() ?? '';
+            dateEl?.text.trim() ??
+            '';
 
         // Comment text
-        final messageEl = commentEl.querySelector('div.comment-text, div.comment_message');
+        final messageEl =
+            commentEl.querySelector('div.comment-text, div.comment_message');
         final text = messageEl?.text.trim() ?? '';
 
         if (text.isNotEmpty || cid > 0) {

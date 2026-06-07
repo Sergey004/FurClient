@@ -73,7 +73,12 @@ class FAUser {
         description: json['description'] as String? ?? '',
         stats: json['stats'] is Map<String, dynamic>
             ? FAUserStats.fromJson(json['stats'] as Map<String, dynamic>)
-            : FAUserStats(views: 0, submissions: 0, favorites: 0, comments: 0, journals: 0),
+            : FAUserStats(
+                views: 0,
+                submissions: 0,
+                favorites: 0,
+                comments: 0,
+                journals: 0),
         isWatching: json['isWatching'] as bool? ?? false,
         watchUrl: json['watchUrl'] as String? ?? '',
       );
@@ -99,9 +104,8 @@ class FAUser {
     final comments = _parseDtValue(document, 'Comments');
     final journals = _parseDtValue(document, 'Journals');
 
-    final watchButton =
-        document.querySelector('a[href*="/watch/"]') ??
-            document.querySelector('a[href*="/unwatch/"]');
+    final watchButton = document.querySelector('a[href*="/watch/"]') ??
+        document.querySelector('a[href*="/unwatch/"]');
     final watchHref = watchButton?.attributes['href'] ?? '';
     final isWatching = watchHref.contains('/unwatch/');
 
@@ -119,9 +123,8 @@ class FAUser {
         journals: journals,
       ),
       isWatching: isWatching,
-      watchUrl: watchHref.isNotEmpty
-          ? 'https://www.furaffinity.net$watchHref'
-          : '',
+      watchUrl:
+          watchHref.isNotEmpty ? 'https://www.furaffinity.net$watchHref' : '',
     );
   }
 

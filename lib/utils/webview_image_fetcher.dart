@@ -104,7 +104,8 @@ class WebViewImageFetcher {
   /// Auto-reset if too many consecutive failures (dead WebView).
   void _maybeAutoReset() {
     if (_consecutiveFailures >= 3) {
-      debugPrint('=== WebViewImageFetcher: $_consecutiveFailures consecutive failures, auto-resetting');
+      debugPrint(
+          '=== WebViewImageFetcher: $_consecutiveFailures consecutive failures, auto-resetting');
       _consecutiveFailures = 0;
       // Schedule async reset (don't block current queue processing)
       Future.microtask(() async {
@@ -231,7 +232,8 @@ class WebViewImageFetcher {
         onReceivedHttpError: (controller, request, response) {
           if (!(request.isForMainFrame ?? false)) return;
           final status = response.statusCode ?? 0;
-          debugPrint('=== WebViewImageFetcher: HTTP error $status for ${request.url}');
+          debugPrint(
+              '=== WebViewImageFetcher: HTTP error $status for ${request.url}');
           if (status == 403 || status == 503) {
             final completer = _currentImageCompleter;
             if (completer != null && !completer.isCompleted) {
@@ -241,7 +243,8 @@ class WebViewImageFetcher {
         },
         onReceivedError: (controller, request, error) {
           if (!(request.isForMainFrame ?? false)) return;
-          debugPrint('=== WebViewImageFetcher: WebView error: ${error.description}');
+          debugPrint(
+              '=== WebViewImageFetcher: WebView error: ${error.description}');
           final completer = _currentImageCompleter;
           if (completer != null && !completer.isCompleted) {
             completer.complete(null);
@@ -259,7 +262,8 @@ class WebViewImageFetcher {
         debugPrint('=== WebViewImageFetcher: Persistent WebView ready');
       } on TimeoutException {
         _ready = false;
-        debugPrint('=== WebViewImageFetcher: Init timeout — WebView may be dead');
+        debugPrint(
+            '=== WebViewImageFetcher: Init timeout — WebView may be dead');
       }
     } catch (e) {
       debugPrint('=== WebViewImageFetcher: Init error: $e');
@@ -300,7 +304,8 @@ class WebViewImageFetcher {
 
       if (dataUrl == null || dataUrl.isEmpty) {
         _consecutiveFailures++;
-        debugPrint('=== WebViewImageFetcher: No data for $url (failures: $_consecutiveFailures)');
+        debugPrint(
+            '=== WebViewImageFetcher: No data for $url (failures: $_consecutiveFailures)');
         _maybeAutoReset();
         return null;
       }
@@ -365,7 +370,8 @@ class WebViewImageFetcher {
         }
       }
     }
-    debugPrint('=== WebViewImageFetcher: Injected ${cookies.length} cookies for $domains');
+    debugPrint(
+        '=== WebViewImageFetcher: Injected ${cookies.length} cookies for $domains');
   }
 
   /// Clear the image cache.
@@ -386,7 +392,8 @@ class WebViewImageFetcher {
     await _headless?.dispose();
     _headless = null;
     _controller = null;
-    debugPrint('=== WebViewImageFetcher: Reset (WebView will be re-created on next fetch)');
+    debugPrint(
+        '=== WebViewImageFetcher: Reset (WebView will be re-created on next fetch)');
   }
 
   /// Full dispose the persistent WebView and clear everything.

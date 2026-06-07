@@ -75,7 +75,8 @@ class SessionProvider extends ChangeNotifier {
   // ── CDN operations ───────────────────────────────────────────────
 
   /// Load content from CDN
-  Future<Uint8List?> loadFromCDN(String url, {Map<String, String>? headers}) async {
+  Future<Uint8List?> loadFromCDN(String url,
+      {Map<String, String>? headers}) async {
     try {
       return await CDNLoader.instance.load(url, headers: headers);
     } catch (e) {

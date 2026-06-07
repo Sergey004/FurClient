@@ -270,13 +270,12 @@ class _GalleryScreenState extends State<GalleryScreen>
                 );
               }
               final sub = _submissions[index];
-               return SubmissionCard(
-                 submission: sub,
-                 client: widget.client,
-                 sfwMode: widget.sfwMode,
-                 onTap: () => _navigateToDetail(sub),
-               );
-
+              return SubmissionCard(
+                submission: sub,
+                client: widget.client,
+                sfwMode: widget.sfwMode,
+                onTap: () => _navigateToDetail(sub),
+              );
             },
           );
         },

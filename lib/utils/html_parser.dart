@@ -97,16 +97,16 @@ Submission parseSubmissionFull(html_dom.Document document, String url) {
     }
 
     // iOS: div.submission-area img#submissionImg
-    final imgEl = document
-            .querySelector('div.submission-area img#submissionImg');
+    final imgEl =
+        document.querySelector('div.submission-area img#submissionImg');
     var imageUrl = imgEl?.attributes['data-fullview-src'] ??
         imgEl?.attributes['data-preview-src'] ??
-        imgEl?.attributes['src'] ?? '';
+        imgEl?.attributes['src'] ??
+        '';
     if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
 
     // iOS: div.submission-description-text
-    final descEl =
-        document.querySelector('div.submission-description-text');
+    final descEl = document.querySelector('div.submission-description-text');
     final description = descEl?.text.trim() ?? '';
 
     // iOS: div[title="Views"] div, div[title="Favorites"] div
@@ -116,17 +116,11 @@ Submission parseSubmissionFull(html_dom.Document document, String url) {
                 '') ??
         0;
     faves = int.tryParse(
-            document
-                    .querySelector('div[title="Favorites"] div')
-                    ?.text
-                    .trim() ??
+            document.querySelector('div[title="Favorites"] div')?.text.trim() ??
                 '') ??
         0;
     comments = int.tryParse(
-            document
-                    .querySelector('div[title="Comments"] div')
-                    ?.text
-                    .trim() ??
+            document.querySelector('div[title="Comments"] div')?.text.trim() ??
                 '') ??
         0;
 

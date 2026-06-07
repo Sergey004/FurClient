@@ -31,6 +31,7 @@ class FAUrls {
   }
 
   static String viewSubmission(String id) => '$baseUrl/view/$id/';
+
   /// FA search sort options
   /// datet = by date, popularityt = by popularity, relevancyt = by relevance
   static const Map<String, String> searchSortLabels = {
@@ -39,7 +40,8 @@ class FAUrls {
     'popularityt': 'Popular',
   };
 
-  static String search(String query, {
+  static String search(
+    String query, {
     int page = 1,
     String sortBy = 'relevancyt',
     String sortDirection = 'desc',

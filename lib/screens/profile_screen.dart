@@ -71,7 +71,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget build(BuildContext context) {
     super.build(context);
     return AdaptiveScaffold(
-      appBar: AppBar(title: Text(widget.targetUsername != null ? _username : 'Profile')),
+      appBar: AppBar(
+          title: Text(widget.targetUsername != null ? _username : 'Profile')),
       body: _buildBody(),
     );
   }
@@ -82,7 +83,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     if (_error != null) {
-      return ErrorView(message: _error!, onRetry: _loadProfile, onRelogin: widget.onLogout);
+      return ErrorView(
+          message: _error!, onRetry: _loadProfile, onRelogin: widget.onLogout);
     }
 
     if (_profile == null) {
@@ -176,9 +178,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         : const Icon(Icons.person,
                             color: AppColors.textMuted, size: 56),
                   ),
-                 ),
-                 const SizedBox(height: 12),
-
+                ),
+                const SizedBox(height: 12),
                 Text(
                   p.displayName,
                   style: const TextStyle(
@@ -254,7 +255,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-
   Widget _buildHeader(FAUser p) {
     return Transform.translate(
       offset: const Offset(0, -40),
@@ -263,31 +263,30 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.bg, width: 4),
-                      ),
-                      child: CircleAvatar(
-                        radius: 44,
-                        backgroundColor: AppColors.bgInput,
-                        child: p.avatarUrl.isNotEmpty
-                            ? FAImage(
-                                url: p.avatarUrl,
-                                width: 88,
-                                height: 88,
-                                fit: BoxFit.cover,
-                                errorWidget: const Icon(
-                                  Icons.person,
-                                  color: AppColors.textMuted,
-                                  size: 44,
-                                ),
-                              )
-                            : const Icon(Icons.person,
-                                color: AppColors.textMuted, size: 44),
-                      ),
-                    ),
-
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.bg, width: 4),
+              ),
+              child: CircleAvatar(
+                radius: 44,
+                backgroundColor: AppColors.bgInput,
+                child: p.avatarUrl.isNotEmpty
+                    ? FAImage(
+                        url: p.avatarUrl,
+                        width: 88,
+                        height: 88,
+                        fit: BoxFit.cover,
+                        errorWidget: const Icon(
+                          Icons.person,
+                          color: AppColors.textMuted,
+                          size: 44,
+                        ),
+                      )
+                    : const Icon(Icons.person,
+                        color: AppColors.textMuted, size: 44),
+              ),
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -454,7 +453,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _linkTile(IconData icon, String title, Color color, VoidCallback onTap) {
+  Widget _linkTile(
+      IconData icon, String title, Color color, VoidCallback onTap) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(

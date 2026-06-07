@@ -27,7 +27,8 @@ void main() {
     test('should detect CDN URLs', () {
       expect(CDNLoader.isCDNUrl('https://t.furaffinity.net/image.jpg'), isTrue);
       expect(CDNLoader.isCDNUrl('https://d.furaffinity.net/file.zip'), isTrue);
-      expect(CDNLoader.isCDNUrl('https://a.furaffinity.net/attachment.pdf'), isTrue);
+      expect(CDNLoader.isCDNUrl('https://a.furaffinity.net/attachment.pdf'),
+          isTrue);
       expect(CDNLoader.isCDNUrl('https://example.com/image.jpg'), isFalse);
     });
 
@@ -64,8 +65,10 @@ void main() {
     });
 
     test('should convert to full CDN URL', () {
-      expect('image.jpg'.toFullCDNUrl(), equals('https://t.furaffinity.net/image.jpg'));
-      expect('https://example.com/image.jpg'.toFullCDNUrl(), equals('https://example.com/image.jpg'));
+      expect('image.jpg'.toFullCDNUrl(),
+          equals('https://t.furaffinity.net/image.jpg'));
+      expect('https://example.com/image.jpg'.toFullCDNUrl(),
+          equals('https://example.com/image.jpg'));
     });
   });
 }

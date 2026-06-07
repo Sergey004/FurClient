@@ -129,8 +129,8 @@ class _UserContentScreenState extends State<UserContentScreen> {
     try {
       final more = widget.contentType == UserContentType.gallery
           ? await widget.client.getGallery(widget.username, page: _currentPage)
-          : await widget.client.getUserFavorites(
-              widget.username, page: _currentPage);
+          : await widget.client
+              .getUserFavorites(widget.username, page: _currentPage);
       if (mounted) {
         setState(() {
           _submissions.addAll(more);
@@ -227,39 +227,37 @@ class _UserContentScreenState extends State<UserContentScreen> {
     }
 
     return LayoutBuilder(
-        builder: (context, constraints) {
-          final crossAxisCount = _getCrossAxisCount(constraints.maxWidth);
-          final isDesktop = constraints.maxWidth >= AppBreakpoints.desktop;
+      builder: (context, constraints) {
+        final crossAxisCount = _getCrossAxisCount(constraints.maxWidth);
+        final isDesktop = constraints.maxWidth >= AppBreakpoints.desktop;
 
-          return GridView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              childAspectRatio: isDesktop ? 0.7 : 0.65,
-              crossAxisSpacing: isDesktop ? 16 : 12,
-              mainAxisSpacing: isDesktop ? 16 : 12,
-            ),
-            itemCount: _submissions.length + (_isLoadingMore ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index >= _submissions.length) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(
-                      child: AdaptiveProgress(strokeWidth: 2)),
-                );
-              }
-              return SubmissionCard(
-                submission: _submissions[index],
-                client: widget.client,
-                sfwMode: false,
-                onTap: () =>
-                    _navigateToDetail(_submissions[index]),
+        return GridView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: isDesktop ? 0.7 : 0.65,
+            crossAxisSpacing: isDesktop ? 16 : 12,
+            mainAxisSpacing: isDesktop ? 16 : 12,
+          ),
+          itemCount: _submissions.length + (_isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index >= _submissions.length) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: AdaptiveProgress(strokeWidth: 2)),
               );
-            },
-          );
-        },
-      );
+            }
+            return SubmissionCard(
+              submission: _submissions[index],
+              client: widget.client,
+              sfwMode: false,
+              onTap: () => _navigateToDetail(_submissions[index]),
+            );
+          },
+        );
+      },
+    );
   }
 
   // ── Journals list ───────────────────────────────────────────────────
