@@ -104,7 +104,7 @@ jobs:
             -o velopack-output `
             --channelUrl "https://github.com/${{ github.repository }}/releases/latest/download/RELEASES" `
             --packId "furclient" `
-            --packVersion "${{ github.ref_name }}
+            --packVersion "${{ github.ref_name }}"
             --packDir build/windows/x64/runner/Release"
 
       - name: Upload Velopack assets to release
