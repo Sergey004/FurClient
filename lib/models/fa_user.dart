@@ -86,26 +86,35 @@ class FAUser {
   static FAUser? parseUserPage(String htmlString, String username) {
     final document = html_parser.parse(htmlString);
 
-    final userLink = document.querySelector('a[href*="/user/$username/"]');
-    final displayName = userLink?.text.trim() ?? username;
+    // Display name — try h2.username first, then any h2 on the user page
+    final displayNameEl = document.querySelector('h2.username, .username, h2');
+    final displayName = displayNameEl?.text.trim() ?? username;
 
+    // Avatar — look for img with alt="Avatar" or inside avatar container
     final avatarEl = document.querySelector('img[alt="Avatar"]');
     final avatarUrl = avatarEl?.attributes['src'] ?? '';
 
-    final bannerEl = document.querySelector('div[class*="banner"] img');
+    // Banner — user-banner div > img
+    final bannerEl = document.querySelector('div.user-banner img, .banner img');
     final bannerUrl = bannerEl?.attributes['src'] ?? '';
 
-    final descEl = document.querySelector('div[class*="description"]');
+    // Description
+    final descEl = document.querySelector(
+        'div.user-description, .profile-description, #user-description');
     final description = descEl?.text.trim() ?? '';
 
-    final views = _parseDtValue(document, 'Views');
-    final submissions = _parseDtValue(document, 'Submissions');
-    final favorites = _parseDtValue(document, 'Favorites');
-    final comments = _parseDtValue(document, 'Comments');
-    final journals = _parseDtValue(document, 'Journals');
+    // Stats — FA uses: <span class="highlight">Views:</span> 3515
+    // inside div.section-body > div.table > div.cell
+    final views = _parseHighlightValue(document, 'Views:');
+    final submissions = _parseHighlightValue(document, 'Submissions:');
+    final favorites = _parseHighlightValue(document, 'Favs:');
+    // FA has "Comments Earned" and "Comments Made" — use Earned as the main count
+    final comments = _parseHighlightValue(document, 'Comments Earned:');
+    final journals = _parseHighlightValue(document, 'Journals:');
 
-    final watchButton = document.querySelector('a[href*="/watch/"]') ??
-        document.querySelector('a[href*="/unwatch/"]');
+    // Watch button
+    final watchButton = document.querySelector('a[href*="/unwatch/"]') ??
+        document.querySelector('a[href*="/watch/"]');
     final watchHref = watchButton?.attributes['href'] ?? '';
     final isWatching = watchHref.contains('/unwatch/');
 
@@ -128,20 +137,32 @@ class FAUser {
     );
   }
 
-  static int _parseDtValue(dom.Document document, String label) {
-    final dd = _findDtSibling(document, label);
-    if (dd == null) return 0;
-    return int.tryParse(dd.text.trim()) ?? 0;
-  }
+  /// Parse a stat value from the FA profile format using regex on raw HTML.
+  /// FA uses: <span class="highlight">Views:</span> 3515
+  static int _parseHighlightValue(dom.Document document, String label) {
+    // Build regex that accounts for </span> between label and number
+    // e.g. "Views:</span> 3515" or "Comments Earned:</span> 105"
+    final pattern = '${RegExp.escape(label)}</span>\\s*([\\d,]+)';
 
-  static dom.Element? _findDtSibling(dom.Document document, String label) {
-    final dts = document.querySelectorAll('dt');
-    for (final dt in dts) {
-      if (dt.text.trim() == label) {
-        final next = dt.nextElementSibling;
-        if (next != null && next.localName == 'dd') return next;
+    // Search in the stats section first
+    final statsSection = document.querySelector('div.section-body');
+    if (statsSection != null) {
+      final regex = RegExp(pattern);
+      final match = regex.firstMatch(statsSection.outerHtml);
+      if (match != null) {
+        final cleaned = match.group(1)!.replaceAll(',', '');
+        return int.tryParse(cleaned) ?? 0;
       }
     }
-    return null;
+
+    // Fallback: search entire document
+    final fullHtml = document.outerHtml;
+    final regex = RegExp(pattern);
+    final match = regex.firstMatch(fullHtml);
+    if (match != null) {
+      final cleaned = match.group(1)!.replaceAll(',', '');
+      return int.tryParse(cleaned) ?? 0;
+    }
+    return 0;
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
+import 'package:window_manager/window_manager.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -6,6 +8,8 @@ import '../widgets/submission_card.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
+import '../widgets/caption_buttons.dart';
+import '../utils/platform_utils.dart';
 import 'submission_detail_screen.dart';
 import 'journal_detail_screen.dart';
 
@@ -177,9 +181,61 @@ class _UserContentScreenState extends State<UserContentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (isWindows) {
+      return fluent.ScaffoldPage(
+        content: Column(
+          children: [
+            _buildWindowTitleBar(context),
+            Expanded(child: _buildBody()),
+          ],
+        ),
+      );
+    }
+
     return AdaptiveScaffold(
       appBar: AppBar(title: Text(_pageTitle)),
       body: _buildBody(),
+    );
+  }
+
+  Widget _buildWindowTitleBar(BuildContext context) {
+    return fluent.TitleBar(
+      isBackButtonVisible: false,
+      icon: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).maybePop(),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(fluent.FluentIcons.back, size: 14),
+              SizedBox(width: 6),
+              Text('Back', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+      ),
+      title: Text(
+        _pageTitle,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        overflow: TextOverflow.ellipsis,
+      ),
+      captionControls: SizedBox(
+        width: 138,
+        height: 46,
+        child: CaptionButtons(
+          brightness: fluent.FluentTheme.of(context).brightness,
+        ),
+      ),
+      onDragStarted: () => windowManager.startDragging(),
+      onDoubleTap: () async {
+        final isMax = await windowManager.isMaximized();
+        if (isMax) {
+          windowManager.unmaximize();
+        } else {
+          windowManager.maximize();
+        }
+      },
     );
   }
 
