@@ -8,6 +8,7 @@ import '../services/fa_client.dart';
 import '../services/update_service.dart';
 import '../utils/platform_utils.dart';
 import '../theme/theme_provider.dart';
+import 'dart:io' show Platform;
 
 class SettingsScreen extends StatefulWidget {
   final bool sfwMode;
@@ -36,7 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _autoCloseOnFave = true;
   String _imageQuality = 'high';
   String _customDownloadPath = '';
-  final UpdateService _updateService = UpdateService();
+  UpdateService? _updateService;
 
   @override
   bool get wantKeepAlive => true;
@@ -45,13 +46,16 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     _sfwMode = widget.sfwMode;
-    _updateService.init();
+    // UpdateService is Windows-only; Android uses the upgrader package.
+    if (Platform.isWindows) {
+      _updateService = UpdateService()..init();
+    }
     _loadSettings();
   }
 
   @override
   void dispose() {
-    _updateService.dispose();
+    _updateService?.dispose();
     super.dispose();
   }
 
@@ -225,8 +229,10 @@ class _SettingsScreenState extends State<SettingsScreen>
             title: 'Version',
             trailing: '1.0.0',
           ),
-          const Divider(height: 1, indent: 56, color: AppColors.border),
-          _buildUpdateTile(),
+          if (Platform.isWindows) ...[
+            const Divider(height: 1, indent: 56, color: AppColors.border),
+            _buildUpdateTile(),
+          ],
           const Divider(height: 1, indent: 56, color: AppColors.border),
           _infoTile(
             icon: Icons.code,
@@ -341,8 +347,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'Version',
                     trailing: '1.0.0',
                   ),
-                  const Divider(height: 1, indent: 56, color: AppColors.border),
-                  _buildUpdateTile(),
+                  if (Platform.isWindows) ...[
+                    const Divider(
+                        height: 1, indent: 56, color: AppColors.border),
+                    _buildUpdateTile(),
+                  ],
                   const Divider(height: 1, indent: 56, color: AppColors.border),
                   _infoTile(
                     icon: Icons.code,

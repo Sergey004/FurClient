@@ -31,8 +31,14 @@ class UpdateService extends ChangeNotifier {
   String? get latestVersion => _latestVersion;
   String? get currentVersion => _currentVersion;
 
-  /// GitHub repo in `owner/repo` format. Change to match your repo.
-  static const String _repo = 'Sergey004/furclient';
+  /// GitHub repo in `owner/repo` format.
+  static const String _repo = 'Sergey004/FurClient';
+
+  /// GitHub API headers — User-Agent is required by GitHub or you get 403.
+  static const Map<String, String> _githubHeaders = {
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'FurClient',
+  };
 
   /// Initialise — loads current version, runs a silent background check.
   Future<void> init() async {
@@ -104,9 +110,14 @@ class UpdateService extends ChangeNotifier {
     final uri =
         Uri.parse('https://api.github.com/repos/$_repo/releases/latest');
 
-    final response =
-        await http.get(uri, headers: {'Accept': 'application/vnd.github+json'});
+    final response = await http.get(uri, headers: _githubHeaders);
 
+    if (response.statusCode == 404) {
+      throw Exception('No releases found');
+    }
+    if (response.statusCode == 403) {
+      throw Exception('GitHub API rate-limited (403). Try again later.');
+    }
     if (response.statusCode != 200) {
       throw Exception('GitHub API returned ${response.statusCode}');
     }
@@ -131,8 +142,7 @@ class UpdateService extends ChangeNotifier {
     final uri =
         Uri.parse('https://api.github.com/repos/$_repo/releases/latest');
 
-    final response =
-        await http.get(uri, headers: {'Accept': 'application/vnd.github+json'});
+    final response = await http.get(uri, headers: _githubHeaders);
 
     if (response.statusCode != 200) {
       throw Exception('GitHub API returned ${response.statusCode}');
