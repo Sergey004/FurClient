@@ -8,6 +8,7 @@ import '../services/fa_client.dart';
 import '../services/update_service.dart';
 import '../utils/platform_utils.dart';
 import '../theme/theme_provider.dart';
+import 'dart:io' show Platform;
 
 class SettingsScreen extends StatefulWidget {
   final bool sfwMode;
@@ -36,7 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _autoCloseOnFave = true;
   String _imageQuality = 'high';
   String _customDownloadPath = '';
-  final UpdateService _updateService = UpdateService();
+  UpdateService? _updateService;
 
   @override
   bool get wantKeepAlive => true;
@@ -45,13 +46,16 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     _sfwMode = widget.sfwMode;
-    _updateService.init();
+    // UpdateService is Windows-only; Android uses the upgrader package.
+    if (Platform.isWindows) {
+      _updateService = UpdateService()..init();
+    }
     _loadSettings();
   }
 
   @override
   void dispose() {
-    _updateService.dispose();
+    _updateService?.dispose();
     super.dispose();
   }
 
@@ -225,8 +229,10 @@ class _SettingsScreenState extends State<SettingsScreen>
             title: 'Version',
             trailing: '1.0.0',
           ),
-          const Divider(height: 1, indent: 56, color: AppColors.border),
-          _buildUpdateTile(),
+          if (Platform.isWindows) ...[
+            const Divider(height: 1, indent: 56, color: AppColors.border),
+            _buildUpdateTile(),
+          ],
           const Divider(height: 1, indent: 56, color: AppColors.border),
           _infoTile(
             icon: Icons.code,
@@ -341,8 +347,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'Version',
                     trailing: '1.0.0',
                   ),
-                  const Divider(height: 1, indent: 56, color: AppColors.border),
-                  _buildUpdateTile(),
+                  if (Platform.isWindows) ...[
+                    const Divider(
+                        height: 1, indent: 56, color: AppColors.border),
+                    _buildUpdateTile(),
+                  ],
                   const Divider(height: 1, indent: 56, color: AppColors.border),
                   _infoTile(
                     icon: Icons.code,
@@ -655,12 +664,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _buildUpdateTile() {
+    final svc = _updateService!;
     return ListenableBuilder(
-      listenable: _updateService,
+      listenable: svc,
       builder: (context, _) {
-        final status = _updateService.status;
-        final version = _updateService.currentVersion ?? '...';
-        final latest = _updateService.latestVersion;
+        final status = svc.status;
+        final version = svc.currentVersion ?? '...';
+        final latest = svc.latestVersion;
 
         Color iconColor = AppColors.textDim;
         String subtitle = 'v$version';
@@ -673,7 +683,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           subtitle = 'v$version -> v$latest available!';
         } else if (status == UpdateStatus.downloading) {
           iconColor = AppColors.fluentCyan;
-          final pct = (_updateService.downloadProgress * 100).toInt();
+          final pct = (svc.downloadProgress * 100).toInt();
           subtitle = 'Downloading... $pct%';
         } else if (status == UpdateStatus.installing) {
           iconColor = AppColors.materialGreen;
@@ -683,7 +693,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           subtitle = 'v$version - up to date';
         } else if (status == UpdateStatus.error) {
           iconColor = AppColors.danger;
-          subtitle = _updateService.errorMessage ?? 'Update check failed';
+          subtitle = svc.errorMessage ?? 'Update check failed';
         }
 
         return Padding(
@@ -714,7 +724,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(3),
                           child: LinearProgressIndicator(
-                            value: _updateService.downloadProgress,
+                            value: svc.downloadProgress,
                             backgroundColor: AppColors.bgInput,
                             valueColor: const AlwaysStoppedAnimation(
                                 AppColors.fluentCyan),
@@ -729,7 +739,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   status == UpdateStatus.upToDate ||
                   status == UpdateStatus.error)
                 GestureDetector(
-                  onTap: () => _updateService.checkForUpdate(),
+                  onTap: () => svc.checkForUpdate(),
                   behavior: HitTestBehavior.opaque,
                   child: Container(
                     padding:
@@ -754,7 +764,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 )
               else if (status == UpdateStatus.available)
                 GestureDetector(
-                  onTap: () => _updateService.downloadAndInstall(),
+                  onTap: () => svc.downloadAndInstall(),
                   behavior: HitTestBehavior.opaque,
                   child: Container(
                     padding:
