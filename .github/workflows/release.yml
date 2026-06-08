@@ -109,15 +109,15 @@ jobs:
       - name: Pack with Velopack
         shell: pwsh
         run: |
-          # Velopack ожидает SemVer без 'v' — убираем префикс
-          $version = "${{ github.ref_name }}".TrimStart('v')
-          vpk pack `
-            --packId "furclient" `
-            --packVersion "$version" `
-            --packDir "build/windows/x64/runner/Release" `
-            --mainExe "furclient.exe" `
-            --outputDir "velopack-output"
-
+           # Velopack expects SemVer format (x.y.z) — remove 'v' prefix and '+' suffix
+           $version = "${{ github.ref_name }}".TrimStart('v').Split('+')[0]
+           vpk pack `
+             --packId "furclient" `
+             --packVersion "$version" `
+             --packDir "build/windows/x64/runner/Release" `
+             --mainExe "furclient.exe" `
+             --outputDir "velopack-output"
+             
       - name: Upload Velopack assets to release
         uses: softprops/action-gh-release@v3
         with:
