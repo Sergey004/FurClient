@@ -15,6 +15,8 @@ jobs:
   release-android:
     name: Release Android
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     timeout-minutes: 30
 
     steps:
@@ -62,6 +64,8 @@ jobs:
   release-windows:
     name: Release Windows
     runs-on: windows-latest
+    permissions:
+      contents: write
     timeout-minutes: 60
 
     steps:
