@@ -21,7 +21,6 @@ class FlashPlayerWidget extends StatefulWidget {
 }
 
 class _FlashPlayerWidgetState extends State<FlashPlayerWidget> {
-  InAppWebViewController? _controller;
   bool _isLoaded = false;
   bool _hasError = false;
   String _errorMessage = '';
@@ -49,9 +48,7 @@ class _FlashPlayerWidgetState extends State<FlashPlayerWidget> {
       ),
       // Share the same WebViewEnvironment as login for cookies
       webViewEnvironment: webViewEnvironment,
-      onWebViewCreated: (controller) {
-        _controller = controller;
-      },
+      onWebViewCreated: (_) {},
       onLoadStart: (controller, url) {
         debugPrint('=== FlashPlayer: loading $url');
       },

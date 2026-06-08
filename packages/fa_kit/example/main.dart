@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:fa_kit/fa_kit.dart';
 
+// ignore_for_file: avoid_print
 /// Example: How to use FAKit in a Flutter/Dart application.
 ///
 /// Note: You need to obtain cookies from a login WebView first.
@@ -105,7 +106,8 @@ void main() async {
   final notePreviews = await session.notePreviews(box: NotesBox.inbox);
   print('\nNotes in inbox: ${notePreviews.length}');
   for (final note in notePreviews) {
-    print('  ${note.unread ? "🔴" : "⚪"} ${note.title} from ${note.displayAuthor}');
+    print(
+        '  ${note.unread ? "🔴" : "⚪"} ${note.title} from ${note.displayAuthor}');
   }
 
   // Read a note
