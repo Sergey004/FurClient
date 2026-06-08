@@ -17,11 +17,13 @@ class Submission {
   final bool isNsfw;
   final String rating; // 'general', 'mature', 'adult'
   final String url;
+  final bool isFlash;
+  final String flashUrl;
   final bool isFavorite;
   final String favoriteUrl;
 
   String get thumbnailUrl => imageUrl;
-  String get fullImageUrl => imageUrl;
+  String get fullImageUrl => flashUrl.isNotEmpty ? flashUrl : imageUrl;
   String get authorAvatar => FAUrls.avatar(author);
 
   Submission({
@@ -39,6 +41,8 @@ class Submission {
     required this.isNsfw,
     this.rating = 'general',
     required this.url,
+    this.isFlash = false,
+    this.flashUrl = '',
     this.isFavorite = false,
     this.favoriteUrl = '',
   });
@@ -58,6 +62,8 @@ class Submission {
         'isNsfw': isNsfw,
         'rating': rating,
         'url': url,
+        'isFlash': isFlash,
+        'flashUrl': flashUrl,
         'isFavorite': isFavorite,
         'favoriteUrl': favoriteUrl,
       };
@@ -77,6 +83,8 @@ class Submission {
         isNsfw: json['isNsfw'] as bool? ?? false,
         rating: json['rating'] as String? ?? 'general',
         url: json['url'] as String? ?? '',
+        isFlash: json['isFlash'] as bool? ?? false,
+        flashUrl: json['flashUrl'] as String? ?? '',
         isFavorite: json['isFavorite'] as bool? ?? false,
         favoriteUrl: json['favoriteUrl'] as String? ?? '',
       );
@@ -157,6 +165,24 @@ class Submission {
         imgEl?.attributes['src'] ??
         '';
     if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
+
+    // Parse Flash SWF: div.submission-area > object[data] or embed[src] with .swf
+    String flashUrl = '';
+    bool isFlash = false;
+    final submissionArea = document.querySelector('div.submission-area');
+    if (submissionArea != null) {
+      final objectEl = submissionArea.querySelector('object[data]');
+      final embedEl = submissionArea.querySelector('embed[src]');
+      final swfEl = objectEl ?? embedEl;
+      if (swfEl != null) {
+        final swfSrc =
+            swfEl.attributes['data'] ?? swfEl.attributes['src'] ?? '';
+        if (swfSrc.toLowerCase().endsWith('.swf')) {
+          isFlash = true;
+          flashUrl = swfSrc.startsWith('//') ? 'https:$swfSrc' : swfSrc;
+        }
+      }
+    }
 
     // iOS: div.submission-title h2
     final titleEl = document.querySelector('div.submission-title h2');
@@ -256,6 +282,8 @@ class Submission {
       isNsfw: isNsfw,
       rating: rating,
       url: 'https://www.furaffinity.net/view/$submissionId/',
+      isFlash: isFlash,
+      flashUrl: flashUrl,
       isFavorite: isFavorite,
       favoriteUrl: favoriteUrl,
     );

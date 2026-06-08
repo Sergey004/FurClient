@@ -1046,6 +1046,27 @@ class FAClient {
     }
   }
 
+  /// Check if SFW mode is enabled on the FA website by reading the sfw_toggle cookie.
+  /// Returns true if SFW is on (sfw_toggle cookie is present and non-empty).
+  bool checkSiteSfwMode() {
+    if (_session?.cookies == null) return false;
+    try {
+      final List<dynamic> raw = jsonDecode(_session!.cookies!);
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          final name = item['name']?.toString() ?? '';
+          if (name == 'sfw_toggle') {
+            final value = item['value']?.toString() ?? '';
+            return value.isNotEmpty && value != '0';
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('=== Error checking SFW cookie: $e');
+    }
+    return false;
+  }
+
   String? _buildCookieHeader() {
     if (_session?.cookies == null) return null;
     try {

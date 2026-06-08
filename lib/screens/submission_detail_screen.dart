@@ -11,6 +11,7 @@ import '../utils/fa_image_loader.dart';
 import '../widgets/fullscreen_image_viewer.dart';
 import '../services/download_service.dart';
 import '../services/search_history.dart';
+import '../widgets/flash_player_widget.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
   final FAClient client;
@@ -353,6 +354,20 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   // ── Shared widgets ────────────────────────────────────────────────────────
 
   Widget _buildImageSection(Submission sub) {
+    // Flash submission — use Ruffle player instead of image
+    if (sub.isFlash && sub.flashUrl.isNotEmpty) {
+      return Container(
+        color: AppColors.bgDeep,
+        child: SizedBox(
+          height: 400,
+          width: double.infinity,
+          child: FlashPlayerWidget(
+            swfUrl: sub.flashUrl,
+          ),
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: sub.imageUrl.isNotEmpty
           ? () => FullscreenImageViewer.open(

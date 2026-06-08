@@ -8,6 +8,7 @@ import '../services/fa_client.dart';
 import '../services/update_service.dart';
 import '../utils/platform_utils.dart';
 import '../theme/theme_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:io' show Platform;
 
 class SettingsScreen extends StatefulWidget {
@@ -38,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   String _imageQuality = 'high';
   String _customDownloadPath = '';
   UpdateService? _updateService;
+  String _appVersion = '...';
 
   @override
   bool get wantKeepAlive => true;
@@ -51,12 +53,22 @@ class _SettingsScreenState extends State<SettingsScreen>
       _updateService = UpdateService()..init();
     }
     _loadSettings();
+    _loadVersionInfo();
   }
 
   @override
   void dispose() {
     _updateService?.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadVersionInfo() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _appVersion = info.version;
+      });
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -227,7 +239,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             icon: Icons.info_outline,
             iconColor: AppColors.textDim,
             title: 'Version',
-            trailing: '1.0.0',
+            trailing: _appVersion,
           ),
           if (Platform.isWindows) ...[
             const Divider(height: 1, indent: 56, color: AppColors.border),
@@ -238,7 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             icon: Icons.code,
             iconColor: AppColors.textDim,
             title: 'Built with Flutter',
-            trailing: '3.x',
+            trailing: 'Flutter',
           ),
         ]),
         const SizedBox(height: 32),
@@ -345,7 +357,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     icon: Icons.info_outline,
                     iconColor: AppColors.textDim,
                     title: 'Version',
-                    trailing: '1.0.0',
+                    trailing: _appVersion,
                   ),
                   if (Platform.isWindows) ...[
                     const Divider(
@@ -357,7 +369,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     icon: Icons.code,
                     iconColor: AppColors.textDim,
                     title: 'Built with Flutter',
-                    trailing: '3.x',
+                    trailing: 'Flutter',
                   ),
                 ],
               ),
