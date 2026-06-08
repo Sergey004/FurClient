@@ -27,7 +27,8 @@ class _FlashPlayerWidgetState extends State<FlashPlayerWidget> {
 
   // Ruffle CDN URL — self-hosted in production assets would be better,
   // but CDN works for now and avoids asset bundling complexity.
-  static const String _ruffleCdn = 'https://unpkg.com/@ruffle-rs/ruffle@latest';
+  static const String _ruffleCdn =
+      'https://unpkg.com/@ruffle-rs/ruffle@latest';
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +148,9 @@ class _FlashPlayerWidgetState extends State<FlashPlayerWidget> {
             ),
             const SizedBox(height: 12),
             Text(
-              _errorMessage.isNotEmpty ? _errorMessage : 'Flash player error',
+              _errorMessage.isNotEmpty
+                  ? _errorMessage
+                  : 'Flash player error',
               style: const TextStyle(
                 color: Color(0xFF666680),
                 fontSize: 13,
