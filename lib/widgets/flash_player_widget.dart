@@ -21,14 +21,14 @@ class FlashPlayerWidget extends StatefulWidget {
 }
 
 class _FlashPlayerWidgetState extends State<FlashPlayerWidget> {
-  InAppWebViewController? _controller;
   bool _isLoaded = false;
   bool _hasError = false;
   String _errorMessage = '';
 
   // Ruffle CDN URL — self-hosted in production assets would be better,
   // but CDN works for now and avoids asset bundling complexity.
-  static const String _ruffleCdn = 'https://unpkg.com/@ruffle-rs/ruffle@latest';
+  static const String _ruffleCdn =
+      'https://unpkg.com/@ruffle-rs/ruffle@latest';
 
   @override
   Widget build(BuildContext context) {
@@ -49,9 +49,7 @@ class _FlashPlayerWidgetState extends State<FlashPlayerWidget> {
       ),
       // Share the same WebViewEnvironment as login for cookies
       webViewEnvironment: webViewEnvironment,
-      onWebViewCreated: (controller) {
-        _controller = controller;
-      },
+      onWebViewCreated: (_) {},
       onLoadStart: (controller, url) {
         debugPrint('=== FlashPlayer: loading $url');
       },
@@ -150,7 +148,9 @@ class _FlashPlayerWidgetState extends State<FlashPlayerWidget> {
             ),
             const SizedBox(height: 12),
             Text(
-              _errorMessage.isNotEmpty ? _errorMessage : 'Flash player error',
+              _errorMessage.isNotEmpty
+                  ? _errorMessage
+                  : 'Flash player error',
               style: const TextStyle(
                 color: Color(0xFF666680),
                 fontSize: 13,
