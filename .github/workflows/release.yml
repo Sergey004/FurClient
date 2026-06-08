@@ -22,6 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            ninja-build \
+            libgtk-3-dev \
+            libblkid-dev \
+            liblzma-dev \
+            cmake \
+            pkg-config
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
@@ -98,14 +109,14 @@ jobs:
       - name: Pack with Velopack
         shell: pwsh
         run: |
+          # Velopack ожидает SemVer без 'v' — убираем префикс
+          $version = "${{ github.ref_name }}".TrimStart('v')
           vpk pack `
-            -e build/windows/x64/runner/Release/furclient.exe `
-            -c build/windows/x64/runner/Release `
-            -o velopack-output `
-            --channelUrl "https://github.com/${{ github.repository }}/releases/latest/download/RELEASES" `
             --packId "furclient" `
-            --packVersion "${{ github.ref_name }}
-            --packDir build/windows/x64/runner/Release"
+            --packVersion "$version" `
+            --packDir "build/windows/x64/runner/Release" `
+            --mainExe "furclient.exe" `
+            --outputDir "velopack-output"
 
       - name: Upload Velopack assets to release
         uses: softprops/action-gh-release@v3
