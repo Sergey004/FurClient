@@ -7,7 +7,6 @@ import 'webview_image_fetcher.dart';
 import '../utils/cookie_store.dart';
 import '../widgets/adaptive/adaptive_progress.dart';
 
-
 /// FA-специфичный виджет для загрузки изображений.
 class FAImage extends StatefulWidget {
   final String url;
@@ -83,11 +82,18 @@ class _FAImageState extends State<FAImage> {
   Future<void> _loadImage() async {
     final imageUrl = _resolvedUrl;
     if (imageUrl.isEmpty) {
-      setState(() { _isLoading = false; _hasError = true; });
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
       return;
     }
 
-    setState(() { _isLoading = true; _hasError = false; _bytes = null; });
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _bytes = null;
+    });
 
     // Use WebView-based image fetching on all platforms.
     // WebView shares cookies + browser TLS fingerprint, so CF doesn't block it.
@@ -103,7 +109,8 @@ class _FAImageState extends State<FAImage> {
         }
         return;
       }
-      debugPrint('=== FAImage: WebView fetch returned null, falling back to HTTP');
+      debugPrint(
+          '=== FAImage: WebView fetch returned null, falling back to HTTP');
     } catch (e) {
       debugPrint('=== FAImage: WebView fetch error: $e');
     }
@@ -122,7 +129,7 @@ class _FAImageState extends State<FAImage> {
         if (response.statusCode == 403 && attempt < 2) {
           client.close();
           debugPrint('FAImage retry $attempt after 403');
-          
+
           // Если это первая попытка и 403, ждем чтобы FACeline мог решить Cloudflare
           if (attempt == 0) {
             await Future.delayed(const Duration(seconds: 3));

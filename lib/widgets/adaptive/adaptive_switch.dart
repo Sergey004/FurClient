@@ -65,8 +65,8 @@ class AdaptiveSwitchTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(
-                        color: AppColors.text, fontSize: 15)),
+                    style:
+                        const TextStyle(color: AppColors.text, fontSize: 15)),
                 const SizedBox(height: 2),
                 Text(subtitle,
                     style: const TextStyle(

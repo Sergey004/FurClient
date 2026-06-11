@@ -11,9 +11,9 @@ import '../utils/fa_image_loader.dart';
 import '../widgets/fullscreen_image_viewer.dart';
 import '../services/download_service.dart';
 import '../services/search_history.dart';
+import '../widgets/flash_player_widget.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
-
   final FAClient client;
   final String submissionId;
   final bool sfwMode;
@@ -51,7 +51,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     });
     try {
       // Single fetch for both submission details and comments
-      final result = await widget.client.getSubmissionWithComments(widget.submissionId);
+      final result =
+          await widget.client.getSubmissionWithComments(widget.submissionId);
       if (mounted) {
         setState(() {
           _submission = result.submission;
@@ -192,7 +193,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       );
       if (mounted) {
         if (path != null) {
-          _showMessage('Saved: ${path.split('/').last}', AppColors.materialGreen);
+          _showMessage(
+              'Saved: ${path.split('/').last}', AppColors.materialGreen);
         } else {
           _showMessage('Download failed', AppColors.danger);
         }
@@ -352,6 +354,20 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   // ── Shared widgets ────────────────────────────────────────────────────────
 
   Widget _buildImageSection(Submission sub) {
+    // Flash submission — use Ruffle player instead of image
+    if (sub.isFlash && sub.flashUrl.isNotEmpty) {
+      return Container(
+        color: AppColors.bgDeep,
+        child: SizedBox(
+          height: 400,
+          width: double.infinity,
+          child: FlashPlayerWidget(
+            swfUrl: sub.flashUrl,
+          ),
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: sub.imageUrl.isNotEmpty
           ? () => FullscreenImageViewer.open(
@@ -430,9 +446,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   radius: 14,
                   backgroundColor: AppColors.bgInput,
                   child: Text(
-                    sub.author.isNotEmpty
-                        ? sub.author[0].toUpperCase()
-                        : '?',
+                    sub.author.isNotEmpty ? sub.author[0].toUpperCase() : '?',
                     style: const TextStyle(
                       color: AppColors.fluentCyan,
                       fontSize: 12,
@@ -472,7 +486,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               GestureDetector(
                 onTap: _isDownloading ? null : _downloadImage,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.bgInput,
                     borderRadius: BorderRadius.circular(10),
@@ -499,7 +514,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               GestureDetector(
                 onTap: _isFaving ? null : _toggleFavorite,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: sub.isFavorite
                         ? AppColors.notifFave.withValues(alpha: 0.15)
@@ -525,7 +541,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                         )
                       else
                         Icon(
-                          sub.isFavorite ? Icons.favorite : Icons.favorite_border,
+                          sub.isFavorite
+                              ? Icons.favorite
+                              : Icons.favorite_border,
                           size: 16,
                           color: sub.isFavorite
                               ? AppColors.notifFave
@@ -604,7 +622,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.materialLavenderBg,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.materialLavender.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: AppColors.materialLavender
+                              .withValues(alpha: 0.3)),
                     ),
                     child: Text(
                       tag,
@@ -634,8 +654,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.materialGreenBg,
                   borderRadius: BorderRadius.circular(10),
@@ -673,8 +692,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     );
   }
 
-  Widget _statChip(
-      IconData icon, String value, String label, Color color) {
+  Widget _statChip(IconData icon, String value, String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -748,13 +766,15 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 Row(
                   children: [
                     GestureDetector(
-                      onTap: comment.author.isNotEmpty && comment.author != 'Anonymous'
+                      onTap: comment.author.isNotEmpty &&
+                              comment.author != 'Anonymous'
                           ? () => _navigateToProfile(comment.author)
                           : null,
                       child: Text(
                         comment.author,
                         style: TextStyle(
-                          color: comment.author.isNotEmpty && comment.author != 'Anonymous'
+                          color: comment.author.isNotEmpty &&
+                                  comment.author != 'Anonymous'
                               ? AppColors.fluentCyan
                               : AppColors.text,
                           fontSize: 14,

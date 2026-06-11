@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
+import 'package:window_manager/window_manager.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
+import '../widgets/caption_buttons.dart';
 import '../utils/fa_image_loader.dart';
+import '../utils/platform_utils.dart';
 import 'user_content_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -70,9 +74,64 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
+    if (isWindows) {
+      return fluent.ScaffoldPage(
+        content: Column(
+          children: [
+            _buildWindowTitleBar(context),
+            Expanded(child: _buildBody()),
+          ],
+        ),
+      );
+    }
+
     return AdaptiveScaffold(
-      appBar: AppBar(title: Text(widget.targetUsername != null ? _username : 'Profile')),
+      appBar: AppBar(
+          title: Text(widget.targetUsername != null ? _username : 'Profile')),
       body: _buildBody(),
+    );
+  }
+
+  Widget _buildWindowTitleBar(BuildContext context) {
+    final title = widget.targetUsername != null ? _username : 'Profile';
+    return fluent.TitleBar(
+      isBackButtonVisible: false,
+      icon: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).maybePop(),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(fluent.FluentIcons.back, size: 14),
+              SizedBox(width: 6),
+              Text('Back', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        overflow: TextOverflow.ellipsis,
+      ),
+      captionControls: SizedBox(
+        width: 138,
+        height: 46,
+        child: CaptionButtons(
+          brightness: fluent.FluentTheme.of(context).brightness,
+        ),
+      ),
+      onDragStarted: () => windowManager.startDragging(),
+      onDoubleTap: () async {
+        final isMax = await windowManager.isMaximized();
+        if (isMax) {
+          windowManager.unmaximize();
+        } else {
+          windowManager.maximize();
+        }
+      },
     );
   }
 
@@ -82,7 +141,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     if (_error != null) {
-      return ErrorView(message: _error!, onRetry: _loadProfile, onRelogin: widget.onLogout);
+      return ErrorView(
+          message: _error!, onRetry: _loadProfile, onRelogin: widget.onLogout);
     }
 
     if (_profile == null) {
@@ -176,9 +236,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         : const Icon(Icons.person,
                             color: AppColors.textMuted, size: 56),
                   ),
-                 ),
-                 const SizedBox(height: 12),
-
+                ),
+                const SizedBox(height: 12),
                 Text(
                   p.displayName,
                   style: const TextStyle(
@@ -254,7 +313,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-
   Widget _buildHeader(FAUser p) {
     return Transform.translate(
       offset: const Offset(0, -40),
@@ -263,31 +321,30 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.bg, width: 4),
-                      ),
-                      child: CircleAvatar(
-                        radius: 44,
-                        backgroundColor: AppColors.bgInput,
-                        child: p.avatarUrl.isNotEmpty
-                            ? FAImage(
-                                url: p.avatarUrl,
-                                width: 88,
-                                height: 88,
-                                fit: BoxFit.cover,
-                                errorWidget: const Icon(
-                                  Icons.person,
-                                  color: AppColors.textMuted,
-                                  size: 44,
-                                ),
-                              )
-                            : const Icon(Icons.person,
-                                color: AppColors.textMuted, size: 44),
-                      ),
-                    ),
-
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.bg, width: 4),
+              ),
+              child: CircleAvatar(
+                radius: 44,
+                backgroundColor: AppColors.bgInput,
+                child: p.avatarUrl.isNotEmpty
+                    ? FAImage(
+                        url: p.avatarUrl,
+                        width: 88,
+                        height: 88,
+                        fit: BoxFit.cover,
+                        errorWidget: const Icon(
+                          Icons.person,
+                          color: AppColors.textMuted,
+                          size: 44,
+                        ),
+                      )
+                    : const Icon(Icons.person,
+                        color: AppColors.textMuted, size: 44),
+              ),
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -356,7 +413,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         crossAxisCount: crossAxisCount,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 2.2,
+        childAspectRatio: crossAxisCount == 3 ? 1.65 : 1.8,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
         children: [
@@ -454,7 +511,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _linkTile(IconData icon, String title, Color color, VoidCallback onTap) {
+  Widget _linkTile(
+      IconData icon, String title, Color color, VoidCallback onTap) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(

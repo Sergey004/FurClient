@@ -38,7 +38,8 @@ class AuthProvider extends ChangeNotifier {
       if (session != null && session.isLoggedIn) {
         _currentSession = session;
         _isAuthenticated = true;
-        debugPrint('=== AuthProvider: Session restored for ${session.username}');
+        debugPrint(
+            '=== AuthProvider: Session restored for ${session.username}');
       }
     } catch (e) {
       debugPrint('=== AuthProvider: Error initializing: $e');

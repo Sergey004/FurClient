@@ -64,13 +64,17 @@ class FANotification {
 
       String type = 'fave';
       final classList = el.classes;
-      if (classList.contains('notif-fave') || titleText.toLowerCase().contains('favorited')) {
+      if (classList.contains('notif-fave') ||
+          titleText.toLowerCase().contains('favorited')) {
         type = 'fave';
-      } else if (classList.contains('notif-comment') || titleText.toLowerCase().contains('commented')) {
+      } else if (classList.contains('notif-comment') ||
+          titleText.toLowerCase().contains('commented')) {
         type = 'comment';
-      } else if (classList.contains('notif-watch') || titleText.toLowerCase().contains('watched')) {
+      } else if (classList.contains('notif-watch') ||
+          titleText.toLowerCase().contains('watched')) {
         type = 'watch';
-      } else if (classList.contains('notif-journal') || titleText.toLowerCase().contains('journal')) {
+      } else if (classList.contains('notif-journal') ||
+          titleText.toLowerCase().contains('journal')) {
         type = 'journal';
       }
 

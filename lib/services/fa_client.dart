@@ -107,7 +107,8 @@ class FAClient {
 
   UserSession? get session => _session;
 
-  Future<void> setSession(UserSession? session, {bool freshLogin = false}) async {
+  Future<void> setSession(UserSession? session,
+      {bool freshLogin = false}) async {
     _session = session;
     await _restoreCookiesFromSession();
     await _enhancedClient.syncCookies();
@@ -182,7 +183,8 @@ class FAClient {
 
     // CF challenge pages are typically small — a real FA page is 100KB+
     if (body.length > 30000) {
-      debugPrint('=== HTTP ${response.statusCode} with ${body.length}B body — not a CF challenge (too large)');
+      debugPrint(
+          '=== HTTP ${response.statusCode} with ${body.length}B body — not a CF challenge (too large)');
       return;
     }
 
@@ -193,10 +195,12 @@ class FAClient {
         lower.contains('challenges.cloudflare.com') ||
         lower.contains('cf_chl_page') ||
         (lower.contains('cf-turnstile') && lower.contains('challenge')) ||
-        (lower.contains('cloudflare') && lower.contains('verify you are human'));
+        (lower.contains('cloudflare') &&
+            lower.contains('verify you are human'));
 
     if (hasCfMarkers) {
-      debugPrint('=== CF challenge detected (HTTP ${response.statusCode}, body ${body.length}B)');
+      debugPrint(
+          '=== CF challenge detected (HTTP ${response.statusCode}, body ${body.length}B)');
       throw CloudflareError();
     }
     debugPrint('=== HTTP ${response.statusCode} — not a CF challenge');
@@ -263,7 +267,8 @@ class FAClient {
   /// If [waitForAjax] is true, waits extra time for JS to load comments.
   /// Shares the same WebViewEnvironment as the login WebView, so it has
   /// the same cookies and can pass CF Turnstile (same TLS fingerprint).
-  Future<String> _fetchHtmlWithWebView(String url, {bool waitForAjax = false}) async {
+  Future<String> _fetchHtmlWithWebView(String url,
+      {bool waitForAjax = false}) async {
     final completer = Completer<String>();
     HeadlessInAppWebView? headless;
     int solveAttempts = 0;
@@ -276,8 +281,7 @@ class FAClient {
       onLoadStop: (controller, loadedUrl) async {
         try {
           final html = await controller.getHtml() ?? '';
-          debugPrint(
-              '=== WebView fetch: ${html.length}B from $loadedUrl');
+          debugPrint('=== WebView fetch: ${html.length}B from $loadedUrl');
 
           // If this is a CF challenge page, wait for it to be solved
           if (_isCloudflarePage(html)) {
@@ -308,7 +312,8 @@ class FAClient {
             if (waitForAjax) {
               await Future.delayed(const Duration(seconds: 3));
               final ajaxHtml = await controller.getHtml() ?? '';
-              debugPrint('=== WebView fetch (after AJAX wait): ${ajaxHtml.length}B');
+              debugPrint(
+                  '=== WebView fetch (after AJAX wait): ${ajaxHtml.length}B');
               if (ajaxHtml.length > html.length) {
                 completer.complete(ajaxHtml);
               } else {
@@ -389,8 +394,7 @@ class FAClient {
         _checkCloudflare(response);
       } on CloudflareError {
         // Dio can't pass CF — use WebView to check if session is valid
-        debugPrint(
-            '=== verifySession: CF detected, checking via WebView');
+        debugPrint('=== verifySession: CF detected, checking via WebView');
         try {
           final html = await _fetchHtmlWithWebView(FAUrls.home);
           // If we got a real FA page (not empty, not CF page), session is valid
@@ -492,7 +496,8 @@ class FAClient {
     final commentStart = html.indexOf('comment');
     if (commentStart > 0) {
       final start = commentStart > 200 ? commentStart - 200 : 0;
-      final end = commentStart + 2000 < html.length ? commentStart + 2000 : html.length;
+      final end =
+          commentStart + 2000 < html.length ? commentStart + 2000 : html.length;
       debugPrint('=== HTML comment section (pos $commentStart):');
       debugPrint('=== ${html.substring(start, end)}');
     } else {
@@ -500,11 +505,13 @@ class FAClient {
     }
     final submission = Submission.parseSubmissionDetails(html, id);
     final comments = FAComment.parseComments(html);
-    debugPrint('=== getSubmissionWithComments: ${comments.length} comments parsed');
+    debugPrint(
+        '=== getSubmissionWithComments: ${comments.length} comments parsed');
     // Dump first comment for debug
     if (comments.isNotEmpty) {
       final c = comments.first;
-      debugPrint('=== First comment: id=${c.id}, author=${c.author}, text=${c.text.length}chars, time=${c.time}, indent=${c.indentLevel}');
+      debugPrint(
+          '=== First comment: id=${c.id}, author=${c.author}, text=${c.text.length}chars, time=${c.time}, indent=${c.indentLevel}');
     }
     return (submission: submission, comments: comments);
   }
@@ -519,12 +526,14 @@ class FAClient {
     return result.comments;
   }
 
-  Future<List<Submission>> search(String query, {
+  Future<List<Submission>> search(
+    String query, {
     int page = 1,
     String sortBy = 'relevancyt',
     String sortDirection = 'desc',
   }) async {
-    final url = FAUrls.search(query, page: page, sortBy: sortBy, sortDirection: sortDirection);
+    final url = FAUrls.search(query,
+        page: page, sortBy: sortBy, sortDirection: sortDirection);
     final html = await _getHtml(url);
     return Submission.parseSearchResults(html);
   }
@@ -552,7 +561,8 @@ class FAClient {
       onLoadStop: (controller, loadedUrl) async {
         try {
           final html = await controller.getHtml() ?? '';
-          debugPrint('=== toggleFavorite WebView: ${html.length}B from $loadedUrl');
+          debugPrint(
+              '=== toggleFavorite WebView: ${html.length}B from $loadedUrl');
 
           if (_isCloudflarePage(html)) {
             debugPrint('=== toggleFavorite: CF challenge, waiting...');
@@ -628,7 +638,8 @@ class FAClient {
       onLoadStop: (controller, loadedUrl) async {
         try {
           final html = await controller.getHtml() ?? '';
-          debugPrint('=== toggleSiteSfwMode WebView: ${html.length}B from $loadedUrl');
+          debugPrint(
+              '=== toggleSiteSfwMode WebView: ${html.length}B from $loadedUrl');
 
           if (_isCloudflarePage(html)) {
             debugPrint('=== toggleSiteSfwMode: CF challenge, waiting...');
@@ -735,7 +746,8 @@ class FAClient {
   }
 
   /// Fetch a user's favorites page.
-  Future<List<Submission>> getUserFavorites(String username, {int page = 1}) async {
+  Future<List<Submission>> getUserFavorites(String username,
+      {int page = 1}) async {
     final url = '${FAUrls.favorites(username)}?page=$page';
     final html = await _getHtml(url);
     return Submission.parseSubmissionsPage(html);
@@ -1034,6 +1046,27 @@ class FAClient {
     }
   }
 
+  /// Check if SFW mode is enabled on the FA website by reading the sfw_toggle cookie.
+  /// Returns true if SFW is on (sfw_toggle cookie is present and non-empty).
+  bool checkSiteSfwMode() {
+    if (_session?.cookies == null) return false;
+    try {
+      final List<dynamic> raw = jsonDecode(_session!.cookies!);
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          final name = item['name']?.toString() ?? '';
+          if (name == 'sfw_toggle') {
+            final value = item['value']?.toString() ?? '';
+            return value.isNotEmpty && value != '0';
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('=== Error checking SFW cookie: $e');
+    }
+    return false;
+  }
+
   String? _buildCookieHeader() {
     if (_session?.cookies == null) return null;
     try {
@@ -1054,6 +1087,4 @@ class FAClient {
       return null;
     }
   }
-
-
 }

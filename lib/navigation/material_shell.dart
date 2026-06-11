@@ -86,10 +86,19 @@ class _MaterialShellState extends State<MaterialShell> {
   }
 
   Future<void> _loadSfwMode() async {
+    // Always check the site's sfw_toggle cookie first
+    final siteSfw = widget.client.checkSiteSfwMode();
+    debugPrint('=== MaterialShell: site SFW mode = $siteSfw');
+
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getBool('sfw_mode') ?? false;
-    if (mounted && saved != _sfwMode) {
-      setState(() => _sfwMode = saved);
+    // Site cookie is authoritative — overwrite local setting
+    final value = siteSfw;
+    if (value != saved) {
+      await prefs.setBool('sfw_mode', value);
+    }
+    if (mounted && value != _sfwMode) {
+      setState(() => _sfwMode = value);
     }
   }
 
@@ -99,10 +108,15 @@ class _MaterialShellState extends State<MaterialShell> {
 
   List<Widget> _buildScreens() {
     return [
-      GalleryScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
-      SearchScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+      GalleryScreen(
+          client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+      SearchScreen(
+          client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
       NotificationsScreen(client: widget.client, onLogout: widget.onLogout),
-      ProfileScreen(client: widget.client, session: widget.session, onLogout: widget.onLogout),
+      ProfileScreen(
+          client: widget.client,
+          session: widget.session,
+          onLogout: widget.onLogout),
       SettingsScreen(
         sfwMode: _sfwMode,
         onSfwModeChanged: _onSfwModeChanged,

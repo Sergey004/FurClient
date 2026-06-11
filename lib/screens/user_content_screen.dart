@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
+import 'package:window_manager/window_manager.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -6,6 +8,8 @@ import '../widgets/submission_card.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
+import '../widgets/caption_buttons.dart';
+import '../utils/platform_utils.dart';
 import 'submission_detail_screen.dart';
 import 'journal_detail_screen.dart';
 
@@ -129,8 +133,8 @@ class _UserContentScreenState extends State<UserContentScreen> {
     try {
       final more = widget.contentType == UserContentType.gallery
           ? await widget.client.getGallery(widget.username, page: _currentPage)
-          : await widget.client.getUserFavorites(
-              widget.username, page: _currentPage);
+          : await widget.client
+              .getUserFavorites(widget.username, page: _currentPage);
       if (mounted) {
         setState(() {
           _submissions.addAll(more);
@@ -177,9 +181,61 @@ class _UserContentScreenState extends State<UserContentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (isWindows) {
+      return fluent.ScaffoldPage(
+        content: Column(
+          children: [
+            _buildWindowTitleBar(context),
+            Expanded(child: _buildBody()),
+          ],
+        ),
+      );
+    }
+
     return AdaptiveScaffold(
       appBar: AppBar(title: Text(_pageTitle)),
       body: _buildBody(),
+    );
+  }
+
+  Widget _buildWindowTitleBar(BuildContext context) {
+    return fluent.TitleBar(
+      isBackButtonVisible: false,
+      icon: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).maybePop(),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(fluent.FluentIcons.back, size: 14),
+              SizedBox(width: 6),
+              Text('Back', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+      ),
+      title: Text(
+        _pageTitle,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        overflow: TextOverflow.ellipsis,
+      ),
+      captionControls: SizedBox(
+        width: 138,
+        height: 46,
+        child: CaptionButtons(
+          brightness: fluent.FluentTheme.of(context).brightness,
+        ),
+      ),
+      onDragStarted: () => windowManager.startDragging(),
+      onDoubleTap: () async {
+        final isMax = await windowManager.isMaximized();
+        if (isMax) {
+          windowManager.unmaximize();
+        } else {
+          windowManager.maximize();
+        }
+      },
     );
   }
 
@@ -227,39 +283,37 @@ class _UserContentScreenState extends State<UserContentScreen> {
     }
 
     return LayoutBuilder(
-        builder: (context, constraints) {
-          final crossAxisCount = _getCrossAxisCount(constraints.maxWidth);
-          final isDesktop = constraints.maxWidth >= AppBreakpoints.desktop;
+      builder: (context, constraints) {
+        final crossAxisCount = _getCrossAxisCount(constraints.maxWidth);
+        final isDesktop = constraints.maxWidth >= AppBreakpoints.desktop;
 
-          return GridView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              childAspectRatio: isDesktop ? 0.7 : 0.65,
-              crossAxisSpacing: isDesktop ? 16 : 12,
-              mainAxisSpacing: isDesktop ? 16 : 12,
-            ),
-            itemCount: _submissions.length + (_isLoadingMore ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index >= _submissions.length) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(
-                      child: AdaptiveProgress(strokeWidth: 2)),
-                );
-              }
-              return SubmissionCard(
-                submission: _submissions[index],
-                client: widget.client,
-                sfwMode: false,
-                onTap: () =>
-                    _navigateToDetail(_submissions[index]),
+        return GridView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: isDesktop ? 0.7 : 0.65,
+            crossAxisSpacing: isDesktop ? 16 : 12,
+            mainAxisSpacing: isDesktop ? 16 : 12,
+          ),
+          itemCount: _submissions.length + (_isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index >= _submissions.length) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: AdaptiveProgress(strokeWidth: 2)),
               );
-            },
-          );
-        },
-      );
+            }
+            return SubmissionCard(
+              submission: _submissions[index],
+              client: widget.client,
+              sfwMode: false,
+              onTap: () => _navigateToDetail(_submissions[index]),
+            );
+          },
+        );
+      },
+    );
   }
 
   // ── Journals list ───────────────────────────────────────────────────
