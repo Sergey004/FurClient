@@ -31,8 +31,14 @@ class UpdateService extends ChangeNotifier {
   String? get latestVersion => _latestVersion;
   String? get currentVersion => _currentVersion;
 
-  /// GitHub repo in `owner/repo` format. Change to match your repo.
-  static const String _repo = 'your-username/furclient';
+  /// GitHub repo in `owner/repo` format.
+  static const String _repo = 'Sergey004/FurClient';
+
+  /// GitHub API headers — User-Agent is required by GitHub or you get 403.
+  static const Map<String, String> _githubHeaders = {
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'FurClient',
+  };
 
   /// Initialise — loads current version, runs a silent background check.
   Future<void> init() async {
@@ -101,15 +107,19 @@ class UpdateService extends ChangeNotifier {
   // ── Internal ──────────────────────────────────────────────────────────
 
   Future<void> _checkGitHub() async {
-    final uri = Uri.parse(
-        'https://api.github.com/repos/$_repo/releases/latest');
+    final uri =
+        Uri.parse('https://api.github.com/repos/$_repo/releases/latest');
 
-    final response = await http
-        .get(uri, headers: {'Accept': 'application/vnd.github+json'});
+    final response = await http.get(uri, headers: _githubHeaders);
 
+    if (response.statusCode == 404) {
+      throw Exception('No releases found');
+    }
+    if (response.statusCode == 403) {
+      throw Exception('GitHub API rate-limited (403). Try again later.');
+    }
     if (response.statusCode != 200) {
-      throw Exception(
-          'GitHub API returned ${response.statusCode}');
+      throw Exception('GitHub API returned ${response.statusCode}');
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -129,11 +139,10 @@ class UpdateService extends ChangeNotifier {
   /// Manual download + `.bat` installer for portable installs.
   Future<void> _downloadAndInstallManual() async {
     // Find the zip asset from the latest release
-    final uri = Uri.parse(
-        'https://api.github.com/repos/$_repo/releases/latest');
+    final uri =
+        Uri.parse('https://api.github.com/repos/$_repo/releases/latest');
 
-    final response = await http
-        .get(uri, headers: {'Accept': 'application/vnd.github+json'});
+    final response = await http.get(uri, headers: _githubHeaders);
 
     if (response.statusCode != 200) {
       throw Exception('GitHub API returned ${response.statusCode}');
@@ -230,10 +239,8 @@ del /f /q "%~f0"
   /// [current].
   bool _isNewer(String latest, String current) {
     try {
-      final lParts =
-          latest.split('.').map(int.parse).toList();
-      final cParts =
-          current.split('.').map(int.parse).toList();
+      final lParts = latest.split('.').map(int.parse).toList();
+      final cParts = current.split('.').map(int.parse).toList();
 
       for (var i = 0; i < 3; i++) {
         final l = i < lParts.length ? lParts[i] : 0;

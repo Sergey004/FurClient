@@ -66,7 +66,8 @@ class CDNLoader {
     } else if (_isAndroid) {
       debugPrint('=== CDNLoader: Platform=Android, using Cronet strategy');
     } else {
-      debugPrint('=== CDNLoader: Platform=${Platform.operatingSystem}, using HTTP strategy');
+      debugPrint(
+          '=== CDNLoader: Platform=${Platform.operatingSystem}, using HTTP strategy');
     }
 
     _isInitialized = true;
@@ -151,7 +152,8 @@ class CDNLoader {
   // ── Strategy selection ───────────────────────────────────────────
 
   /// Try loading with platform-specific strategies in order
-  Future<Uint8List?> _loadWithStrategies(String url, Map<String, String> headers) async {
+  Future<Uint8List?> _loadWithStrategies(
+      String url, Map<String, String> headers) async {
     final allHeaders = _buildHeaders(headers);
 
     // Strategy 1: Platform-specific optimized client
@@ -185,20 +187,23 @@ class CDNLoader {
   // ── Strategy: HTTP Client ────────────────────────────────────────
 
   /// Load using dart:http client
-  Future<Uint8List?> _loadWithHttpClient(String url, Map<String, String> headers) async {
+  Future<Uint8List?> _loadWithHttpClient(
+      String url, Map<String, String> headers) async {
     try {
       final cookieHeader = await _getCookieHeader(url);
       if (cookieHeader != null) {
         headers['Cookie'] = cookieHeader;
       }
 
-      final response = await http.get(
-        Uri.parse(url),
-        headers: headers,
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => throw TimeoutException('HTTP client timeout'),
-      );
+      final response = await http
+          .get(
+            Uri.parse(url),
+            headers: headers,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw TimeoutException('HTTP client timeout'),
+          );
 
       if (response.statusCode == 200) {
         _updateCookiesFromResponse(url, response.headers);
@@ -206,7 +211,8 @@ class CDNLoader {
         return response.bodyBytes;
       }
 
-      debugPrint('=== CDNLoader: HTTP client returned ${response.statusCode} for $url');
+      debugPrint(
+          '=== CDNLoader: HTTP client returned ${response.statusCode} for $url');
       return null;
     } catch (e) {
       debugPrint('=== CDNLoader: HTTP client failed for $url: $e');
@@ -217,7 +223,8 @@ class CDNLoader {
   // ── Strategy: Cronet (Android) ───────────────────────────────────
 
   /// Load using Cronet client (Android only)
-  Future<Uint8List?> _loadWithCronet(String url, Map<String, String> headers) async {
+  Future<Uint8List?> _loadWithCronet(
+      String url, Map<String, String> headers) async {
     try {
       final cookieHeader = await _getCookieHeader(url);
       if (cookieHeader != null) {
@@ -228,9 +235,9 @@ class CDNLoader {
         ..headers.addAll(headers);
 
       final response = await _cronetClient!.send(request).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => throw TimeoutException('Cronet timeout'),
-      );
+            const Duration(seconds: 30),
+            onTimeout: () => throw TimeoutException('Cronet timeout'),
+          );
 
       if (response.statusCode == 200) {
         final bytes = await response.stream.toBytes();
@@ -239,7 +246,8 @@ class CDNLoader {
         return bytes;
       }
 
-      debugPrint('=== CDNLoader: Cronet returned ${response.statusCode} for $url');
+      debugPrint(
+          '=== CDNLoader: Cronet returned ${response.statusCode} for $url');
       return null;
     } catch (e) {
       debugPrint('=== CDNLoader: Cronet failed for $url: $e');
@@ -250,7 +258,8 @@ class CDNLoader {
   // ── Strategy: WebView ────────────────────────────────────────────
 
   /// Load using InAppWebView (for Cloudflare-protected content)
-  Future<Uint8List?> _loadWithWebView(String url, Map<String, String> headers) async {
+  Future<Uint8List?> _loadWithWebView(
+      String url, Map<String, String> headers) async {
     if (_webViewController == null) {
       debugPrint('=== CDNLoader: WebView not available');
       return null;
@@ -305,7 +314,8 @@ class CDNLoader {
   /// Load using local HTTP proxy (Windows-specific)
   Future<Uint8List?> _loadWithProxy(String url) async {
     try {
-      final proxyUrl = 'http://127.0.0.1:47652/fa-proxy?url=${Uri.encodeComponent(url)}';
+      final proxyUrl =
+          'http://127.0.0.1:47652/fa-proxy?url=${Uri.encodeComponent(url)}';
 
       final response = await http.get(
         Uri.parse(proxyUrl),
@@ -407,7 +417,8 @@ class CDNLoader {
     }
 
     if (expiredKeys.isNotEmpty) {
-      debugPrint('=== CDNLoader: Cleaned ${expiredKeys.length} expired cache entries');
+      debugPrint(
+          '=== CDNLoader: Cleaned ${expiredKeys.length} expired cache entries');
     }
   }
 
@@ -417,7 +428,8 @@ class CDNLoader {
   Map<String, String> _buildHeaders(Map<String, String> extra) {
     return {
       'User-Agent': 'FurClient/1.0',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept':
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.9',
       'Accept-Encoding': 'gzip, deflate, br',
       'Connection': 'keep-alive',

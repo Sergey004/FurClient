@@ -153,13 +153,11 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
               const SizedBox(height: 16),
               Text(
                 _error ?? 'Failed to load journal',
-                style: const TextStyle(
-                    color: AppColors.textDim, fontSize: 14),
+                style: const TextStyle(color: AppColors.textDim, fontSize: 14),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              AdaptiveButton(
-                  label: 'Retry', onPressed: _loadJournal),
+              AdaptiveButton(label: 'Retry', onPressed: _loadJournal),
             ],
           ),
         ),
@@ -284,7 +282,8 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.materialGreenBg,
                     borderRadius: BorderRadius.circular(10),
@@ -312,8 +311,8 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
 
   Widget _buildComment(FAComment comment) {
     final indent = (comment.indentLevel.clamp(0, 4)) * 24.0;
-    final isClickable = comment.author.isNotEmpty &&
-        comment.author != 'Anonymous';
+    final isClickable =
+        comment.author.isNotEmpty && comment.author != 'Anonymous';
 
     return Padding(
       padding: EdgeInsets.only(bottom: 16, left: indent),

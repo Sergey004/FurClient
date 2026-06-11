@@ -91,7 +91,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
 
     // User profile: /user/username/
-    final userMatch = RegExp(r'/user/([a-zA-Z][a-zA-Z0-9_]+)/').firstMatch(notification.url);
+    final userMatch =
+        RegExp(r'/user/([a-zA-Z][a-zA-Z0-9_]+)/').firstMatch(notification.url);
     if (userMatch != null) {
       Navigator.of(context).push(
         adaptiveRoute(
@@ -153,7 +154,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
 
     if (_error != null) {
-      return ErrorView(message: _error!, onRetry: _loadNotifications, onRelogin: widget.onLogout);
+      return ErrorView(
+          message: _error!,
+          onRetry: _loadNotifications,
+          onRelogin: widget.onLogout);
     }
 
     if (_notifications.isEmpty) {
@@ -207,20 +211,20 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 border:
                     Border.all(color: color.withValues(alpha: 0.2), width: 1),
               ),
-               child: CircleAvatar(
-                 radius: 22,
-                 backgroundColor: Colors.transparent,
-                   child: notif.avatarUrl.isNotEmpty
-                        ? FAImage(
-                            url: notif.avatarUrl,
-                            width: 44,
-                            height: 44,
-                            fit: BoxFit.cover,
-                            errorWidget: Icon(_typeIcon(notif.type), color: color, size: 22),
-                          )
-                       : Icon(_typeIcon(notif.type), color: color, size: 22),
-               ),
-
+              child: CircleAvatar(
+                radius: 22,
+                backgroundColor: Colors.transparent,
+                child: notif.avatarUrl.isNotEmpty
+                    ? FAImage(
+                        url: notif.avatarUrl,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        errorWidget:
+                            Icon(_typeIcon(notif.type), color: color, size: 22),
+                      )
+                    : Icon(_typeIcon(notif.type), color: color, size: 22),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(

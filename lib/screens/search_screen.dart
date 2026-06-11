@@ -60,7 +60,8 @@ class _SearchScreenState extends State<SearchScreen>
     // If initial query provided, search immediately
     if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
       _searchController.text = widget.initialQuery!;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _search(widget.initialQuery!));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _search(widget.initialQuery!));
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _searchFocusNode.requestFocus();
@@ -214,7 +215,8 @@ class _SearchScreenState extends State<SearchScreen>
                   style: const TextStyle(color: AppColors.text, fontSize: 14),
                   prefix: const Padding(
                     padding: EdgeInsets.only(left: 8),
-                    child: Icon(Icons.search, size: 16, color: AppColors.materialGreen),
+                    child: Icon(Icons.search,
+                        size: 16, color: AppColors.materialGreen),
                   ),
                   suffix: _searchController.text.isNotEmpty
                       ? fluent.IconButton(
@@ -291,7 +293,8 @@ class _SearchScreenState extends State<SearchScreen>
         children: [
           const Icon(Icons.sort, size: 18, color: AppColors.textMuted),
           const SizedBox(width: 6),
-          const Text('Sort:', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          const Text('Sort:',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
           const SizedBox(width: 8),
           _sortChip('Relevance', 'relevancyt'),
           const SizedBox(width: 6),
@@ -322,7 +325,8 @@ class _SearchScreenState extends State<SearchScreen>
                     const SizedBox(width: 4),
                     Text(
                       _sortDirection == 'desc' ? 'Desc' : 'Asc',
-                      style: const TextStyle(color: AppColors.textDim, fontSize: 11),
+                      style: const TextStyle(
+                          color: AppColors.textDim, fontSize: 11),
                     ),
                   ],
                 ),
@@ -379,7 +383,10 @@ class _SearchScreenState extends State<SearchScreen>
     }
 
     if (_error != null) {
-      return ErrorView(message: _error!, onRetry: () => _search(_query), onRelogin: widget.onLogout);
+      return ErrorView(
+          message: _error!,
+          onRetry: () => _search(_query),
+          onRelogin: widget.onLogout);
     }
 
     if (!_hasSearched) {
@@ -419,8 +426,8 @@ class _SearchScreenState extends State<SearchScreen>
               return const Padding(
                 padding: EdgeInsets.all(16),
                 child: Center(
-                  child: AdaptiveProgress(
-                      color: AppColors.materialGreen, strokeWidth: 2)),
+                    child: AdaptiveProgress(
+                        color: AppColors.materialGreen, strokeWidth: 2)),
               );
             }
             final sub = _results[index];
@@ -449,7 +456,8 @@ class _SearchScreenState extends State<SearchScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.search,
-                color: AppColors.materialGreen.withValues(alpha: 0.5), size: 48),
+                color: AppColors.materialGreen.withValues(alpha: 0.5),
+                size: 48),
             const SizedBox(height: 16),
             const Text('Search for submissions',
                 style: TextStyle(color: AppColors.textDim, fontSize: 16)),
@@ -486,13 +494,15 @@ class _SearchScreenState extends State<SearchScreen>
                     setState(() {});
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       border: Border.all(color: AppColors.border),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text('Clear All',
-                        style: TextStyle(color: AppColors.textDim, fontSize: 12)),
+                        style:
+                            TextStyle(color: AppColors.textDim, fontSize: 12)),
                   ),
                 ),
             ],
@@ -524,10 +534,13 @@ class _SearchScreenState extends State<SearchScreen>
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           child: Row(
             children: [
-              const Icon(Icons.history, color: AppColors.materialGreen, size: 18),
+              const Icon(Icons.history,
+                  color: AppColors.materialGreen, size: 18),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(term, style: const TextStyle(color: AppColors.textDim, fontSize: 14)),
+                child: Text(term,
+                    style: const TextStyle(
+                        color: AppColors.textDim, fontSize: 14)),
               ),
               const SizedBox(width: 8),
               GestureDetector(
@@ -535,7 +548,8 @@ class _SearchScreenState extends State<SearchScreen>
                   await _searchHistory.remove(term);
                   setState(() {});
                 },
-                child: const Icon(Icons.close, color: AppColors.textMuted, size: 16),
+                child: const Icon(Icons.close,
+                    color: AppColors.textMuted, size: 16),
               ),
             ],
           ),
@@ -545,8 +559,10 @@ class _SearchScreenState extends State<SearchScreen>
     // Material
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      leading: const Icon(Icons.history, color: AppColors.materialGreen, size: 20),
-      title: Text(term, style: const TextStyle(color: AppColors.textDim, fontSize: 14)),
+      leading:
+          const Icon(Icons.history, color: AppColors.materialGreen, size: 20),
+      title: Text(term,
+          style: const TextStyle(color: AppColors.textDim, fontSize: 14)),
       trailing: IconButton(
         icon: const Icon(Icons.close, color: AppColors.textMuted, size: 18),
         onPressed: () async {

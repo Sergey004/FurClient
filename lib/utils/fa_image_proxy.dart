@@ -116,7 +116,8 @@ class FAImageProxy {
         return;
       }
 
-      final contentType = response.headers.value('content-type') ?? 'image/jpeg';
+      final contentType =
+          response.headers.value('content-type') ?? 'image/jpeg';
       request.response.headers.set('Content-Type', contentType);
       request.response.headers.set('Cache-Control', 'public, max-age=86400');
       request.response.statusCode = 200;

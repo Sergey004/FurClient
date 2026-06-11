@@ -81,14 +81,16 @@ class DownloadService {
 
       // Retry: if fetch failed, reset WebView and try again
       if (bytes == null || bytes.isEmpty) {
-        debugPrint('=== DownloadService: Fetch failed, resetting WebView and retrying...');
+        debugPrint(
+            '=== DownloadService: Fetch failed, resetting WebView and retrying...');
         await WebViewImageFetcher.instance.reset();
         await Future.delayed(const Duration(milliseconds: 500));
         bytes = await WebViewImageFetcher.instance.fetchImage(imageUrl);
       }
 
       if (bytes == null || bytes.isEmpty) {
-        debugPrint('=== DownloadService: Failed to fetch image bytes after retry');
+        debugPrint(
+            '=== DownloadService: Failed to fetch image bytes after retry');
         return null;
       }
       debugPrint('=== DownloadService: Fetched ${bytes.length} bytes');
@@ -121,7 +123,8 @@ class DownloadService {
         final size = await file.length();
         debugPrint('=== DownloadService: Saved OK: $finalPath ($size bytes)');
       } else {
-        debugPrint('=== DownloadService: ERROR — file not found after write: $finalPath');
+        debugPrint(
+            '=== DownloadService: ERROR — file not found after write: $finalPath');
       }
 
       return finalPath;
@@ -181,7 +184,8 @@ class DownloadService {
 
     // Fallback: app-specific external directory
     try {
-      final dirs = await getExternalStorageDirectories(type: StorageDirectory.downloads);
+      final dirs =
+          await getExternalStorageDirectories(type: StorageDirectory.downloads);
       if (dirs != null && dirs.isNotEmpty) {
         final furDir = Directory('${dirs.first.path}/furaffinity');
         if (!furDir.existsSync()) {
@@ -243,7 +247,11 @@ class DownloadService {
       // Check query params like "...?download&ext=png"
       if (uri.queryParameters.containsKey('ext')) {
         final e = uri.queryParameters['ext']!.toLowerCase();
-        if (e == 'png' || e == 'jpg' || e == 'jpeg' || e == 'gif' || e == 'webp') {
+        if (e == 'png' ||
+            e == 'jpg' ||
+            e == 'jpeg' ||
+            e == 'gif' ||
+            e == 'webp') {
           return '.$e';
         }
       }

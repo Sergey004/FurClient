@@ -6,7 +6,7 @@ on:
       - "v*"
 
 env:
-  FLUTTER_VERSION: "3.24.0"
+  FLUTTER_VERSION: "3.44.1"
   JAVA_VERSION: "17"
   DOTNET_VERSION: "8.0.x"
 
@@ -15,13 +15,26 @@ jobs:
   release-android:
     name: Release Android
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            ninja-build \
+            libgtk-3-dev \
+            libblkid-dev \
+            liblzma-dev \
+            cmake \
+            pkg-config
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: "zulu"
           java-version: ${{ env.JAVA_VERSION }}
@@ -51,7 +64,7 @@ jobs:
             furclient-${{ github.ref_name }}-android.aab
 
       - name: Upload Android to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             furclient-${{ github.ref_name }}-android.apk
@@ -62,13 +75,15 @@ jobs:
   release-windows:
     name: Release Windows
     runs-on: windows-latest
+    permissions:
+      contents: write
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -94,16 +109,17 @@ jobs:
       - name: Pack with Velopack
         shell: pwsh
         run: |
-          vpk pack `
-            -e build/windows/x64/runner/Release/furclient.exe `
-            -c build/windows/x64/runner/Release `
-            -o velopack-output `
-            --channelUrl "https://github.com/${{ github.repository }}/releases/latest/download/RELEASES" `
-            --packId "furclient" `
-            --packVersion "${{ github.ref_name }}"
-
+           # Velopack expects SemVer format (x.y.z) — remove 'v' prefix and '+' suffix
+           $version = "${{ github.ref_name }}".TrimStart('v').Split('+')[0]
+           vpk pack `
+             --packId "furclient" `
+             --packVersion "$version" `
+             --packDir "build/windows/x64/runner/Release" `
+             --mainExe "furclient.exe" `
+             --outputDir "velopack-output"
+             
       - name: Upload Velopack assets to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: velopack-output/*
           generate_release_notes: true

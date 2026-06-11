@@ -48,8 +48,7 @@ class SubmissionCard extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         ClipRRect(
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(11)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
           child: submission.imageUrl.isNotEmpty
               ? FAImage(
                   url: submission.imageUrl,
@@ -83,8 +82,7 @@ class SubmissionCard extends StatelessWidget {
         ),
         if (submission.isNsfw && sfwMode)
           ClipRRect(
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(11)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(

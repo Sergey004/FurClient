@@ -8,6 +8,8 @@ import '../services/fa_client.dart';
 import '../services/update_service.dart';
 import '../utils/platform_utils.dart';
 import '../theme/theme_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'dart:io' show Platform;
 
 class SettingsScreen extends StatefulWidget {
   final bool sfwMode;
@@ -34,9 +36,10 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _sfwMode = false;
   bool _autoDownloadOnFave = false;
   bool _autoCloseOnFave = true;
-  String _imageQuality = 'high'; // low, medium, high
+  String _imageQuality = 'high';
   String _customDownloadPath = '';
-  final UpdateService _updateService = UpdateService();
+  UpdateService? _updateService;
+  String _appVersion = '...';
 
   @override
   bool get wantKeepAlive => true;
@@ -45,14 +48,27 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     _sfwMode = widget.sfwMode;
-    _updateService.init();
+    // UpdateService is Windows-only; Android uses the upgrader package.
+    if (Platform.isWindows) {
+      _updateService = UpdateService()..init();
+    }
     _loadSettings();
+    _loadVersionInfo();
   }
 
   @override
   void dispose() {
-    _updateService.dispose();
+    _updateService?.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadVersionInfo() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _appVersion = info.version;
+      });
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -78,7 +94,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     widget.onSfwModeChanged(value);
     await _saveSetting('sfw_mode', value);
     if (widget.client != null) {
-      debugPrint('=== SettingsScreen: Syncing SFW toggle with FA website...');
       await widget.client!.toggleSiteSfwMode();
     }
   }
@@ -131,7 +146,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                 Navigator.of(context).pop();
                 widget.onLogout();
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
               child: const Text('Logout'),
             ),
           ],
@@ -223,16 +239,18 @@ class _SettingsScreenState extends State<SettingsScreen>
             icon: Icons.info_outline,
             iconColor: AppColors.textDim,
             title: 'Version',
-            trailing: '1.0.0',
+            trailing: _appVersion,
           ),
-          const Divider(height: 1, indent: 56, color: AppColors.border),
-          _buildUpdateTile(),
+          if (Platform.isWindows) ...[
+            const Divider(height: 1, indent: 56, color: AppColors.border),
+            _buildUpdateTile(),
+          ],
           const Divider(height: 1, indent: 56, color: AppColors.border),
           _infoTile(
             icon: Icons.code,
             iconColor: AppColors.textDim,
             title: 'Built with Flutter',
-            trailing: '3.x',
+            trailing: 'Flutter',
           ),
         ]),
         const SizedBox(height: 32),
@@ -339,16 +357,19 @@ class _SettingsScreenState extends State<SettingsScreen>
                     icon: Icons.info_outline,
                     iconColor: AppColors.textDim,
                     title: 'Version',
-                    trailing: '1.0.0',
+                    trailing: _appVersion,
                   ),
-                  const Divider(height: 1, indent: 56, color: AppColors.border),
-                  _buildUpdateTile(),
+                  if (Platform.isWindows) ...[
+                    const Divider(
+                        height: 1, indent: 56, color: AppColors.border),
+                    _buildUpdateTile(),
+                  ],
                   const Divider(height: 1, indent: 56, color: AppColors.border),
                   _infoTile(
                     icon: Icons.code,
                     iconColor: AppColors.textDim,
                     title: 'Built with Flutter',
-                    trailing: '3.x',
+                    trailing: 'Flutter',
                   ),
                 ],
               ),
@@ -359,9 +380,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  // ── Shared tile helpers (no Material widgets) ──────────────────────
-
-  /// Info row — icon + title + optional subtitle + optional trailing text.
   Widget _infoTile({
     required IconData icon,
     required Color iconColor,
@@ -393,13 +411,13 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           if (trailing != null)
             Text(trailing,
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 14)),
+                style:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 14)),
         ],
       ),
     );
   }
 
-  /// Action row — icon + title + optional subtitle, tappable.
   Widget _actionTile({
     required IconData icon,
     required Color color,
@@ -438,7 +456,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  /// Image quality tile with platform-conditional dropdown.
   Widget _buildImageQualityTile() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -452,12 +469,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Image Quality',
-                    style:
-                        TextStyle(color: AppColors.text, fontSize: 15)),
+                    style: TextStyle(color: AppColors.text, fontSize: 15)),
                 SizedBox(height: 2),
                 Text('Quality for full-size images',
-                    style:
-                        TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
               ],
             ),
           ),
@@ -488,8 +503,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             )
           else
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.bgInput,
                 borderRadius: BorderRadius.circular(8),
@@ -520,7 +534,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  /// Download folder tile — no Material/InkWell.
   Widget _buildDownloadFolderTile() {
     final displayPath =
         _customDownloadPath.isEmpty ? 'Default' : _customDownloadPath;
@@ -537,8 +550,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Download Folder',
-                    style:
-                        TextStyle(color: AppColors.text, fontSize: 15)),
+                    style: TextStyle(color: AppColors.text, fontSize: 15)),
                 const SizedBox(height: 2),
                 Text(
                   displayPath,
@@ -563,15 +575,13 @@ class _SettingsScreenState extends State<SettingsScreen>
               },
               child: const Padding(
                 padding: EdgeInsets.all(4),
-                child:
-                    Icon(Icons.close, size: 16, color: AppColors.textDim),
+                child: Icon(Icons.close, size: 16, color: AppColors.textDim),
               ),
             ),
           GestureDetector(
             onTap: _pickFolder,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.bgInput,
                 borderRadius: BorderRadius.circular(8),
@@ -593,8 +603,6 @@ class _SettingsScreenState extends State<SettingsScreen>
       ),
     );
   }
-
-  // ── Section helpers ──────────────────────────────────────────────────
 
   Widget _sectionHeader(String text) {
     return Padding(
@@ -667,14 +675,14 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
   }
 
-  /// Update check tile — version + check/download button.
   Widget _buildUpdateTile() {
+    final svc = _updateService!;
     return ListenableBuilder(
-      listenable: _updateService,
+      listenable: svc,
       builder: (context, _) {
-        final status = _updateService.status;
-        final version = _updateService.currentVersion ?? '...';
-        final latest = _updateService.latestVersion;
+        final status = svc.status;
+        final version = svc.currentVersion ?? '...';
+        final latest = svc.latestVersion;
 
         Color iconColor = AppColors.textDim;
         String subtitle = 'v$version';
@@ -684,20 +692,20 @@ class _SettingsScreenState extends State<SettingsScreen>
           subtitle = 'Checking...';
         } else if (status == UpdateStatus.available) {
           iconColor = AppColors.materialGreen;
-          subtitle = 'v$version \u2192 v$latest available!';
+          subtitle = 'v$version -> v$latest available!';
         } else if (status == UpdateStatus.downloading) {
           iconColor = AppColors.fluentCyan;
-          final pct = (_updateService.downloadProgress * 100).toInt();
+          final pct = (svc.downloadProgress * 100).toInt();
           subtitle = 'Downloading... $pct%';
         } else if (status == UpdateStatus.installing) {
           iconColor = AppColors.materialGreen;
           subtitle = 'Installing...';
         } else if (status == UpdateStatus.upToDate) {
           iconColor = AppColors.materialGreen;
-          subtitle = 'v$version \u2014 up to date';
+          subtitle = 'v$version - up to date';
         } else if (status == UpdateStatus.error) {
           iconColor = AppColors.danger;
-          subtitle = _updateService.errorMessage ?? 'Update check failed';
+          subtitle = svc.errorMessage ?? 'Update check failed';
         }
 
         return Padding(
@@ -728,10 +736,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(3),
                           child: LinearProgressIndicator(
-                            value: _updateService.downloadProgress,
+                            value: svc.downloadProgress,
                             backgroundColor: AppColors.bgInput,
-                            valueColor:
-                                const AlwaysStoppedAnimation(AppColors.fluentCyan),
+                            valueColor: const AlwaysStoppedAnimation(
+                                AppColors.fluentCyan),
                             minHeight: 4,
                           ),
                         ),
@@ -743,7 +751,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   status == UpdateStatus.upToDate ||
                   status == UpdateStatus.error)
                 GestureDetector(
-                  onTap: () => _updateService.checkForUpdate(),
+                  onTap: () => svc.checkForUpdate(),
                   behavior: HitTestBehavior.opaque,
                   child: Container(
                     padding:
@@ -756,7 +764,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.refresh, size: 14, color: AppColors.fluentCyan),
+                        Icon(Icons.refresh,
+                            size: 14, color: AppColors.fluentCyan),
                         SizedBox(width: 4),
                         Text('Check',
                             style: TextStyle(
@@ -767,11 +776,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                 )
               else if (status == UpdateStatus.available)
                 GestureDetector(
-                  onTap: () => _updateService.downloadAndInstall(),
+                  onTap: () => svc.downloadAndInstall(),
                   behavior: HitTestBehavior.opaque,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppColors.materialGreen,
                       borderRadius: BorderRadius.circular(8),
@@ -782,8 +791,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                         Icon(Icons.download, size: 14, color: Colors.white),
                         SizedBox(width: 4),
                         Text('Update',
-                            style: TextStyle(
-                                color: Colors.white, fontSize: 13)),
+                            style:
+                                TextStyle(color: Colors.white, fontSize: 13)),
                       ],
                     ),
                   ),
@@ -795,7 +804,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  /// Theme selection tile — System / Light / Dark / Original.
   Widget _buildThemeTile() {
     return ListenableBuilder(
       listenable: widget.themeProvider,
@@ -855,8 +863,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     child: DropdownButton<AppThemeMode>(
                       value: current,
                       isDense: true,
-                      style: const TextStyle(
-                          color: AppColors.text, fontSize: 13),
+                      style:
+                          const TextStyle(color: AppColors.text, fontSize: 13),
                       dropdownColor: AppColors.bgCard,
                       items: AppThemeMode.values
                           .map((e) => DropdownMenuItem(

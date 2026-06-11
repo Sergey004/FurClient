@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
+import '../theme/theme_provider.dart';
 import '../screens/gallery_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/notifications_screen.dart';
@@ -13,12 +14,14 @@ class AppNavigator extends StatefulWidget {
   final FAClient client;
   final UserSession session;
   final VoidCallback onLogout;
+  final ThemeProvider themeProvider;
 
   const AppNavigator({
     super.key,
     required this.client,
     required this.session,
     required this.onLogout,
+    required this.themeProvider,
   });
 
   @override
@@ -64,10 +67,19 @@ class _AppNavigatorState extends State<AppNavigator> {
   }
 
   Future<void> _loadSfwMode() async {
+    // Always check the site's sfw_toggle cookie first
+    final siteSfw = widget.client.checkSiteSfwMode();
+    debugPrint('=== AppNavigator: site SFW mode = $siteSfw');
+
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getBool('sfw_mode') ?? false;
-    if (mounted && saved != _sfwMode) {
-      setState(() => _sfwMode = saved);
+    // Site cookie is authoritative — overwrite local setting
+    final value = siteSfw;
+    if (value != saved) {
+      await prefs.setBool('sfw_mode', value);
+    }
+    if (mounted && value != _sfwMode) {
+      setState(() => _sfwMode = value);
     }
   }
 
@@ -77,15 +89,21 @@ class _AppNavigatorState extends State<AppNavigator> {
 
   List<Widget> _buildScreens() {
     return [
-      GalleryScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
-      SearchScreen(client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+      GalleryScreen(
+          client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+      SearchScreen(
+          client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
       NotificationsScreen(client: widget.client, onLogout: widget.onLogout),
-      ProfileScreen(client: widget.client, session: widget.session, onLogout: widget.onLogout),
+      ProfileScreen(
+          client: widget.client,
+          session: widget.session,
+          onLogout: widget.onLogout),
       SettingsScreen(
         sfwMode: _sfwMode,
         onSfwModeChanged: _onSfwModeChanged,
         onLogout: widget.onLogout,
         client: widget.client,
+        themeProvider: widget.themeProvider,
       ),
     ];
   }

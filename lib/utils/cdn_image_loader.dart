@@ -36,7 +36,8 @@ class CDNImageLoader {
   // ── Image loading ────────────────────────────────────────────────
 
   /// Load image from CDN
-  Future<Uint8List?> loadImage(String url, {Map<String, String>? headers}) async {
+  Future<Uint8List?> loadImage(String url,
+      {Map<String, String>? headers}) async {
     debugPrint('=== CDNImageLoader: Loading $url');
 
     final result = await CDNLoader.instance.load(url, headers: headers);
@@ -64,20 +65,22 @@ class CDNImageLoader {
       future: loadImage(url, headers: headers),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return placeholder ?? const SizedBox(
-            width: 50,
-            height: 50,
-            child: Center(child: AdaptiveProgress()),
-          );
+          return placeholder ??
+              const SizedBox(
+                width: 50,
+                height: 50,
+                child: Center(child: AdaptiveProgress()),
+              );
         }
 
         if (snapshot.hasError || snapshot.data == null) {
-          return errorWidget ?? Container(
-            width: width,
-            height: height,
-            color: Colors.grey[200],
-            child: const Icon(Icons.error),
-          );
+          return errorWidget ??
+              Container(
+                width: width,
+                height: height,
+                color: Colors.grey[200],
+                child: const Icon(Icons.error),
+              );
         }
 
         return Image.memory(
@@ -137,7 +140,8 @@ class CDNImageLoader {
   }
 
   /// Preload multiple images
-  Future<void> preloadImages(List<String> urls, {Map<String, String>? headers}) async {
+  Future<void> preloadImages(List<String> urls,
+      {Map<String, String>? headers}) async {
     debugPrint('=== CDNImageLoader: Preloading ${urls.length} images');
 
     for (final url in urls) {
@@ -185,12 +189,13 @@ class CDNImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (url.isEmpty) {
-      return errorWidget ?? Container(
-        width: width,
-        height: height,
-        color: Colors.grey[200],
-        child: const Icon(Icons.error),
-      );
+      return errorWidget ??
+          Container(
+            width: width,
+            height: height,
+            color: Colors.grey[200],
+            child: const Icon(Icons.error),
+          );
     }
 
     final cdnUrl = url.toFullCDNUrl();
