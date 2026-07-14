@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 /// HTTP method enum.
-enum HTTPMethod { GET, POST }
+enum HTTPMethod { get, post }
 
 /// Abstract interface for HTTP data fetching.
 ///
@@ -12,7 +12,7 @@ abstract class HTTPDataSource {
   Future<Uint8List> httpData({
     required Uri url,
     List<Cookie>? cookies,
-    HTTPMethod method = HTTPMethod.GET,
+    HTTPMethod method = HTTPMethod.get,
     Map<String, String>? parameters,
   });
 

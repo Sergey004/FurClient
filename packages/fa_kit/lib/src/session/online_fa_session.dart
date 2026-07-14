@@ -115,7 +115,7 @@ class OnlineFASession extends FASession {
     final data = await _dataSource.httpData(
       url: url,
       cookies: _cookies,
-      method: HTTPMethod.POST,
+      method: HTTPMethod.post,
       parameters: params,
     );
     return utf8.decode(data);
@@ -162,7 +162,8 @@ class OnlineFASession extends FASession {
         .whereType<FASubmissionsPageItem>()
         .map(FASubmissionPreview.fromPageItem)
         .toList();
-    _log.info('Got ${page.submissions.length} submission previews (${previews.length} after filter)');
+    _log.info(
+        'Got ${page.submissions.length} submission previews (${previews.length} after filter)');
     return previews;
   }
 
@@ -182,7 +183,8 @@ class OnlineFASession extends FASession {
   Future<FAUserGalleryLike> galleryLikeForUrl(Uri url) async {
     final page = await _makePage(url, FAUserGalleryLikePage.parse);
     final gallery = FAUserGalleryLike.fromPage(page, url);
-    _log.info('Got ${page.previews.length} gallery previews (${gallery.previews.length} after filter)');
+    _log.info(
+        'Got ${page.previews.length} gallery previews (${gallery.previews.length} after filter)');
     return gallery;
   }
 
@@ -368,7 +370,8 @@ class OnlineFASession extends FASession {
   }
 
   @override
-  Future<List<FANotePreview>> markNotesAsUnread(List<FANotePreview> notes) async {
+  Future<List<FANotePreview>> markNotesAsUnread(
+      List<FANotePreview> notes) async {
     final params = <String, String>{
       'manage_notes': '1',
       'move_to': 'inbox',
@@ -398,7 +401,8 @@ class OnlineFASession extends FASession {
   }
 
   @override
-  Future<void> deleteSubmissionPreviews(List<FASubmissionPreview> previews) async {
+  Future<void> deleteSubmissionPreviews(
+      List<FASubmissionPreview> previews) async {
     final maxSid = previews.isEmpty
         ? 0
         : previews.map((p) => p.sid).reduce((a, b) => a > b ? a : b);

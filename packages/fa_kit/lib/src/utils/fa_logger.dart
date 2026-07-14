@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 /// Logger for the FAKit library.
 ///
 /// Uses the standard `dart:developer` logging. To configure log output,
@@ -24,23 +26,23 @@ class FALogger {
   static const String _libraryName = 'fa_kit';
 
   /// Create a logger instance for a specific subsystem.
-  static _FALoggerImpl loggerFor(String subsystem) {
-    return _FALoggerImpl(subsystem);
+  static FALoggerImpl loggerFor(String subsystem) {
+    return FALoggerImpl(subsystem);
   }
 
   /// The main library logger.
-  static _FALoggerImpl get logger => loggerFor(_libraryName);
+  static FALoggerImpl get logger => loggerFor(_libraryName);
 }
 
 /// Logger implementation that wraps dart:developer log().
-class _FALoggerImpl {
+class FALoggerImpl {
   final String _name;
   bool _isInfoEnabled = true;
   bool _isDebugEnabled = false;
   final bool _isWarningEnabled = true;
   final bool _isErrorEnabled = true;
 
-  _FALoggerImpl(this._name);
+  FALoggerImpl(this._name);
 
   /// Enable or disable info-level logging.
   set infoEnabled(bool value) => _isInfoEnabled = value;
@@ -81,11 +83,10 @@ class _FALoggerImpl {
   }
 
   void _log(String level, String message, [StackTrace? stackTrace]) {
-    // Using print for compatibility. Users can override by integrating
-    // with package:logging or any other logging framework.
-    print('[$_name] $level: $message');
+    final formattedMessage = '[$_name] $level: $message';
+    developer.log(formattedMessage, name: _name);
     if (stackTrace != null) {
-      print(stackTrace);
+      developer.log(stackTrace.toString(), name: _name);
     }
   }
 }

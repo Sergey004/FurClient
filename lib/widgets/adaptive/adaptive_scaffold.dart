@@ -1,6 +1,7 @@
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 import '../../utils/platform_utils.dart';
+import '../../theme/app_theme.dart';
 
 class AdaptiveScaffold extends StatelessWidget {
   final PreferredSizeWidget? appBar;
@@ -20,7 +21,10 @@ class AdaptiveScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isWindows) {
       return fluent.ScaffoldPage(
-        content: body,
+        content: ColoredBox(
+          color: backgroundColor ?? AppColors.bg,
+          child: body,
+        ),
       );
     }
     return Scaffold(

@@ -17,7 +17,7 @@ class HttpDataSourceImpl implements HTTPDataSource {
   Future<Uint8List> httpData({
     required Uri url,
     List<Cookie>? cookies,
-    HTTPMethod method = HTTPMethod.GET,
+    HTTPMethod method = HTTPMethod.get,
     Map<String, String>? parameters,
   }) async {
     final headers = <String, String>{
@@ -25,16 +25,16 @@ class HttpDataSourceImpl implements HTTPDataSource {
     };
 
     if (cookies != null && cookies.isNotEmpty) {
-      final cookieHeader = cookies.map((c) => '${c.name}=${c.value}').join('; ');
+      final cookieHeader =
+          cookies.map((c) => '${c.name}=${c.value}').join('; ');
       headers['Cookie'] = cookieHeader;
     }
 
     http.Response response;
 
-    if (method == HTTPMethod.POST) {
-      final body = parameters != null
-          ? _encodeFormData(parameters)
-          : <String, String>{};
+    if (method == HTTPMethod.post) {
+      final body =
+          parameters != null ? _encodeFormData(parameters) : <String, String>{};
       headers['Content-Type'] =
           'application/x-www-form-urlencoded; charset=utf-8';
       response = await _client.post(url, headers: headers, body: body);

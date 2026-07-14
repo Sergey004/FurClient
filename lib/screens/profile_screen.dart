@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
-import 'package:window_manager/window_manager.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
-import '../widgets/caption_buttons.dart';
 import '../utils/fa_image_loader.dart';
 import '../utils/platform_utils.dart';
 import 'user_content_screen.dart';
@@ -77,12 +75,33 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     if (isWindows) {
       return fluent.ScaffoldPage(
-        content: Column(
+        header: Row(
           children: [
-            _buildWindowTitleBar(context),
-            Expanded(child: _buildBody()),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).maybePop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    fluent.FluentIcons.back,
+                    size: 16,
+                    color: AppColors.textDim,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              widget.targetUsername != null ? _username : 'Profile',
+              style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text),
+            ),
           ],
         ),
+        content: _buildBody(),
       );
     }
 
@@ -90,48 +109,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       appBar: AppBar(
           title: Text(widget.targetUsername != null ? _username : 'Profile')),
       body: _buildBody(),
-    );
-  }
-
-  Widget _buildWindowTitleBar(BuildContext context) {
-    final title = widget.targetUsername != null ? _username : 'Profile';
-    return fluent.TitleBar(
-      isBackButtonVisible: false,
-      icon: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: () => Navigator.of(context).maybePop(),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(fluent.FluentIcons.back, size: 14),
-              SizedBox(width: 6),
-              Text('Back', style: TextStyle(fontSize: 13)),
-            ],
-          ),
-        ),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-        overflow: TextOverflow.ellipsis,
-      ),
-      captionControls: SizedBox(
-        width: 138,
-        height: 46,
-        child: CaptionButtons(
-          brightness: fluent.FluentTheme.of(context).brightness,
-        ),
-      ),
-      onDragStarted: () => windowManager.startDragging(),
-      onDoubleTap: () async {
-        final isMax = await windowManager.isMaximized();
-        if (isMax) {
-          windowManager.unmaximize();
-        } else {
-          windowManager.maximize();
-        }
-      },
     );
   }
 

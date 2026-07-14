@@ -841,6 +841,9 @@ class AppTheme {
       inactiveColor: AppColors.textMuted,
       inactiveBackgroundColor: const Color(0xFF1a1a1e),
       shadowColor: Colors.transparent,
+      navigationPaneTheme: fluent.NavigationPaneThemeData(
+        backgroundColor: AppColors.bg,
+      ),
     );
   }
 
@@ -856,6 +859,9 @@ class AppTheme {
       inactiveColor: AppColors.textMuted,
       inactiveBackgroundColor: const Color(0xFF1a1a1e),
       shadowColor: Colors.transparent,
+      navigationPaneTheme: fluent.NavigationPaneThemeData(
+        backgroundColor: AppColors.bg,
+      ),
     );
   }
 
@@ -872,6 +878,9 @@ class AppTheme {
       inactiveColor: AppColors.lightTextDim,
       inactiveBackgroundColor: const Color(0xFFF5F5F5),
       shadowColor: const Color(0x1A000000),
+      navigationPaneTheme: fluent.NavigationPaneThemeData(
+        backgroundColor: AppColors.lightBg,
+      ),
     );
   }
 

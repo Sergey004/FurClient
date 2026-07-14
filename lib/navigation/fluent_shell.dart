@@ -108,14 +108,15 @@ class _FluentShellState extends State<FluentShell> {
         selected: _currentIndex,
         onChanged: (index) => setState(() => _currentIndex = index),
         displayMode: fluent.PaneDisplayMode.auto,
+        size: const fluent.NavigationPaneSize(openWidth: 280),
         header: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
           child: Row(
             children: [
               ClipOval(
                 child: SizedBox(
-                  width: 32,
-                  height: 32,
+                  width: 28,
+                  height: 28,
                   child: widget.session.avatarUrl.isNotEmpty
                       ? Image.network(
                           widget.session.avatarUrl,
