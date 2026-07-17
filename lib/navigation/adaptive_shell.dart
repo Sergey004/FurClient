@@ -2,8 +2,6 @@ import 'package:flutter/widgets.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../theme/theme_provider.dart';
-import '../utils/platform_utils.dart';
-import 'fluent_shell.dart';
 import 'material_shell.dart';
 
 class AdaptiveShell extends StatelessWidget {
@@ -22,14 +20,7 @@ class AdaptiveShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (isWindows) {
-      return FluentShell(
-        client: client,
-        session: session,
-        onLogout: onLogout,
-        themeProvider: themeProvider,
-      );
-    }
+    // Always use MaterialShell for consistent Material 3 experience across platforms
     return MaterialShell(
       client: client,
       session: session,

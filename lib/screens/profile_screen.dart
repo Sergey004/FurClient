@@ -7,6 +7,7 @@ import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/fa_image_loader.dart';
+import '../widgets/m3/app_list_tile.dart';
 import '../utils/platform_utils.dart';
 import 'user_content_screen.dart';
 
@@ -477,51 +478,37 @@ class _ProfileScreenState extends State<ProfileScreen>
                   fontSize: 16,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          _linkTile(Icons.collections, 'Gallery', AppColors.fluentCyan,
-              () => _openUserContent(p.username, UserContentType.gallery)),
-          _linkTile(Icons.favorite, 'Favorites', AppColors.materialGreen,
-              () => _openUserContent(p.username, UserContentType.favorites)),
-          _linkTile(Icons.book, 'Journals', AppColors.notifJournal,
-              () => _openUserContent(p.username, UserContentType.journals)),
+          AppListTile(
+            leading: Icon(Icons.collections, color: AppColors.fluentCyan),
+            title: 'Gallery',
+            subtitle: null,
+            trailing: const Icon(Icons.chevron_right,
+                size: 20, color: AppColors.textMuted),
+            onTap: () => _openUserContent(p.username, UserContentType.gallery),
+          ),
+          const SizedBox(height: 8),
+          AppListTile(
+            leading: Icon(Icons.favorite, color: AppColors.materialGreen),
+            title: 'Favorites',
+            trailing: const Icon(Icons.chevron_right,
+                size: 20, color: AppColors.textMuted),
+            onTap: () =>
+                _openUserContent(p.username, UserContentType.favorites),
+          ),
+          const SizedBox(height: 8),
+          AppListTile(
+            leading: Icon(Icons.book, color: AppColors.notifJournal),
+            title: 'Journals',
+            trailing: const Icon(Icons.chevron_right,
+                size: 20, color: AppColors.textMuted),
+            onTap: () => _openUserContent(p.username, UserContentType.journals),
+          ),
         ],
       ),
     );
   }
 
-  Widget _linkTile(
-      IconData icon, String title, Color color, VoidCallback onTap) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.1)),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(title,
-                    style: const TextStyle(
-                        color: AppColors.text,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500)),
-              ),
-              const Icon(Icons.chevron_right,
-                  color: AppColors.textMuted, size: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // old _linkTile removed; AppListTile used instead
 
   void _openUserContent(String username, UserContentType contentType) {
     Navigator.of(context).push(

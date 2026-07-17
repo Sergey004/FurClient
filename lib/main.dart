@@ -3,7 +3,7 @@ import 'dart:io' show Platform, HttpClient;
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:fluent_ui/fluent_ui.dart' as fluent;
+// Fluent UI removed: using Material 3 across the app
 import 'package:system_theme/system_theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
@@ -192,52 +192,11 @@ class _FurClientAppState extends State<FurClientApp> {
 
   @override
   Widget build(BuildContext context) {
-    if (isWindows) {
-      return _buildFluentApp();
-    }
+    // Use MaterialApp (Material 3) on all platforms for consistent look.
     return _buildMaterialApp();
   }
 
-  Widget _buildFluentApp() {
-    return ListenableBuilder(
-      listenable: _themeProvider,
-      builder: (context, _) {
-        final mode = _themeProvider.mode;
-        final accent = AppTheme.systemAccent;
-
-        fluent.FluentThemeData theme;
-        fluent.FluentThemeData? darkTheme;
-
-        switch (mode) {
-          case AppThemeMode.system:
-            theme = AppTheme.fluentLightTheme(accent: accent);
-            darkTheme = AppTheme.fluentFromSystemAccent(accent);
-            break;
-          case AppThemeMode.light:
-            theme = AppTheme.fluentLightTheme(accent: accent);
-            darkTheme = null;
-            break;
-          case AppThemeMode.dark:
-            theme = AppTheme.fluentDarkTheme;
-            darkTheme = AppTheme.fluentFromSystemAccent(accent);
-            break;
-          case AppThemeMode.original:
-            theme = AppTheme.fluentDarkTheme;
-            darkTheme = AppTheme.fluentDarkTheme;
-            break;
-        }
-
-        return fluent.FluentApp(
-          title: 'FurClient',
-          debugShowCheckedModeBanner: false,
-          themeMode: _themeProvider.themeMode,
-          theme: theme,
-          darkTheme: darkTheme,
-          home: _buildHome(),
-        );
-      },
-    );
-  }
+  // FluentApp removed: using Material 3 via _buildMaterialApp for all windows.
 
   Widget _buildMaterialApp() {
     return ListenableBuilder(
@@ -309,30 +268,16 @@ class _FurClientAppState extends State<FurClientApp> {
 
   Widget _buildHome() {
     if (_isRestoringSession) {
-      if (isWindows) {
-        return fluent.ScaffoldPage(
-          content: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const fluent.ProgressRing(),
-                const SizedBox(height: 16),
-                Text(
-                  'Restoring session...',
-                  style: TextStyle(color: AppColors.textDim, fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
       return Scaffold(
-        backgroundColor: AppColors.bg,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(color: AppColors.fluentCyan),
+              const SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(),
+              ),
               const SizedBox(height: 16),
               Text(
                 'Restoring session...',
@@ -356,11 +301,6 @@ class _FurClientAppState extends State<FurClientApp> {
       }
     }
 
-    if (isWindows) {
-      return fluent.ScaffoldPage(
-        content: LoginScreen(authService: _authService, onLogin: _onLogin),
-      );
-    }
     return LoginScreen(authService: _authService, onLogin: _onLogin);
   }
 }

@@ -1113,7 +1113,7 @@ class _LoginScreenState extends State<LoginScreen>
                       Icon(Icons.monitor, size: 14, color: AppColors.textMuted),
                       SizedBox(width: 6),
                       Text(
-                        'Windows • Linux • macOS • Android • iOS',
+                        'Windows • Android',
                         style: TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 11,

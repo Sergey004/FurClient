@@ -6,6 +6,7 @@ import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/fa_image_loader.dart';
+import '../widgets/m3/app_list_tile.dart';
 import 'submission_detail_screen.dart';
 import 'journal_detail_screen.dart';
 import 'profile_screen.dart';
@@ -179,16 +180,19 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
     return RefreshIndicator(
       color: AppColors.cupertinoPurple,
-      backgroundColor: AppColors.bgCard,
+      backgroundColor: Theme.of(context).cardColor,
       onRefresh: _loadNotifications,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _notifications.length,
         separatorBuilder: (_, __) =>
-            const Divider(height: 1, color: AppColors.border, indent: 62),
+            Divider(height: 8, color: Colors.transparent),
         itemBuilder: (context, index) {
           final notif = _notifications[index];
-          return _buildNotificationTile(notif);
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: _buildNotificationTile(notif),
+          );
         },
       ),
     );
@@ -196,99 +200,57 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
   Widget _buildNotificationTile(FANotification notif) {
     final color = _typeColor(notif.type);
-
-    return GestureDetector(
-      onTap: () => _onNotificationTap(notif),
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withValues(alpha: 0.1),
-                border:
-                    Border.all(color: color.withValues(alpha: 0.2), width: 1),
-              ),
-              child: CircleAvatar(
-                radius: 22,
-                backgroundColor: Colors.transparent,
-                child: notif.avatarUrl.isNotEmpty
-                    ? FAImage(
-                        url: notif.avatarUrl,
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
-                        errorWidget:
-                            Icon(_typeIcon(notif.type), color: color, size: 22),
-                      )
-                    : Icon(_typeIcon(notif.type), color: color, size: 22),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      style: const TextStyle(
-                          color: AppColors.textDim, fontSize: 14, height: 1.4),
-                      children: [
-                        TextSpan(
-                          text: notif.author,
-                          style: const TextStyle(
-                              color: AppColors.text,
-                              fontWeight: FontWeight.w600),
-                        ),
-                        if (notif.title.isNotEmpty)
-                          TextSpan(text: ' ${notif.title}'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(_typeIcon(notif.type), color: color, size: 12),
-                            const SizedBox(width: 4),
-                            Text(
-                              notif.type.toUpperCase(),
-                              style: TextStyle(
-                                  color: color,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        notif.datetime,
-                        style: const TextStyle(
-                            color: AppColors.textMuted, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    final leading = Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withValues(alpha: 0.08),
+        border: Border.all(color: color.withValues(alpha: 0.18), width: 1),
       ),
+      child: CircleAvatar(
+        radius: 20,
+        backgroundColor: Colors.transparent,
+        child: notif.avatarUrl.isNotEmpty
+            ? FAImage(
+                url: notif.avatarUrl,
+                width: 36,
+                height: 36,
+                fit: BoxFit.cover,
+                errorWidget:
+                    Icon(_typeIcon(notif.type), color: color, size: 18),
+              )
+            : Icon(_typeIcon(notif.type), color: color, size: 18),
+      ),
+    );
+
+    final trailing = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_typeIcon(notif.type), color: color, size: 12),
+          const SizedBox(width: 6),
+          Text(
+            notif.type.toUpperCase(),
+            style: TextStyle(
+                color: color, fontSize: 11, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+
+    final subtitle =
+        (notif.title.isNotEmpty ? '${notif.title} · ' : '') + notif.datetime;
+
+    return AppListTile(
+      leading: leading,
+      title: notif.author,
+      subtitle: subtitle,
+      trailing: trailing,
+      onTap: () => _onNotificationTap(notif),
     );
   }
 }

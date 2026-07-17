@@ -130,28 +130,29 @@ class _MaterialShellState extends State<MaterialShell> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final isDesktop = width >= AppBreakpoints.desktop;
+    final isTabletOrLarger = width >= AppBreakpoints.tablet;
+    final isLargeScreen = width >= AppBreakpoints.desktop;
 
     final screens = _buildScreens();
 
-    if (isDesktop) {
-      return _buildDesktopLayout(screens);
+    if (isTabletOrLarger) {
+      return _buildRailLayout(screens, isExtended: isLargeScreen);
     }
     return _buildMobileLayout(screens);
   }
 
-  Widget _buildDesktopLayout(List<Widget> screens) {
-    final isExtended = MediaQuery.of(context).size.width >= 1000;
+  Widget _buildRailLayout(List<Widget> screens, {required bool isExtended}) {
     final currentAccent = _navItems[_currentIndex].accent;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: Row(
         children: [
           Container(
-            decoration: const BoxDecoration(
-              color: AppColors.bgCard,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
               border: Border(
-                right: BorderSide(color: AppColors.border, width: 1),
+                right: BorderSide(color: colorScheme.outlineVariant, width: 1),
               ),
             ),
             child: NavigationRail(
@@ -159,6 +160,13 @@ class _MaterialShellState extends State<MaterialShell> {
               onDestinationSelected: (index) =>
                   setState(() => _currentIndex = index),
               extended: isExtended,
+              minExtendedWidth: 220,
+              backgroundColor: colorScheme.surfaceContainerLow,
+              indicatorColor: currentAccent.withValues(alpha: 0.16),
+              useIndicator: true,
+              labelType: isExtended
+                  ? null
+                  : NavigationRailLabelType.selected,
               leading: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: isExtended
@@ -179,51 +187,77 @@ class _MaterialShellState extends State<MaterialShell> {
                       )
                     : Icon(Icons.pets, color: currentAccent, size: 28),
               ),
-              indicatorColor: currentAccent.withValues(alpha: 0.15),
               destinations: _navItems.map((item) {
                 return NavigationRailDestination(
-                  icon: Icon(item.icon, color: AppColors.textMuted),
+                  icon: Icon(item.icon, color: colorScheme.onSurfaceVariant),
                   selectedIcon: Icon(item.selectedIcon, color: currentAccent),
                   label: Text(item.label),
                 );
               }).toList(),
             ),
           ),
-          Expanded(child: screens[_currentIndex]),
+          Expanded(
+            child: Container(
+              color: colorScheme.surface,
+              child: screens[_currentIndex],
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildMobileLayout(List<Widget> screens) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.bgCard,
-          border: Border(
-            top: BorderSide(color: AppColors.border, width: 1),
-          ),
+      extendBody: true,
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: IndexedStack(
+          index: _currentIndex,
+          children: screens,
         ),
-        child: NavigationBar(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (index) =>
-              setState(() => _currentIndex = index),
-          backgroundColor: AppColors.bgCard,
-          indicatorColor:
-              _navItems[_currentIndex].accent.withValues(alpha: 0.15),
-          height: 64,
-          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-          destinations: _navItems.map((item) {
-            return NavigationDestination(
-              icon: Icon(item.icon, size: 22),
-              selectedIcon: Icon(item.selectedIcon, size: 24),
-              label: item.label,
-            );
-          }).toList(),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: Material(
+            color: colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(24),
+            elevation: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+                  width: 1,
+                ),
+              ),
+              child: NavigationBar(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: (index) =>
+                    setState(() => _currentIndex = index),
+                backgroundColor: Colors.transparent,
+                surfaceTintColor: colorScheme.surfaceTint,
+                indicatorColor:
+                    _navItems[_currentIndex].accent.withValues(alpha: 0.14),
+                height: 72,
+                labelBehavior:
+                    NavigationDestinationLabelBehavior.onlyShowSelected,
+                destinations: _navItems.map((item) {
+                  return NavigationDestination(
+                    icon: Icon(item.icon, size: 22),
+                    selectedIcon: Icon(item.selectedIcon, size: 24),
+                    label: item.label,
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
         ),
       ),
     );

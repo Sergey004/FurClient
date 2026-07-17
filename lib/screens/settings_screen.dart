@@ -126,15 +126,22 @@ class _SettingsScreenState extends State<SettingsScreen>
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          backgroundColor: AppColors.bgCard,
+          backgroundColor:
+              Theme.of(context).colorScheme.surfaceContainerHighest,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AppColors.border),
+            side: BorderSide(
+                color: Theme.of(context)
+                    .colorScheme
+                    .outlineVariant
+                    .withValues(alpha: 0.12)),
           ),
-          title: const Text('Logout', style: TextStyle(color: AppColors.text)),
-          content: const Text(
+          title: Text('Logout',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+          content: Text(
             'Are you sure you want to logout? You will need to sign in again.',
-            style: TextStyle(color: AppColors.textDim),
+            style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           actions: [
             TextButton(
@@ -146,8 +153,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                 Navigator.of(context).pop();
                 widget.onLogout();
               },
-              style:
-                  ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error),
               child: const Text('Logout'),
             ),
           ],
@@ -169,6 +176,12 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _buildMobileBody() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = colorScheme.primary;
+    final secondary = colorScheme.primary;
+    final tertiary = colorScheme.tertiary;
+    final outline = colorScheme.outlineVariant.withValues(alpha: 0.12);
+
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
@@ -179,16 +192,16 @@ class _SettingsScreenState extends State<SettingsScreen>
         _card([
           _adaptiveSwitchTile(
             icon: Icons.shield_outlined,
-            iconColor: AppColors.materialGreen,
+            iconColor: primary,
             value: _sfwMode,
             onChanged: _onSfwToggle,
             title: 'SFW Mode',
             subtitle: 'Blur NSFW content',
           ),
-          const Divider(height: 1, indent: 16, color: AppColors.border),
+          Divider(height: 1, indent: 16, color: outline),
           _adaptiveSwitchTile(
             icon: Icons.download_outlined,
-            iconColor: AppColors.fluentCyan,
+            iconColor: secondary,
             value: _autoDownloadOnFave,
             onChanged: (v) {
               setState(() => _autoDownloadOnFave = v);
@@ -197,10 +210,11 @@ class _SettingsScreenState extends State<SettingsScreen>
             title: 'Auto-download on Fave',
             subtitle: 'Save image when favoriting',
           ),
-          const Divider(height: 1, indent: 16, color: AppColors.border),
+          Divider(height: 1, indent: 16, color: outline),
+          Divider(height: 1, indent: 16, color: outline),
           _adaptiveSwitchTile(
             icon: Icons.close_fullscreen_outlined,
-            iconColor: AppColors.cupertinoPurple,
+            iconColor: tertiary,
             value: _autoCloseOnFave,
             onChanged: (v) {
               setState(() => _autoCloseOnFave = v);
@@ -209,7 +223,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             title: 'Auto-close on Fave',
             subtitle: 'Close submission view after favoriting',
           ),
-          const Divider(height: 1, indent: 16, color: AppColors.border),
+          Divider(height: 1, indent: 16, color: outline),
+          Divider(height: 1, indent: 56, color: outline),
           _buildImageQualityTile(),
         ]),
         const SizedBox(height: 24),
@@ -220,7 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         _card([
           _actionTile(
             icon: Icons.logout,
-            color: AppColors.danger,
+            color: Theme.of(context).colorScheme.error,
             title: 'Logout',
             onTap: _confirmLogout,
           ),
@@ -230,25 +245,37 @@ class _SettingsScreenState extends State<SettingsScreen>
         _card([
           _infoTile(
             icon: Icons.pets,
-            iconColor: AppColors.accentLight,
+            iconColor: primary,
             title: 'FurClient',
             subtitle: 'A FurAffinity client',
           ),
-          const Divider(height: 1, indent: 56, color: AppColors.border),
+          Divider(height: 1, indent: 56, color: outline),
           _infoTile(
             icon: Icons.info_outline,
-            iconColor: AppColors.textDim,
+            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
             title: 'Version',
             trailing: _appVersion,
           ),
           if (Platform.isWindows) ...[
-            const Divider(height: 1, indent: 56, color: AppColors.border),
+            Divider(
+                height: 1,
+                indent: 56,
+                color: Theme.of(context)
+                    .colorScheme
+                    .outlineVariant
+                    .withValues(alpha: 0.12)),
             _buildUpdateTile(),
           ],
-          const Divider(height: 1, indent: 56, color: AppColors.border),
+          Divider(
+              height: 1,
+              indent: 56,
+              color: Theme.of(context)
+                  .colorScheme
+                  .outlineVariant
+                  .withValues(alpha: 0.12)),
           _infoTile(
             icon: Icons.code,
-            iconColor: AppColors.textDim,
+            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
             title: 'Built with Flutter',
             trailing: 'Flutter',
           ),
@@ -259,6 +286,12 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _buildDesktopBody() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = colorScheme.primary;
+    final secondary = colorScheme.primary;
+    final tertiary = colorScheme.tertiary;
+    final outline = colorScheme.outlineVariant.withValues(alpha: 0.12);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
       child: Center(
@@ -273,27 +306,27 @@ class _SettingsScreenState extends State<SettingsScreen>
               _desktopSection(
                 title: 'Appearance',
                 icon: Icons.palette_outlined,
-                accent: AppColors.cupertinoPurple,
+                accent: primary,
                 children: [_buildThemeTile()],
               ),
               const SizedBox(height: 20),
               _desktopSection(
                 title: 'Content',
                 icon: Icons.tune,
-                accent: AppColors.materialGreen,
+                accent: tertiary,
                 children: [
                   _adaptiveSwitchTile(
                     icon: Icons.shield_outlined,
-                    iconColor: AppColors.materialGreen,
+                    iconColor: primary,
                     value: _sfwMode,
                     onChanged: _onSfwToggle,
                     title: 'SFW Mode',
                     subtitle: 'Blur NSFW content',
                   ),
-                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  Divider(height: 1, indent: 16, color: outline),
                   _adaptiveSwitchTile(
                     icon: Icons.download_outlined,
-                    iconColor: AppColors.fluentCyan,
+                    iconColor: secondary,
                     value: _autoDownloadOnFave,
                     onChanged: (v) {
                       setState(() => _autoDownloadOnFave = v);
@@ -302,10 +335,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'Auto-download on Fave',
                     subtitle: 'Save image when favoriting',
                   ),
-                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  Divider(height: 1, indent: 16, color: outline),
                   _adaptiveSwitchTile(
                     icon: Icons.close_fullscreen_outlined,
-                    iconColor: AppColors.cupertinoPurple,
+                    iconColor: tertiary,
                     value: _autoCloseOnFave,
                     onChanged: (v) {
                       setState(() => _autoCloseOnFave = v);
@@ -314,7 +347,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     title: 'Auto-close on Fave',
                     subtitle: 'Close submission view after favoriting',
                   ),
-                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  Divider(height: 1, indent: 16, color: outline),
                   _buildImageQualityTile(),
                 ],
               ),
@@ -322,18 +355,18 @@ class _SettingsScreenState extends State<SettingsScreen>
               _desktopSection(
                 title: 'Downloads',
                 icon: Icons.folder_outlined,
-                accent: AppColors.fluentCyan,
+                accent: secondary,
                 children: [_buildDownloadFolderTile()],
               ),
               const SizedBox(height: 20),
               _desktopSection(
                 title: 'Account',
                 icon: Icons.person,
-                accent: AppColors.fluentCyan,
+                accent: secondary,
                 children: [
                   _actionTile(
                     icon: Icons.logout,
-                    color: AppColors.danger,
+                    color: Theme.of(context).colorScheme.error,
                     title: 'Logout',
                     subtitle: 'Sign out and clear session',
                     onTap: _confirmLogout,
@@ -344,30 +377,41 @@ class _SettingsScreenState extends State<SettingsScreen>
               _desktopSection(
                 title: 'About',
                 icon: Icons.info_outline,
-                accent: AppColors.materialLavender,
+                accent: tertiary,
                 children: [
                   _infoTile(
                     icon: Icons.pets,
-                    iconColor: AppColors.accentLight,
+                    iconColor: primary,
                     title: 'FurClient',
                     subtitle: 'A FurAffinity client',
                   ),
-                  const Divider(height: 1, indent: 56, color: AppColors.border),
+                  Divider(height: 1, indent: 56, color: outline),
                   _infoTile(
                     icon: Icons.info_outline,
-                    iconColor: AppColors.textDim,
+                    iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
                     title: 'Version',
                     trailing: _appVersion,
                   ),
                   if (Platform.isWindows) ...[
-                    const Divider(
-                        height: 1, indent: 56, color: AppColors.border),
+                    Divider(
+                        height: 1,
+                        indent: 56,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant
+                            .withValues(alpha: 0.12)),
                     _buildUpdateTile(),
                   ],
-                  const Divider(height: 1, indent: 56, color: AppColors.border),
+                  Divider(
+                      height: 1,
+                      indent: 56,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outlineVariant
+                          .withValues(alpha: 0.12)),
                   _infoTile(
                     icon: Icons.code,
-                    iconColor: AppColors.textDim,
+                    iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
                     title: 'Built with Flutter',
                     trailing: 'Flutter',
                   ),
@@ -398,21 +442,23 @@ class _SettingsScreenState extends State<SettingsScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(
-                        color: AppColors.text,
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 15,
                         fontWeight: FontWeight.w500)),
                 if (subtitle != null)
                   Text(subtitle,
-                      style: const TextStyle(
-                          color: AppColors.textMuted, fontSize: 13)),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 13)),
               ],
             ),
           ),
           if (trailing != null)
             Text(trailing,
-                style:
-                    const TextStyle(color: AppColors.textMuted, fontSize: 14)),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 14)),
         ],
       ),
     );
@@ -445,8 +491,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                           fontWeight: FontWeight.w500)),
                   if (subtitle != null)
                     Text(subtitle,
-                        style: const TextStyle(
-                            color: AppColors.textMuted, fontSize: 13)),
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 13)),
                 ],
               ),
             ),
@@ -461,18 +509,22 @@ class _SettingsScreenState extends State<SettingsScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          const Icon(Icons.high_quality_outlined,
-              color: AppColors.materialLavender, size: 20),
+          Icon(Icons.high_quality_outlined,
+              color: Theme.of(context).colorScheme.tertiary, size: 20),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Image Quality',
-                    style: TextStyle(color: AppColors.text, fontSize: 15)),
-                SizedBox(height: 2),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 15)),
+                const SizedBox(height: 2),
                 Text('Quality for full-size images',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 13)),
               ],
             ),
           ),
@@ -505,16 +557,22 @@ class _SettingsScreenState extends State<SettingsScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.bgInput,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .outlineVariant
+                        .withValues(alpha: 0.12)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _imageQuality,
                   isDense: true,
-                  style: const TextStyle(color: AppColors.text, fontSize: 13),
-                  dropdownColor: AppColors.bgCard,
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 13),
+                  dropdownColor: Theme.of(context).cardColor,
                   items: const [
                     DropdownMenuItem(value: 'low', child: Text('Low')),
                     DropdownMenuItem(value: 'medium', child: Text('Medium')),
@@ -542,22 +600,24 @@ class _SettingsScreenState extends State<SettingsScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          const Icon(Icons.folder_outlined,
-              color: AppColors.fluentCyan, size: 20),
+            Icon(Icons.folder_outlined,
+              color: Theme.of(context).colorScheme.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Download Folder',
-                    style: TextStyle(color: AppColors.text, fontSize: 15)),
+                Text('Download Folder',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 15)),
                 const SizedBox(height: 2),
                 Text(
                   displayPath,
                   style: TextStyle(
                     color: _customDownloadPath.isEmpty
-                        ? AppColors.textMuted
-                        : AppColors.textDim,
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : Theme.of(context).colorScheme.onSurface,
                     fontSize: 13,
                   ),
                   maxLines: 1,
@@ -573,9 +633,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                 setState(() => _customDownloadPath = '');
                 _saveSetting('custom_download_path', '');
               },
-              child: const Padding(
-                padding: EdgeInsets.all(4),
-                child: Icon(Icons.close, size: 16, color: AppColors.textDim),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.close,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ),
           GestureDetector(
@@ -583,18 +645,24 @@ class _SettingsScreenState extends State<SettingsScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.bgInput,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .outlineVariant
+                        .withValues(alpha: 0.12)),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.edit, size: 14, color: AppColors.fluentCyan),
-                  SizedBox(width: 4),
-                  Text('Change',
-                      style:
-                          TextStyle(color: AppColors.fluentCyan, fontSize: 13)),
+                    Icon(Icons.edit,
+                      size: 14, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 4),
+                    Text('Change',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 13)),
                 ],
               ),
             ),
@@ -609,8 +677,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Text(
         text,
-        style: const TextStyle(
-          color: AppColors.textMuted,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           fontSize: 13,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
@@ -620,12 +688,15 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _card(List<Widget> children) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final cardColor = colorScheme.surfaceContainerHighest;
+    final outline = colorScheme.outlineVariant.withValues(alpha: 0.12);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: outline),
       ),
       child: Column(children: children),
     );
@@ -684,27 +755,27 @@ class _SettingsScreenState extends State<SettingsScreen>
         final version = svc.currentVersion ?? '...';
         final latest = svc.latestVersion;
 
-        Color iconColor = AppColors.textDim;
+        Color iconColor = Theme.of(context).colorScheme.onSurfaceVariant;
         String subtitle = 'v$version';
 
         if (status == UpdateStatus.checking) {
-          iconColor = AppColors.fluentCyan;
+          iconColor = Theme.of(context).colorScheme.primary;
           subtitle = 'Checking...';
         } else if (status == UpdateStatus.available) {
-          iconColor = AppColors.materialGreen;
+          iconColor = Theme.of(context).colorScheme.primary;
           subtitle = 'v$version -> v$latest available!';
         } else if (status == UpdateStatus.downloading) {
-          iconColor = AppColors.fluentCyan;
+          iconColor = Theme.of(context).colorScheme.primary;
           final pct = (svc.downloadProgress * 100).toInt();
           subtitle = 'Downloading... $pct%';
         } else if (status == UpdateStatus.installing) {
-          iconColor = AppColors.materialGreen;
+          iconColor = Theme.of(context).colorScheme.primary;
           subtitle = 'Installing...';
         } else if (status == UpdateStatus.upToDate) {
-          iconColor = AppColors.materialGreen;
+          iconColor = Theme.of(context).colorScheme.primary;
           subtitle = 'v$version - up to date';
         } else if (status == UpdateStatus.error) {
-          iconColor = AppColors.danger;
+          iconColor = Theme.of(context).colorScheme.error;
           subtitle = svc.errorMessage ?? 'Update check failed';
         }
 
@@ -718,17 +789,19 @@ class _SettingsScreenState extends State<SettingsScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Update',
+                    Text('Update',
                         style: TextStyle(
-                            color: AppColors.text,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 15,
                             fontWeight: FontWeight.w500)),
                     const SizedBox(height: 2),
                     Text(subtitle,
                         style: TextStyle(
                             color: status == UpdateStatus.error
-                                ? AppColors.danger
-                                : AppColors.textMuted,
+                                ? Theme.of(context).colorScheme.error
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                             fontSize: 13)),
                     if (status == UpdateStatus.downloading)
                       Padding(
@@ -737,9 +810,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                           borderRadius: BorderRadius.circular(3),
                           child: LinearProgressIndicator(
                             value: svc.downloadProgress,
-                            backgroundColor: AppColors.bgInput,
-                            valueColor: const AlwaysStoppedAnimation(
-                                AppColors.fluentCyan),
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            valueColor: AlwaysStoppedAnimation(
+                              Theme.of(context).colorScheme.primary),
                             minHeight: 4,
                           ),
                         ),
@@ -757,19 +832,26 @@ class _SettingsScreenState extends State<SettingsScreen>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.bgInput,
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outlineVariant
+                              .withValues(alpha: 0.12)),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.refresh,
-                            size: 14, color: AppColors.fluentCyan),
-                        SizedBox(width: 4),
+                          size: 14,
+                          color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 4),
                         Text('Check',
-                            style: TextStyle(
-                                color: AppColors.fluentCyan, fontSize: 13)),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: 13)),
                       ],
                     ),
                   ),
@@ -782,7 +864,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.materialGreen,
+                      color: Theme.of(context).colorScheme.primary,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Row(
@@ -813,22 +895,24 @@ class _SettingsScreenState extends State<SettingsScreen>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              const Icon(Icons.palette_outlined,
-                  color: AppColors.cupertinoPurple, size: 22),
+              Icon(Icons.palette_outlined,
+                  color: Theme.of(context).colorScheme.primary, size: 22),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Theme',
+                    Text('Theme',
                         style: TextStyle(
-                            color: AppColors.text,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 15,
                             fontWeight: FontWeight.w500)),
                     const SizedBox(height: 2),
                     Text('App appearance mode',
-                        style: const TextStyle(
-                            color: AppColors.textMuted, fontSize: 13)),
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 13)),
                   ],
                 ),
               ),
@@ -855,17 +939,23 @@ class _SettingsScreenState extends State<SettingsScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.bgInput,
+                    color:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant
+                            .withValues(alpha: 0.12)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<AppThemeMode>(
                       value: current,
                       isDense: true,
-                      style:
-                          const TextStyle(color: AppColors.text, fontSize: 13),
-                      dropdownColor: AppColors.bgCard,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 13),
+                      dropdownColor: Theme.of(context).cardColor,
                       items: AppThemeMode.values
                           .map((e) => DropdownMenuItem(
                                 value: e,
