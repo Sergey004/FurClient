@@ -1,3 +1,4 @@
+import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as parser;
 import 'fa_page.dart';
 
@@ -39,31 +40,41 @@ class FAUserPage implements FAPage {
     final nameMatch = RegExp(r'/user/([^/]+)/').firstMatch(url.path);
     final name = nameMatch?.group(1) ?? '';
 
+    final mainWindow = document.querySelector('body div#main-window');
+    final navHeader =
+        mainWindow?.querySelector('div#site-content userpage-nav-header');
+
     // Display name
-    String displayName = name;
-    final nameEl = document.querySelector('h2.username, .username, h2');
-    if (nameEl != null) {
-      displayName = nameEl.text.trim();
-    }
+    final authorNode = navHeader?.querySelector(
+        'username div.c-usernameBlock a.c-usernameBlock__displayName');
+    final displayName = _extractDisplayName(document, name, authorNode);
 
     // Banner
     Uri? bannerUrl;
-    final bannerEl = document.querySelector('div.user-banner img, .banner img');
+    final bannerEl = mainWindow?.querySelector('div#header a img') ??
+        document.querySelector('div.user-banner img, .banner img');
     if (bannerEl != null) {
       final src = bannerEl.attributes['src'] ?? '';
       if (src.isNotEmpty) {
-        bannerUrl = Uri.parse(src.startsWith('http') ? src : 'https://www.furaffinity.net$src');
+        bannerUrl = Uri.parse(
+            src.startsWith('http') ? src : 'https://www.furaffinity.net$src');
       }
     }
 
     // Description
-    final descEl = document.querySelector('div.user-description, .profile-description, #user-description');
+    const descriptionQuery =
+        'div#site-content div#page-userpage section.userpage-layout-profile div.userpage-layout-profile-container div.userpage-profile';
+    final descEl = mainWindow?.querySelector(descriptionQuery) ??
+        document.querySelector(
+            'div.user-description, .profile-description, #user-description');
     final htmlDescription = descEl?.innerHtml ?? '';
 
     // Shouts (guestbook comments)
     final shouts = <FAPageComment>[];
-    final shoutElements = document.querySelectorAll(
-        'div.shout-container, div.comment, .shout');
+    const shoutsQuery =
+        'div#site-content div#page-userpage section.userpage-right-column div.userpage-section-right div.comment_container';
+    final shoutElements = mainWindow?.querySelectorAll(shoutsQuery) ??
+        document.querySelectorAll('div.shout-container, div.comment, .shout');
 
     for (final shoutEl in shoutElements) {
       try {
@@ -71,17 +82,21 @@ class FAUserPage implements FAPage {
         final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
         if (cid == 0) continue;
 
-        final indentEl = shoutEl.querySelector('.comment-indentation, .comment-avatar');
+        final indentEl =
+            shoutEl.querySelector('.comment-indentation, .comment-avatar');
         int indentation = 0;
         if (indentEl != null) {
           final widthAttr = indentEl.attributes['width'] ?? '0';
           indentation = (double.tryParse(widthAttr) ?? 0).toInt() ~/ 16;
         }
 
-        final authorLink = shoutEl.querySelector('a.comment-username, a[href*="/user/"]');
+        final authorLink =
+            shoutEl.querySelector('a.comment-username, a[href*="/user/"]');
         final author = authorLink != null
-            ? (RegExp(r'/user/([^/]+)/').firstMatch(
-                authorLink.attributes['href'] ?? '')?.group(1) ?? '')
+            ? (RegExp(r'/user/([^/]+)/')
+                    .firstMatch(authorLink.attributes['href'] ?? '')
+                    ?.group(1) ??
+                '')
             : '';
         final displayAuthor = authorLink?.text.trim() ?? '';
 
@@ -90,7 +105,8 @@ class FAUserPage implements FAPage {
         final datetimeAttr = dateEl?.attributes['title'] ?? '';
         final datetime = DateTime.tryParse(datetimeAttr) ?? DateTime.now();
 
-        final messageEl = shoutEl.querySelector('div.comment-text, .shout-text');
+        final messageEl =
+            shoutEl.querySelector('div.comment-text, .shout-text');
         final htmlMessage = messageEl?.innerHtml ?? '';
 
         shouts.add(FAVisiblePageComment(
@@ -109,23 +125,23 @@ class FAUserPage implements FAPage {
 
     // Target shout from URL
     int? targetShoutId;
-    final hashMatch = RegExp(r'cid(\d+)').firstMatch(url.fragment);
+    final hashMatch = RegExp(r'shout-(\d+)').firstMatch(url.fragment);
     if (hashMatch != null) {
       targetShoutId = int.tryParse(hashMatch.group(1)!);
     }
 
     // Watch data
     FAWatchData? watchData;
-    final watchLink = document.querySelector('a[href*="/watch/"], a[href*="/unwatch/"]');
-    if (watchLink != null) {
-      final href = watchLink.attributes['href'] ?? '';
-      if (href.isNotEmpty) {
-        watchData = FAWatchData(
-          watchUrl: Uri.parse(href.startsWith('http')
-              ? href
-              : 'https://www.furaffinity.net$href'),
-        );
-      }
+    final watchLink =
+        navHeader?.querySelector('userpage-nav-interface-buttons a.button') ??
+            document.querySelector('a[href*="/watch/"], a[href*="/unwatch/"]');
+    final href = watchLink?.attributes['href'] ?? '';
+    if (href.isNotEmpty) {
+      watchData = FAWatchData(
+        watchUrl: Uri.parse(href.startsWith('http')
+            ? href
+            : 'https://www.furaffinity.net$href'),
+      );
     }
 
     return FAUserPage(
@@ -137,5 +153,43 @@ class FAUserPage implements FAPage {
       targetShoutId: targetShoutId,
       watchData: watchData,
     );
+  }
+
+  static String _extractDisplayName(
+      dom.Document document, String username, dom.Element? authorNode) {
+    final authorText = authorNode?.text.trim();
+    if (authorText != null && authorText.isNotEmpty) {
+      final normalized = authorText.toLowerCase();
+      if (normalized != 'browse') {
+        return authorText;
+      }
+    }
+
+    final selectors = [
+      'h2.username',
+      '.username',
+      'h2[class*="username"]',
+      'div.user-profile h2',
+      'div.user-info h2',
+      'div#user-profile h2',
+      '.user-profile h2',
+      '.user-info h2',
+      '.profile h2',
+      '.user-page h2',
+      'h2',
+    ];
+
+    for (final selector in selectors) {
+      final element = document.querySelector(selector);
+      if (element == null) continue;
+
+      final text = element.text.trim();
+      if (text.isEmpty) continue;
+      if (text.toLowerCase() == 'browse') continue;
+
+      return text;
+    }
+
+    return username;
   }
 }

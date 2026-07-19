@@ -75,35 +75,42 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.build(context);
 
     if (isWindows) {
-      return fluent.ScaffoldPage(
-        header: Row(
-          children: [
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).maybePop(),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  child: const Icon(
-                    fluent.FluentIcons.back,
-                    size: 16,
-                    color: AppColors.textDim,
+      final colorScheme = Theme.of(context).colorScheme;
+      final fluentTheme = colorScheme.brightness == Brightness.dark
+          ? AppTheme.fluentFromSystemAccent(colorScheme.primary)
+          : AppTheme.fluentLightTheme(accent: colorScheme.primary);
+
+      return fluent.FluentTheme(
+          data: fluentTheme,
+          child: fluent.ScaffoldPage(
+            header: Row(
+              children: [
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      child: const Icon(
+                        fluent.FluentIcons.back,
+                        size: 16,
+                        color: AppColors.textDim,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Text(
+                  widget.targetUsername != null ? _username : 'Profile',
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              widget.targetUsername != null ? _username : 'Profile',
-              style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.text),
-            ),
-          ],
-        ),
-        content: _buildBody(),
-      );
+            content: _buildBody(),
+          ));
     }
 
     return AdaptiveScaffold(
@@ -391,7 +398,10 @@ class _ProfileScreenState extends State<ProfileScreen>
         crossAxisCount: crossAxisCount,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: crossAxisCount == 3 ? 1.65 : 1.8,
+        // Aspect ratio is tuned so a stat cell (icon + value + label ≈ 61px)
+        // always fits inside its height on both layouts. Previous 1.65/1.8 led
+        // to a "RenderFlex overflowed by 7.4 pixels" overflow on narrow screens.
+        childAspectRatio: crossAxisCount == 3 ? 1.4 : 1.55,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
         children: [

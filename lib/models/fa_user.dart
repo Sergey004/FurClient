@@ -85,22 +85,29 @@ class FAUser {
 
   static FAUser? parseUserPage(String htmlString, String username) {
     final document = html_parser.parse(htmlString);
+    final mainWindow = document.querySelector('body div#main-window');
+    final navHeader =
+        mainWindow?.querySelector('div#site-content userpage-nav-header');
+    final authorNode = navHeader?.querySelector(
+        'username div.c-usernameBlock a.c-usernameBlock__displayName');
 
-    // Display name — try h2.username first, then any h2 on the user page
-    final displayNameEl = document.querySelector('h2.username, .username, h2');
-    final displayName = displayNameEl?.text.trim() ?? username;
+    final displayName = _extractDisplayName(document, username, authorNode);
 
     // Avatar — look for img with alt="Avatar" or inside avatar container
     final avatarEl = document.querySelector('img[alt="Avatar"]');
     final avatarUrl = avatarEl?.attributes['src'] ?? '';
 
     // Banner — user-banner div > img
-    final bannerEl = document.querySelector('div.user-banner img, .banner img');
+    final bannerEl = mainWindow?.querySelector('div#header a img') ??
+        document.querySelector('div.user-banner img, .banner img');
     final bannerUrl = bannerEl?.attributes['src'] ?? '';
 
     // Description
-    final descEl = document.querySelector(
-        'div.user-description, .profile-description, #user-description');
+    const descriptionQuery =
+        'div#site-content div#page-userpage section.userpage-layout-profile div.userpage-layout-profile-container div.userpage-profile';
+    final descEl = mainWindow?.querySelector(descriptionQuery) ??
+        document.querySelector(
+            'div.user-description, .profile-description, #user-description');
     final description = descEl?.text.trim() ?? '';
 
     // Stats — FA uses: <span class="highlight">Views:</span> 3515
@@ -135,6 +142,44 @@ class FAUser {
       watchUrl:
           watchHref.isNotEmpty ? 'https://www.furaffinity.net$watchHref' : '',
     );
+  }
+
+  static String _extractDisplayName(
+      dom.Document document, String username, dom.Element? authorNode) {
+    final authorText = authorNode?.text.trim();
+    if (authorText != null && authorText.isNotEmpty) {
+      final normalized = authorText.toLowerCase();
+      if (normalized != 'browse') {
+        return authorText;
+      }
+    }
+
+    final selectors = [
+      'h2.username',
+      '.username',
+      'h2[class*="username"]',
+      'div.user-profile h2',
+      'div.user-info h2',
+      'div#user-profile h2',
+      '.user-profile h2',
+      '.user-info h2',
+      '.profile h2',
+      '.user-page h2',
+      'h2',
+    ];
+
+    for (final selector in selectors) {
+      final element = document.querySelector(selector);
+      if (element == null) continue;
+
+      final text = element.text.trim();
+      if (text.isEmpty) continue;
+      if (text.toLowerCase() == 'browse') continue;
+
+      return text;
+    }
+
+    return username;
   }
 
   /// Parse a stat value from the FA profile format using regex on raw HTML.

@@ -77,12 +77,20 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (isWindows) {
-      return fluent.ScaffoldPage(
-        content: Column(
-          children: [
-            _buildWindowTitleBar(),
-            Expanded(child: _buildBody()),
-          ],
+      final colorScheme = Theme.of(context).colorScheme;
+      final fluentTheme = colorScheme.brightness == Brightness.dark
+          ? AppTheme.fluentFromSystemAccent(colorScheme.primary)
+          : AppTheme.fluentLightTheme(accent: colorScheme.primary);
+
+      return fluent.FluentTheme(
+        data: fluentTheme,
+        child: fluent.ScaffoldPage(
+          content: Column(
+            children: [
+              _buildWindowTitleBar(),
+              Expanded(child: _buildBody()),
+            ],
+          ),
         ),
       );
     }
@@ -95,45 +103,51 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
 
   /// Custom title bar for Windows — always visible, supports drag.
   Widget _buildWindowTitleBar() {
-    return fluent.TitleBar(
-      isBackButtonVisible: false,
-      icon: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: () => Navigator.of(context).maybePop(),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(fluent.FluentIcons.back, size: 14),
-              SizedBox(width: 6),
-              Text('Back', style: TextStyle(fontSize: 13)),
-            ],
-          ),
+    final brightness = fluent.FluentTheme.of(context).brightness;
+    final title = _journal != null ? _journal!.title : 'Loading...';
+    return SizedBox(
+      height: 48,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onPanStart: (_) => windowManager.startDragging(),
+        onDoubleTap: () async {
+          final isMax = await windowManager.isMaximized();
+          if (isMax) {
+            windowManager.unmaximize();
+          } else {
+            windowManager.maximize();
+          }
+        },
+        child: Row(
+          children: [
+            const SizedBox(width: 12),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).maybePop(),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(fluent.FluentIcons.back, size: 14),
+                    SizedBox(width: 6),
+                    Text('Back', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            CaptionButtons(brightness: brightness),
+          ],
         ),
       ),
-      title: _journal != null
-          ? Text(
-              _journal!.title,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-              overflow: TextOverflow.ellipsis,
-            )
-          : const Text('Loading...', style: TextStyle(fontSize: 13)),
-      captionControls: SizedBox(
-        width: 138,
-        height: 46,
-        child: CaptionButtons(
-          brightness: fluent.FluentTheme.of(context).brightness,
-        ),
-      ),
-      onDragStarted: () => windowManager.startDragging(),
-      onDoubleTap: () async {
-        final isMax = await windowManager.isMaximized();
-        if (isMax) {
-          windowManager.unmaximize();
-        } else {
-          windowManager.maximize();
-        }
-      },
     );
   }
 

@@ -215,8 +215,16 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     final isDesktop = width >= AppBreakpoints.desktop;
 
     if (isWindows) {
-      return fluent.ScaffoldPage(
-        content: _buildBody(isDesktop),
+      final colorScheme = Theme.of(context).colorScheme;
+      final fluentTheme = colorScheme.brightness == Brightness.dark
+          ? AppTheme.fluentFromSystemAccent(colorScheme.primary)
+          : AppTheme.fluentLightTheme(accent: colorScheme.primary);
+
+      return fluent.FluentTheme(
+        data: fluentTheme,
+        child: fluent.ScaffoldPage(
+          content: _buildBody(isDesktop),
+        ),
       );
     }
 

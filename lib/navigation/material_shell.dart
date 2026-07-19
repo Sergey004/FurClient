@@ -164,9 +164,7 @@ class _MaterialShellState extends State<MaterialShell> {
               backgroundColor: colorScheme.surfaceContainerLow,
               indicatorColor: currentAccent.withValues(alpha: 0.16),
               useIndicator: true,
-              labelType: isExtended
-                  ? null
-                  : NavigationRailLabelType.selected,
+              labelType: isExtended ? null : NavigationRailLabelType.selected,
               leading: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: isExtended

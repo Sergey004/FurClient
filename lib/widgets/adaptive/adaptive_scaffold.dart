@@ -20,10 +20,18 @@ class AdaptiveScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isWindows) {
-      return fluent.ScaffoldPage(
-        content: ColoredBox(
-          color: backgroundColor ?? AppColors.bg,
-          child: body,
+      final colorScheme = Theme.of(context).colorScheme;
+      final fluentTheme = colorScheme.brightness == Brightness.dark
+          ? AppTheme.fluentFromSystemAccent(colorScheme.primary)
+          : AppTheme.fluentLightTheme(accent: colorScheme.primary);
+
+      return fluent.FluentTheme(
+        data: fluentTheme,
+        child: fluent.ScaffoldPage(
+          content: ColoredBox(
+            color: backgroundColor ?? AppColors.bg,
+            child: body,
+          ),
         ),
       );
     }

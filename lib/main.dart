@@ -3,7 +3,7 @@ import 'dart:io' show Platform, HttpClient;
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-// Fluent UI removed: using Material 3 across the app
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:system_theme/system_theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
@@ -21,6 +21,7 @@ import 'utils/platform_utils.dart';
 import 'package:upgrader/upgrader.dart';
 import 'utils/fa_image_proxy.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_driver/driver_extension.dart';
 
 WebViewEnvironment? webViewEnvironment;
 
@@ -59,7 +60,9 @@ void main() {
       }
 
       AppTheme.setSystemOverlay();
-
+      if (const bool.fromEnvironment('ENABLE_FLUTTER_DRIVER')) {
+        enableFlutterDriverExtension();
+      }
       runApp(const FurClientApp());
     }, () {
       if (Platform.isAndroid) {
@@ -192,11 +195,57 @@ class _FurClientAppState extends State<FurClientApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Use MaterialApp (Material 3) on all platforms for consistent look.
+    // Use FluentApp (Windows-native chrome) on Windows, MaterialApp everywhere else.
+    if (isWindows) {
+      return _buildFluentApp();
+    }
     return _buildMaterialApp();
   }
 
-  // FluentApp removed: using Material 3 via _buildMaterialApp for all windows.
+  /// Windows-only root widget. Mirrors [_buildMaterialApp] but swaps the
+  /// MaterialApp for a [fluent.FluentApp] using the Fluent theme builders
+  /// defined in [AppTheme]. Android/macOS/Linux are unaffected — they go
+  /// through [_buildMaterialApp].
+  Widget _buildFluentApp() {
+    return ListenableBuilder(
+      listenable: _themeProvider,
+      builder: (context, _) {
+        final mode = _themeProvider.mode;
+        final accent = AppTheme.systemAccent;
+
+        fluent.FluentThemeData theme;
+        fluent.FluentThemeData? darkTheme;
+
+        switch (mode) {
+          case AppThemeMode.system:
+            theme = AppTheme.fluentLightTheme(accent: accent);
+            darkTheme = AppTheme.fluentFromSystemAccent(accent);
+            break;
+          case AppThemeMode.light:
+            theme = AppTheme.fluentLightTheme(accent: accent);
+            darkTheme = null;
+            break;
+          case AppThemeMode.dark:
+            theme = AppTheme.fluentDarkTheme;
+            darkTheme = AppTheme.fluentFromSystemAccent(accent);
+            break;
+          case AppThemeMode.original:
+            theme = AppTheme.fluentDarkTheme;
+            darkTheme = AppTheme.fluentDarkTheme;
+            break;
+        }
+
+        return fluent.FluentApp(
+          title: 'FurClient',
+          debugShowCheckedModeBanner: false,
+          themeMode: _themeProvider.themeMode,
+          theme: theme,
+          darkTheme: darkTheme,
+          home: UpgradeAlert(child: _buildHome()),
+        );
+      },
+    );
+  }
 
   Widget _buildMaterialApp() {
     return ListenableBuilder(
@@ -268,6 +317,24 @@ class _FurClientAppState extends State<FurClientApp> {
 
   Widget _buildHome() {
     if (_isRestoringSession) {
+      if (isWindows) {
+        // Fluent-native restoration screen: no Material Scaffold inside FluentApp.
+        return fluent.ScaffoldPage(
+          content: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const fluent.ProgressRing(),
+                const SizedBox(height: 16),
+                Text(
+                  'Restoring session...',
+                  style: TextStyle(color: AppColors.textDim, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return Scaffold(
         body: Center(
           child: Column(
@@ -301,6 +368,14 @@ class _FurClientAppState extends State<FurClientApp> {
       }
     }
 
+    // On Windows wrap the login screen in a Fluent ScaffoldPage so it lives
+    // inside the FluentApp tree. LoginScreen itself already branches on
+    // isWindows for its inner widgets.
+    if (isWindows) {
+      return fluent.ScaffoldPage(
+        content: LoginScreen(authService: _authService, onLogin: _onLogin),
+      );
+    }
     return LoginScreen(authService: _authService, onLogin: _onLogin);
   }
 }

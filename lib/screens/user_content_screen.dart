@@ -182,12 +182,20 @@ class _UserContentScreenState extends State<UserContentScreen> {
   @override
   Widget build(BuildContext context) {
     if (isWindows) {
-      return fluent.ScaffoldPage(
-        content: Column(
-          children: [
-            _buildWindowTitleBar(context),
-            Expanded(child: _buildBody()),
-          ],
+      final colorScheme = Theme.of(context).colorScheme;
+      final fluentTheme = colorScheme.brightness == Brightness.dark
+          ? AppTheme.fluentFromSystemAccent(colorScheme.primary)
+          : AppTheme.fluentLightTheme(accent: colorScheme.primary);
+
+      return fluent.FluentTheme(
+        data: fluentTheme,
+        child: fluent.ScaffoldPage(
+          content: Column(
+            children: [
+              _buildWindowTitleBar(context),
+              Expanded(child: _buildBody()),
+            ],
+          ),
         ),
       );
     }
@@ -199,43 +207,50 @@ class _UserContentScreenState extends State<UserContentScreen> {
   }
 
   Widget _buildWindowTitleBar(BuildContext context) {
-    return fluent.TitleBar(
-      isBackButtonVisible: false,
-      icon: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: () => Navigator.of(context).maybePop(),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(fluent.FluentIcons.back, size: 14),
-              SizedBox(width: 6),
-              Text('Back', style: TextStyle(fontSize: 13)),
-            ],
-          ),
+    final brightness = fluent.FluentTheme.of(context).brightness;
+    return SizedBox(
+      height: 48,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onPanStart: (_) => windowManager.startDragging(),
+        onDoubleTap: () async {
+          final isMax = await windowManager.isMaximized();
+          if (isMax) {
+            windowManager.unmaximize();
+          } else {
+            windowManager.maximize();
+          }
+        },
+        child: Row(
+          children: [
+            const SizedBox(width: 12),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).maybePop(),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(fluent.FluentIcons.back, size: 14),
+                    SizedBox(width: 6),
+                    Text('Back', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                _pageTitle,
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            CaptionButtons(brightness: brightness),
+          ],
         ),
       ),
-      title: Text(
-        _pageTitle,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-        overflow: TextOverflow.ellipsis,
-      ),
-      captionControls: SizedBox(
-        width: 138,
-        height: 46,
-        child: CaptionButtons(
-          brightness: fluent.FluentTheme.of(context).brightness,
-        ),
-      ),
-      onDragStarted: () => windowManager.startDragging(),
-      onDoubleTap: () async {
-        final isMax = await windowManager.isMaximized();
-        if (isMax) {
-          windowManager.unmaximize();
-        } else {
-          windowManager.maximize();
-        }
-      },
     );
   }
 

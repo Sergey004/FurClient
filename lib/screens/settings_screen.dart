@@ -600,7 +600,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-            Icon(Icons.folder_outlined,
+          Icon(Icons.folder_outlined,
               color: Theme.of(context).colorScheme.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
@@ -656,13 +656,13 @@ class _SettingsScreenState extends State<SettingsScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                    Icon(Icons.edit,
+                  Icon(Icons.edit,
                       size: 14, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 4),
-                    Text('Change',
+                  Text('Change',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 13)),
+                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 13)),
                 ],
               ),
             ),
@@ -814,7 +814,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                 .colorScheme
                                 .surfaceContainerHighest,
                             valueColor: AlwaysStoppedAnimation(
-                              Theme.of(context).colorScheme.primary),
+                                Theme.of(context).colorScheme.primary),
                             minHeight: 4,
                           ),
                         ),
@@ -845,13 +845,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.refresh,
-                          size: 14,
-                          color: Theme.of(context).colorScheme.primary),
+                            size: 14,
+                            color: Theme.of(context).colorScheme.primary),
                         const SizedBox(width: 4),
                         Text('Check',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontSize: 13)),
+                            style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontSize: 13)),
                       ],
                     ),
                   ),
