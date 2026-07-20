@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:cronet_http/cronet_http.dart';
 import 'package:cupertino_http/cupertino_http.dart';
+import 'package:window_manager/window_manager.dart';
 import 'services/auth_service.dart';
 import 'services/fa_client.dart';
 import 'services/update_service.dart';
@@ -17,6 +18,7 @@ import 'theme/theme_provider.dart';
 import 'utils/cookie_manager.dart';
 import 'screens/login_screen.dart';
 import 'navigation/adaptive_shell.dart';
+import 'widgets/fluent_root_chrome.dart';
 import 'utils/platform_utils.dart';
 import 'package:upgrader/upgrader.dart';
 import 'utils/fa_image_proxy.dart';
@@ -50,6 +52,19 @@ void main() {
             '=== WebViewEnvironment created successfully, version: $availableVersion');
         // Запускаем прокси для FA CDN — читает cookies из webview2_data профиля
         await FAImageProxy().start();
+
+        // Hide the OS title bar so the single FluentRootChrome caption bar is
+        // the only one in the window (prevents duplicate min/max/close buttons).
+        await windowManager.ensureInitialized();
+        const windowOptions = WindowOptions(
+          titleBarStyle: TitleBarStyle.hidden,
+          size: Size(1280, 800),
+          minimumSize: Size(720, 540),
+          center: true,
+        );
+        await windowManager.waitUntilReadyToShow(windowOptions, () async {
+          await windowManager.show();
+        });
       }
 
       if (isDesktop) {
@@ -241,7 +256,9 @@ class _FurClientAppState extends State<FurClientApp> {
           themeMode: _themeProvider.themeMode,
           theme: theme,
           darkTheme: darkTheme,
-          home: UpgradeAlert(child: _buildHome()),
+          home: FluentRootChrome(
+            child: UpgradeAlert(child: _buildHome()),
+          ),
         );
       },
     );

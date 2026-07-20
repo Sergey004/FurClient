@@ -10,6 +10,7 @@ import '../utils/platform_utils.dart';
 import '../theme/theme_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:io' show Platform;
+import '../widgets/age_gate_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool sfwMode;
@@ -90,6 +91,17 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _onSfwToggle(bool value) async {
+    // Turning SFW off means enabling NSFW — require an 18+ confirmation
+    // the first time. Subsequent toggles reuse the stored confirmation.
+    if (!value && !await isAgeConfirmed()) {
+      if (!mounted) return;
+      final confirmed = await showAgeGateDialog(context);
+      if (!confirmed) {
+        // Leave SFW on; ignore this toggle.
+        return;
+      }
+      await setAgeConfirmed();
+    }
     setState(() => _sfwMode = value);
     widget.onSfwModeChanged(value);
     await _saveSetting('sfw_mode', value);
@@ -181,10 +193,18 @@ class _SettingsScreenState extends State<SettingsScreen>
     final secondary = colorScheme.primary;
     final tertiary = colorScheme.tertiary;
     final outline = colorScheme.outlineVariant.withValues(alpha: 0.12);
+    // Bottom padding so the last item doesn't slide under the Material
+    // BottomNavigationBar shown by AppNavigator on mobile (it's outside this
+    // Scaffold, so the inner Scaffold can't reserve space for it). 80 covers
+    // the BAR height (~64) plus a little breathing room.
+    final bottomInset = MediaQuery.paddingOf(context).bottom + 80;
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      children: [
+    return SafeArea(
+      top: false,
+      child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8)
+            .copyWith(bottom: bottomInset),
+        children: [
         _sectionHeader('APPEARANCE'),
         _card([_buildThemeTile()]),
         const SizedBox(height: 24),
@@ -282,6 +302,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         ]),
         const SizedBox(height: 32),
       ],
+      ),
     );
   }
 

@@ -56,8 +56,19 @@ class FAUserPage implements FAPage {
     if (bannerEl != null) {
       final src = bannerEl.attributes['src'] ?? '';
       if (src.isNotEmpty) {
-        bannerUrl = Uri.parse(
-            src.startsWith('http') ? src : 'https://www.furaffinity.net$src');
+        // Skip FA seasonal promo banners — it's site decoration, not the
+        // user's banner. e.g. //d.furaffinity.net/media/banners/modern/
+        // fa-banner-summer-mayakitty-20260701.jpg
+        final isSitePromoBanner =
+            src.contains('/media/banners/modern/fa-banner-');
+        if (!isSitePromoBanner) {
+          final resolved = src.startsWith('//')
+              ? 'https:$src'
+              : src.startsWith('http')
+                  ? src
+                  : 'https://www.furaffinity.net$src';
+          bannerUrl = Uri.parse(resolved);
+        }
       }
     }
 

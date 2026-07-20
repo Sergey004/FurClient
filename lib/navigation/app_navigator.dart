@@ -30,7 +30,8 @@ class AppNavigator extends StatefulWidget {
 
 class _AppNavigatorState extends State<AppNavigator> {
   int _currentIndex = 0;
-  bool _sfwMode = false;
+  // Default to SFW on (NSFW off) until the site cookie is checked.
+  bool _sfwMode = true;
 
   static const _navItems = [
     _NavItem(

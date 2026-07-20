@@ -31,7 +31,8 @@ class FluentShell extends StatefulWidget {
 
 class _FluentShellState extends State<FluentShell> {
   int _currentIndex = 0;
-  bool _sfwMode = false;
+  // Default to SFW on (NSFW off) until the site cookie is checked.
+  bool _sfwMode = true;
 
   @override
   void initState() {

@@ -46,6 +46,12 @@ class _FAImageState extends State<FAImage> {
           .bestThumbnailUrl(width: widget.width!, height: widget.height!)
           .toString();
     }
+    // Normalise protocol-relative URLs (//host/...) — these come from FA HTML
+    // sometimes and Uri.parse leaves the scheme empty, which then crashes
+    // HttpClient.getUrl with "Unsupported scheme ''".
+    if (url.startsWith('//')) {
+      url = 'https:$url';
+    }
     // Windows: WebView fetcher handles CF (same TLS fingerprint as login WebView).
     // Android: direct HTTP with cookies (proxy server only runs on Windows).
     return url;

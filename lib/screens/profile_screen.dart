@@ -116,7 +116,15 @@ class _ProfileScreenState extends State<ProfileScreen>
     return AdaptiveScaffold(
       appBar: AppBar(
           title: Text(widget.targetUsername != null ? _username : 'Profile')),
-      body: _buildBody(),
+      body: SafeArea(
+        // top: false — UserProfile's AppBar already reserves the status bar
+        // area; we only need to keep content clear of the bottom navigation
+        // bar drawn by AppNavigator (which lives in the outer Scaffold).
+        top: false,
+        left: false,
+        right: false,
+        child: _buildBody(),
+      ),
     );
   }
 
@@ -150,6 +158,10 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildMobileLayout(FAUser p) {
+    // Bottom spacing to keep the last Quick Link clear of the outer
+    // BottomNavigationBar (~64 tall). SafeArea handles system insets; this
+    // reserves space for the in-app nav bar itself.
+    final bottomInset = MediaQuery.paddingOf(context).bottom + 80;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -163,7 +175,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ],
         const SizedBox(height: 20),
         _buildLinks(p),
-        const SizedBox(height: 32),
+        SizedBox(height: bottomInset),
       ],
     );
   }
