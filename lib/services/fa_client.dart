@@ -112,13 +112,11 @@ class FAClient {
     _session = session;
     await _restoreCookiesFromSession();
     await _enhancedClient.syncCookies();
-    // Do NOT run CF pass for fresh logins — the user just authenticated
-    // through WebView, cookies are valid. CF pass is only needed when
-    // restoring a saved session or when actual CF errors occur.
-    if (!freshLogin) {
-      await passCloudflareChallenge();
+    if (freshLogin) {
+      debugPrint('=== setSession: skipping proactive CF pass for fresh login');
     } else {
-      debugPrint('=== setSession: skipping CF pass for fresh login');
+      debugPrint(
+          '=== setSession: restored session cookies; CF challenge will be handled only after a real request failure');
     }
   }
 
@@ -169,6 +167,28 @@ class FAClient {
     }
   }
 
+  @visibleForTesting
+  static List<Map<String, dynamic>> mergeCookiesForSession(
+    List<Map<String, dynamic>> existingCookies,
+    List<Map<String, dynamic>> incomingCookies,
+  ) {
+    final merged = <String, Map<String, dynamic>>{};
+
+    for (final cookie in existingCookies) {
+      final name = cookie['name']?.toString();
+      if (name == null || name.isEmpty) continue;
+      merged[name] = Map<String, dynamic>.from(cookie);
+    }
+
+    for (final cookie in incomingCookies) {
+      final name = cookie['name']?.toString();
+      if (name == null || name.isEmpty) continue;
+      merged[name] = Map<String, dynamic>.from(cookie);
+    }
+
+    return merged.values.toList();
+  }
+
   /// Check if response is a genuine Cloudflare challenge page.
   /// CF challenge pages are small (< 30KB). Normal FA pages are 100KB+.
   /// Only throws if CF-specific markers are found in a small response body.
@@ -209,7 +229,7 @@ class FAClient {
   Future<String> _getHtml(String url, {bool waitForAjax = false}) async {
     await _ensureInitialized();
 
-    // Use enhanced client for CDN URLs
+    // Use enhanced client for CDN URLs.
     if (url.contains('t.furaffinity.net') ||
         url.contains('d.furaffinity.net') ||
         url.contains('a.furaffinity.net')) {
@@ -223,42 +243,19 @@ class FAClient {
       }
     }
 
-    // Always build explicit Cookie header from session data.
-    final cookieHeader = _buildCookieHeader();
-    final options = cookieHeader != null
-        ? Options(headers: {'Cookie': cookieHeader})
-        : null;
-
-    // Strategy 1: Try Dio (fast HTTP client).
-    // This works when CF is not active or does not require Turnstile.
     try {
-      final response =
-          await _dio.get<String>(url, options: options ?? Options());
-      _checkCloudflare(response);
-      if (response.statusCode == null ||
-          response.statusCode! < 200 ||
-          response.statusCode! >= 300) {
-        throw DioException(
-          requestOptions: response.requestOptions,
-          response: response,
-          type: DioExceptionType.badResponse,
-          message: 'HTTP ${response.statusCode}',
-        );
+      final html = await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
+      if (html.isEmpty) {
+        debugPrint('=== WebView fetch returned empty HTML for $url');
+        throw CloudflareError();
       }
-      return response.data ?? '';
-    } on CloudflareError {
-      // Dio cannot pass CF Turnstile — different TLS fingerprint than WebView2.
-      // Do NOT retry with Dio. Fall back to HeadlessInAppWebView which shares
-      // the same WebViewEnvironment and can solve CF automatically.
-      debugPrint('=== Dio blocked by CF, falling back to WebView for $url');
-      try {
-        return await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
-      } catch (e) {
-        debugPrint('=== WebView fallback failed for $url: $e');
-        rethrow;
+      if (_isCloudflarePage(html)) {
+        debugPrint('=== WebView fetched a Cloudflare challenge page for $url');
+        throw CloudflareError();
       }
+      return html;
     } catch (e) {
-      debugPrint('=== Dio request failed for $url: $e');
+      debugPrint('=== WebView HTML fetch failed for $url: $e');
       rethrow;
     }
   }
@@ -356,8 +353,10 @@ class FAClient {
       );
       await headless.dispose();
 
-      // Sync any new cookies from this request
+      // Sync any new cookies from this request, then restore the existing
+      // session cookies so essential values such as 'a' remain available.
       await _syncCookiesFromWebView();
+      await _restoreCookiesFromSession();
 
       if (html.isEmpty) {
         debugPrint('=== WebView fetch returned empty for $url');
@@ -377,45 +376,18 @@ class FAClient {
     if (_session?.cookies == null) return false;
     try {
       await _ensureInitialized();
+      debugPrint('=== verifySession: checking session via WebView');
 
-      // Build explicit Cookie header from session data.
-      final cookieHeader = _buildCookieHeader();
-      debugPrint(
-          '=== verifySession: cookie header length: ${cookieHeader?.length ?? 0}');
-
-      final options = cookieHeader != null
-          ? Options(headers: {'Cookie': cookieHeader})
-          : null;
-
-      final response =
-          await _dio.get<String>(FAUrls.home, options: options ?? Options());
-
-      try {
-        _checkCloudflare(response);
-      } on CloudflareError {
-        // Dio can't pass CF — use WebView to check if session is valid
-        debugPrint('=== verifySession: CF detected, checking via WebView');
-        try {
-          final html = await _fetchHtmlWithWebView(FAUrls.home);
-          // If we got a real FA page (not empty, not CF page), session is valid
-          return html.isNotEmpty && !_isCloudflarePage(html);
-        } catch (e) {
-          debugPrint('=== verifySession: WebView check failed: $e');
-          return false;
-        }
-      }
-
-      final status = response.statusCode ?? 0;
-      debugPrint('=== verifySession status: $status');
-      if (status >= 200 && status < 300) return true;
-      if (status == 401 || status == 403) {
-        debugPrint('=== verifySession: HTTP $status, session may be invalid');
+      final html = await _fetchHtmlWithWebView(FAUrls.home);
+      if (html.isEmpty) {
+        debugPrint('=== verifySession: WebView returned empty HTML');
         return false;
       }
-      if (status >= 500) return true; // Server error, session itself is ok
-      return false;
-    } on CloudflareError {
-      return false;
+
+      final isValid = !_isCloudflarePage(html);
+      debugPrint(
+          '=== verifySession: WebView result is ${isValid ? 'valid' : 'blocked by CF'}');
+      return isValid;
     } catch (e) {
       debugPrint('verifySession error: $e');
       return false;
@@ -987,37 +959,33 @@ class FAClient {
     if (_session?.cookies == null) return;
     try {
       final List<dynamic> raw = jsonDecode(_session!.cookies!);
-      final sessionCookies = <String, Map<String, dynamic>>{};
-      for (final item in raw) {
-        if (item is Map<String, dynamic>) {
-          final name = item['name']?.toString() ?? '';
-          if (name.isNotEmpty) sessionCookies[name] = item;
-        }
-      }
+      final sessionCookieMaps = raw.whereType<Map<String, dynamic>>().toList();
+      final webViewCookieMaps = webViewCookies
+          .where((c) => c.value.isNotEmpty)
+          .map((c) => {
+                'name': c.name,
+                'value': c.value,
+                'domain': c.domain ?? '.furaffinity.net',
+                'path': c.path ?? '/',
+                'isHttpOnly': c.isHttpOnly,
+                'isSecure': c.isSecure,
+                'expiresDate': c.expiresDate ?? 0,
+              })
+          .toList();
 
-      for (final c in webViewCookies) {
-        final value = c.value;
-        if (value.isEmpty) continue;
-        final expiresDate = c.expiresDate ?? 0;
-        sessionCookies[c.name] = {
-          'name': c.name,
-          'value': value,
-          'domain': c.domain ?? '.furaffinity.net',
-          'path': c.path ?? '/',
-          'isHttpOnly': c.isHttpOnly,
-          'isSecure': c.isSecure,
-          'expiresDate': expiresDate,
-        };
-      }
+      final mergedCookies = mergeCookiesForSession(
+        sessionCookieMaps,
+        webViewCookieMaps,
+      );
 
       _session = UserSession(
         username: _session!.username,
         avatarUrl: _session!.avatarUrl,
         isLoggedIn: _session!.isLoggedIn,
-        cookies: jsonEncode(sessionCookies.values.toList()),
+        cookies: jsonEncode(mergedCookies),
       );
 
-      debugPrint('=== Session updated with ${webViewCookies.length} cookies');
+      debugPrint('=== Session updated with ${mergedCookies.length} cookies');
     } catch (e) {
       debugPrint('=== CF sync: error saving to session: $e');
     }
@@ -1026,16 +994,52 @@ class FAClient {
   Future<void> _saveWebViewCookiesToCookieJar(
       List<Cookie> webViewCookies) async {
     await _ensureInitialized();
+
+    final sessionCookieMaps = <Map<String, dynamic>>[];
+    if (_session?.cookies != null) {
+      try {
+        final raw = jsonDecode(_session!.cookies!);
+        sessionCookieMaps.addAll(
+          raw.whereType<Map<String, dynamic>>().toList(),
+        );
+      } catch (e) {
+        debugPrint('=== CF sync: error reading session cookies for jar: $e');
+      }
+    }
+
+    final webViewCookieMaps = webViewCookies
+        .where((c) => c.value.isNotEmpty)
+        .map((c) => {
+              'name': c.name,
+              'value': c.value,
+              'domain': c.domain ?? '.furaffinity.net',
+              'path': c.path ?? '/',
+              'isHttpOnly': c.isHttpOnly,
+              'isSecure': c.isSecure,
+              'expiresDate': c.expiresDate ?? 0,
+            })
+        .toList();
+
+    final mergedCookies = mergeCookiesForSession(
+      sessionCookieMaps,
+      webViewCookieMaps,
+    );
+
     final cookies = <io.Cookie>[];
-    for (final c in webViewCookies) {
-      final value = c.value;
-      if (value.isEmpty) continue;
-      final cookie = io.Cookie(c.name, value);
-      cookie.domain = c.domain ?? '.furaffinity.net';
-      cookie.path = c.path ?? '/';
-      cookie.secure = c.isSecure ?? false;
+    for (final entry in mergedCookies) {
+      final name = entry['name']?.toString();
+      final value = entry['value']?.toString();
+      if (name == null || name.isEmpty || value == null || value.isEmpty) {
+        continue;
+      }
+      final cookie = io.Cookie(name, value);
+      cookie.domain = entry['domain']?.toString() ?? '.furaffinity.net';
+      cookie.path = entry['path']?.toString() ?? '/';
+      cookie.secure = entry['isSecure'] as bool? ?? false;
+      cookie.httpOnly = entry['isHttpOnly'] as bool? ?? false;
       cookies.add(cookie);
     }
+
     if (cookies.isNotEmpty) {
       await _cookieJar.saveFromResponse(Uri.parse(FAUrls.baseUrl), cookies);
       debugPrint('=== CookieJar updated with ${cookies.length} cookies');
