@@ -123,4 +123,5 @@ export 'src/login/fa_login.dart';
 
 // Utilities
 export 'src/utils/css_inliner.dart';
+export 'src/utils/fa_date_parser.dart';
 export 'src/utils/fa_logger.dart';
