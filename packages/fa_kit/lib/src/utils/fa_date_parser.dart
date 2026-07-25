@@ -94,7 +94,8 @@ class FADateResult {
 /// "October 10, 2022 01:45:09 PM") while the element text contains the
 /// relative form (e.g. "3 years ago").
 FADateResult parseFADateNode(dom.Element? node) {
-  if (node == null) return const FADateResult(datetime: null, naturalDatetime: '');
+  if (node == null)
+    return const FADateResult(datetime: null, naturalDatetime: '');
   final datetime = parseFADatetime(node.attributes['title']);
   final naturalDatetime = node.text.trim();
   return FADateResult(datetime: datetime, naturalDatetime: naturalDatetime);

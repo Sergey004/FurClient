@@ -24,7 +24,8 @@ class FAWatchlist {
           nextPageUrl == other.nextPageUrl;
 
   @override
-  int get hashCode => Object.hash(currentUser, watchDirection, users, nextPageUrl);
+  int get hashCode =>
+      Object.hash(currentUser, watchDirection, users, nextPageUrl);
 
   /// Create from a parsed watchlist page.
   factory FAWatchlist.fromPage(FAWatchlistPage page) {

@@ -72,10 +72,13 @@ class FAUserJournalsPage {
         String naturalDatetime = '';
         final parent = link.parent;
         if (parent != null) {
-          final dateEl = parent.querySelector('span.popup_date, span.date, time');
+          final dateEl =
+              parent.querySelector('span.popup_date, span.date, time');
           if (dateEl != null) {
             naturalDatetime = dateEl.text.trim();
-            final ts = dateEl.attributes['title'] ?? dateEl.attributes['datetime'] ?? '';
+            final ts = dateEl.attributes['title'] ??
+                dateEl.attributes['datetime'] ??
+                '';
             if (ts.isNotEmpty) {
               datetime = DateTime.tryParse(ts) ?? DateTime.now();
             }

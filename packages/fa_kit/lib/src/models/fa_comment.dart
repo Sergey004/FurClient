@@ -225,8 +225,7 @@ List<FAComment> buildCommentsTree(List<FAPageComment> flatComments) {
     // Record current cid at its indentation, then drop any entries at
     // deeper indentations (we've left that branch).
     lastCidAtIndentation[indentation] = comment.cid;
-    lastCidAtIndentation
-        .removeWhere((key, _) => key > indentation);
+    lastCidAtIndentation.removeWhere((key, _) => key > indentation);
   }
 
   // Attach children to parents (rebuild each parent with its answers).

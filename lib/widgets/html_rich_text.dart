@@ -92,9 +92,8 @@ class _HtmlRichTextState extends State<HtmlRichText> {
       spans.add(TextSpan(text: html, style: widget.defaultStyle));
     }
 
-    _root = spans.isEmpty
-        ? const TextSpan(text: '')
-        : TextSpan(children: spans);
+    _root =
+        spans.isEmpty ? const TextSpan(text: '') : TextSpan(children: spans);
   }
 
   /// Walk the children of [node], composing [parentStyle] into inline styles

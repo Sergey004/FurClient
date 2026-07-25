@@ -205,78 +205,87 @@ class _SettingsScreenState extends State<SettingsScreen>
         padding: const EdgeInsets.symmetric(vertical: 8)
             .copyWith(bottom: bottomInset),
         children: [
-        _sectionHeader('APPEARANCE'),
-        _card([_buildThemeTile()]),
-        const SizedBox(height: 24),
-        _sectionHeader('CONTENT'),
-        _card([
-          _adaptiveSwitchTile(
-            icon: Icons.shield_outlined,
-            iconColor: primary,
-            value: _sfwMode,
-            onChanged: _onSfwToggle,
-            title: 'SFW Mode',
-            subtitle: 'Blur NSFW content',
-          ),
-          Divider(height: 1, indent: 16, color: outline),
-          _adaptiveSwitchTile(
-            icon: Icons.download_outlined,
-            iconColor: secondary,
-            value: _autoDownloadOnFave,
-            onChanged: (v) {
-              setState(() => _autoDownloadOnFave = v);
-              _saveSetting('auto_download_on_fave', v);
-            },
-            title: 'Auto-download on Fave',
-            subtitle: 'Save image when favoriting',
-          ),
-          Divider(height: 1, indent: 16, color: outline),
-          Divider(height: 1, indent: 16, color: outline),
-          _adaptiveSwitchTile(
-            icon: Icons.close_fullscreen_outlined,
-            iconColor: tertiary,
-            value: _autoCloseOnFave,
-            onChanged: (v) {
-              setState(() => _autoCloseOnFave = v);
-              _saveSetting('auto_close_on_fave', v);
-            },
-            title: 'Auto-close on Fave',
-            subtitle: 'Close submission view after favoriting',
-          ),
-          Divider(height: 1, indent: 16, color: outline),
-          Divider(height: 1, indent: 56, color: outline),
-          _buildImageQualityTile(),
-        ]),
-        const SizedBox(height: 24),
-        _sectionHeader('DOWNLOADS'),
-        _card([_buildDownloadFolderTile()]),
-        const SizedBox(height: 24),
-        _sectionHeader('ACCOUNT'),
-        _card([
-          _actionTile(
-            icon: Icons.logout,
-            color: Theme.of(context).colorScheme.error,
-            title: 'Logout',
-            onTap: _confirmLogout,
-          ),
-        ]),
-        const SizedBox(height: 24),
-        _sectionHeader('ABOUT'),
-        _card([
-          _infoTile(
-            icon: Icons.pets,
-            iconColor: primary,
-            title: 'FurClient',
-            subtitle: 'A FurAffinity client',
-          ),
-          Divider(height: 1, indent: 56, color: outline),
-          _infoTile(
-            icon: Icons.info_outline,
-            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            title: 'Version',
-            trailing: _appVersion,
-          ),
-          if (Platform.isWindows) ...[
+          _sectionHeader('APPEARANCE'),
+          _card([_buildThemeTile()]),
+          const SizedBox(height: 24),
+          _sectionHeader('CONTENT'),
+          _card([
+            _adaptiveSwitchTile(
+              icon: Icons.shield_outlined,
+              iconColor: primary,
+              value: _sfwMode,
+              onChanged: _onSfwToggle,
+              title: 'SFW Mode',
+              subtitle: 'Blur NSFW content',
+            ),
+            Divider(height: 1, indent: 16, color: outline),
+            _adaptiveSwitchTile(
+              icon: Icons.download_outlined,
+              iconColor: secondary,
+              value: _autoDownloadOnFave,
+              onChanged: (v) {
+                setState(() => _autoDownloadOnFave = v);
+                _saveSetting('auto_download_on_fave', v);
+              },
+              title: 'Auto-download on Fave',
+              subtitle: 'Save image when favoriting',
+            ),
+            Divider(height: 1, indent: 16, color: outline),
+            Divider(height: 1, indent: 16, color: outline),
+            _adaptiveSwitchTile(
+              icon: Icons.close_fullscreen_outlined,
+              iconColor: tertiary,
+              value: _autoCloseOnFave,
+              onChanged: (v) {
+                setState(() => _autoCloseOnFave = v);
+                _saveSetting('auto_close_on_fave', v);
+              },
+              title: 'Auto-close on Fave',
+              subtitle: 'Close submission view after favoriting',
+            ),
+            Divider(height: 1, indent: 16, color: outline),
+            Divider(height: 1, indent: 56, color: outline),
+            _buildImageQualityTile(),
+          ]),
+          const SizedBox(height: 24),
+          _sectionHeader('DOWNLOADS'),
+          _card([_buildDownloadFolderTile()]),
+          const SizedBox(height: 24),
+          _sectionHeader('ACCOUNT'),
+          _card([
+            _actionTile(
+              icon: Icons.logout,
+              color: Theme.of(context).colorScheme.error,
+              title: 'Logout',
+              onTap: _confirmLogout,
+            ),
+          ]),
+          const SizedBox(height: 24),
+          _sectionHeader('ABOUT'),
+          _card([
+            _infoTile(
+              icon: Icons.pets,
+              iconColor: primary,
+              title: 'FurClient',
+              subtitle: 'A FurAffinity client',
+            ),
+            Divider(height: 1, indent: 56, color: outline),
+            _infoTile(
+              icon: Icons.info_outline,
+              iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+              title: 'Version',
+              trailing: _appVersion,
+            ),
+            if (Platform.isWindows) ...[
+              Divider(
+                  height: 1,
+                  indent: 56,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .outlineVariant
+                      .withValues(alpha: 0.12)),
+              _buildUpdateTile(),
+            ],
             Divider(
                 height: 1,
                 indent: 56,
@@ -284,24 +293,15 @@ class _SettingsScreenState extends State<SettingsScreen>
                     .colorScheme
                     .outlineVariant
                     .withValues(alpha: 0.12)),
-            _buildUpdateTile(),
-          ],
-          Divider(
-              height: 1,
-              indent: 56,
-              color: Theme.of(context)
-                  .colorScheme
-                  .outlineVariant
-                  .withValues(alpha: 0.12)),
-          _infoTile(
-            icon: Icons.code,
-            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            title: 'Built with Flutter',
-            trailing: 'Flutter',
-          ),
-        ]),
-        const SizedBox(height: 32),
-      ],
+            _infoTile(
+              icon: Icons.code,
+              iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+              title: 'Built with Flutter',
+              trailing: 'Flutter',
+            ),
+          ]),
+          const SizedBox(height: 32),
+        ],
       ),
     );
   }

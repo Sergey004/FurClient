@@ -23,7 +23,8 @@ class FAUserGalleryLikePage implements FAPage {
 
     // Display author from page
     String displayAuthor = '';
-    final authorEl = document.querySelector('h2, .section-title, .gallery-header');
+    final authorEl =
+        document.querySelector('h2, .section-title, .gallery-header');
     if (authorEl != null) {
       displayAuthor = authorEl.text.trim();
     }
@@ -85,16 +86,20 @@ class FAUserGalleryLikePage implements FAPage {
 
     // Parse folder groups
     final folderGroups = <FAFolderGroup>[];
-    final folderContainers = document.querySelectorAll('div.folder-group, .gallery-folder-group');
+    final folderContainers =
+        document.querySelectorAll('div.folder-group, .gallery-folder-group');
     for (final container in folderContainers) {
-      final groupTitle = container.querySelector('h3, .folder-title')?.text.trim();
+      final groupTitle =
+          container.querySelector('h3, .folder-title')?.text.trim();
       final folders = <FAFolder>[];
       final folderLinks = container.querySelectorAll('a[href*="/folder/"]');
       for (final folderLink in folderLinks) {
         final href = folderLink.attributes['href'] ?? '';
         folders.add(FAFolder(
           title: folderLink.text.trim(),
-          url: Uri.parse(href.startsWith('http') ? href : 'https://www.furaffinity.net$href'),
+          url: Uri.parse(href.startsWith('http')
+              ? href
+              : 'https://www.furaffinity.net$href'),
           isActive: folderLink.classes.contains('active'),
           id: href,
         ));

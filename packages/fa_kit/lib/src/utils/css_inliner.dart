@@ -33,8 +33,8 @@ class CSSInliner {
       final cssUrl = match.group(1) ?? '';
       final cssContent = await _fetchCSS(cssUrl);
       if (cssContent != null) {
-        result = result.replaceAll(match.group(0)!,
-            '<style type="text/css">$cssContent</style>');
+        result = result.replaceAll(
+            match.group(0)!, '<style type="text/css">$cssContent</style>');
       }
     }
 
@@ -42,8 +42,9 @@ class CSSInliner {
   }
 
   Future<String?> _fetchCSS(String cssUrl) async {
-    final fullUrl = Uri.parse(
-        cssUrl.startsWith('http') ? cssUrl : 'https://www.furaffinity.net$cssUrl');
+    final fullUrl = Uri.parse(cssUrl.startsWith('http')
+        ? cssUrl
+        : 'https://www.furaffinity.net$cssUrl');
 
     // Check cache
     final cached = _cache[fullUrl.toString()];

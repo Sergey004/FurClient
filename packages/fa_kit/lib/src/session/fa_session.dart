@@ -154,7 +154,8 @@ abstract class FASession {
   Future<FASubmission> submissionForPreview(FASubmissionPreview preview) =>
       submissionForUrl(preview.url);
 
-  Future<FAJournal> journalForNotification(FANotificationPreview notification) =>
+  Future<FAJournal> journalForNotification(
+          FANotificationPreview notification) =>
       journalForUrl(notification.url);
 
   Future<FANote> noteForPreview(FANotePreview preview) =>

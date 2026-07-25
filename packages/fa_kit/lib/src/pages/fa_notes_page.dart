@@ -34,7 +34,8 @@ class FANotesPage {
     final document = parser.parse(html);
     final headers = <FANoteHeader?>[];
 
-    final rows = document.querySelectorAll('table.notes-table tr, table tbody tr, .note-list-item');
+    final rows = document.querySelectorAll(
+        'table.notes-table tr, table tbody tr, .note-list-item');
     for (final row in rows) {
       try {
         final link = row.querySelector('a[href*="/msg/pms/"]');
@@ -68,7 +69,8 @@ class FANotesPage {
         String naturalDatetime = dateEl?.text.trim() ?? '';
         DateTime datetime = DateTime.now();
         if (dateEl != null) {
-          final ts = dateEl.attributes['title'] ?? dateEl.attributes['datetime'] ?? '';
+          final ts =
+              dateEl.attributes['title'] ?? dateEl.attributes['datetime'] ?? '';
           if (ts.isNotEmpty) {
             datetime = DateTime.tryParse(ts) ?? DateTime.now();
           }

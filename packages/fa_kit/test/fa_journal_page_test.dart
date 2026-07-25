@@ -2,16 +2,14 @@ import 'dart:io';
 import 'package:fa_kit/fa_kit.dart';
 import 'package:test/test.dart';
 
-String fixture(String name) =>
-    File('test/fixtures/$name').readAsStringSync();
+String fixture(String name) => File('test/fixtures/$name').readAsStringSync();
 
 void main() {
   group('FAJournalPage', () {
     test('parses journal with comments', () {
-      final html = fixture(
-          'www.furaffinity.net-journal-10516170-withcomments.html');
-      final url =
-          Uri.parse('https://www.furaffinity.net/journal/10516170/');
+      final html =
+          fixture('www.furaffinity.net-journal-10516170-withcomments.html');
+      final url = Uri.parse('https://www.furaffinity.net/journal/10516170/');
       final page = FAJournalPage.parse(html, url);
 
       expect(page.author, 'rudragon');
@@ -44,8 +42,7 @@ void main() {
     test('parses journal with disabled comments', () {
       final html = fixture(
           'www.furaffinity.net-journal-10882268-disabled-comments.html');
-      final url =
-          Uri.parse('https://www.furaffinity.net/journal/10882268/');
+      final url = Uri.parse('https://www.furaffinity.net/journal/10882268/');
       final page = FAJournalPage.parse(html, url);
 
       expect(page.acceptsNewComments, false);

@@ -70,8 +70,8 @@ class FAUserGalleryLike {
       displayAuthor: displayAuthor,
       previews: [...previews, ...other.previews],
       nextPageUrl: other.nextPageUrl,
-      folderGroups: other.folderGroups.isNotEmpty ? other.folderGroups : folderGroups,
+      folderGroups:
+          other.folderGroups.isNotEmpty ? other.folderGroups : folderGroups,
     );
   }
 }
-

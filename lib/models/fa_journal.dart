@@ -25,8 +25,7 @@ class FAJournal {
   // ── Backward compat ──
   String get idString => id.toString();
 
-  factory FAJournal.fromFAJournalPage(
-      fa.FAJournalPage page, int journalId) {
+  factory FAJournal.fromFAJournalPage(fa.FAJournalPage page, int journalId) {
     return FAJournal(
       id: journalId,
       title: page.title,

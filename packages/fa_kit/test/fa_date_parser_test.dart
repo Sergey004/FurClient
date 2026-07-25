@@ -19,12 +19,18 @@ void main() {
     });
 
     test('AM/PM boundary cases', () {
-      expect(parseFADatetime('Aug 12, 2022 12:00 AM'), DateTime(2022, 8, 12, 0, 0));
-      expect(parseFADatetime('Aug 12, 2022 12:00 PM'), DateTime(2022, 8, 12, 12, 0));
-      expect(parseFADatetime('Aug 12, 2022 01:05 AM'), DateTime(2022, 8, 12, 1, 5));
-      expect(parseFADatetime('Aug 12, 2022 01:05 PM'), DateTime(2022, 8, 12, 13, 5));
-      expect(parseFADatetime('Aug 12, 2022 11:59 PM'), DateTime(2022, 8, 12, 23, 59));
-      expect(parseFADatetime('Aug 12, 2022 12:05 PM'), DateTime(2022, 8, 12, 12, 5));
+      expect(parseFADatetime('Aug 12, 2022 12:00 AM'),
+          DateTime(2022, 8, 12, 0, 0));
+      expect(parseFADatetime('Aug 12, 2022 12:00 PM'),
+          DateTime(2022, 8, 12, 12, 0));
+      expect(parseFADatetime('Aug 12, 2022 01:05 AM'),
+          DateTime(2022, 8, 12, 1, 5));
+      expect(parseFADatetime('Aug 12, 2022 01:05 PM'),
+          DateTime(2022, 8, 12, 13, 5));
+      expect(parseFADatetime('Aug 12, 2022 11:59 PM'),
+          DateTime(2022, 8, 12, 23, 59));
+      expect(parseFADatetime('Aug 12, 2022 12:05 PM'),
+          DateTime(2022, 8, 12, 12, 5));
     });
 
     test('returns null on empty/null/invalid input', () {

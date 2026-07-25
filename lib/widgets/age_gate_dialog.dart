@@ -63,9 +63,7 @@ Future<bool> _showFluent(BuildContext context) async {
                 child: const Text('Cancel'),
               ),
               fluent.FilledButton(
-                onPressed: confirmed
-                    ? () => Navigator.of(ctx).pop(true)
-                    : null,
+                onPressed: confirmed ? () => Navigator.of(ctx).pop(true) : null,
                 child: const Text('Continue'),
               ),
             ],
@@ -126,9 +124,7 @@ Future<bool> _showMaterial(BuildContext context) async {
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
-                onPressed: confirmed
-                    ? () => Navigator.of(ctx).pop(true)
-                    : null,
+                onPressed: confirmed ? () => Navigator.of(ctx).pop(true) : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.materialLavenderDark,
                   foregroundColor: Colors.white,

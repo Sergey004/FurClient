@@ -128,8 +128,8 @@ class FASubmissionPage implements FAPage {
     // div.submission-area img#submissionImg → data-preview-src / data-fullview-src
     final submissionContentNode =
         submissionMainContentNode?.querySelector('div div.submission-content');
-    final imgEl =
-        submissionContentNode?.querySelector('div.submission-area img#submissionImg');
+    final imgEl = submissionContentNode
+        ?.querySelector('div.submission-area img#submissionImg');
     final previewSrc = imgEl?.attributes['data-preview-src'] ?? '';
     final fullViewSrc = imgEl?.attributes['data-fullview-src'] ?? '';
     Uri previewImageUrl = Uri.parse(FAURLs.baseUrl);
@@ -140,9 +140,8 @@ class FASubmissionPage implements FAPage {
           previewSrc.startsWith('//') ? 'https:$previewSrc' : previewSrc);
     }
     if (fullViewSrc.isNotEmpty) {
-      final full = fullViewSrc.startsWith('//')
-          ? 'https:$fullViewSrc'
-          : fullViewSrc;
+      final full =
+          fullViewSrc.startsWith('//') ? 'https:$fullViewSrc' : fullViewSrc;
       fullResUrl = Uri.parse(full);
     }
 
@@ -158,9 +157,8 @@ class FASubmissionPage implements FAPage {
         if (text == '+Fav' || text == '-Fav') {
           final href = btn.attributes['href'] ?? '';
           if (href.isNotEmpty) {
-            favoriteUrl = Uri.parse(href.startsWith('http')
-                ? href
-                : '${FAURLs.baseUrl}$href');
+            favoriteUrl = Uri.parse(
+                href.startsWith('http') ? href : '${FAURLs.baseUrl}$href');
             isFavorite = text == '-Fav';
           }
           break;
@@ -177,7 +175,7 @@ class FASubmissionPage implements FAPage {
     // ── Comments ────────────────────────────────────────────────────
     // div.comments-list div#comments-submission div.comment_container
     final commentNodes = submissionPageContentNode?.querySelectorAll(
-        'div.comments-list div#comments-submission div.comment_container') ??
+            'div.comments-list div#comments-submission div.comment_container') ??
         [];
     final comments = commentNodes
         .map((node) => parsePageComment(node, CommentType.comment))
@@ -185,9 +183,8 @@ class FASubmissionPage implements FAPage {
 
     // ── Target comment from URL ─────────────────────────────────────
     int? targetCommentId;
-    final targetMatch =
-        RegExp(r'www\.furaffinity\.net\/view\/\d+\/#cid:(\d+)$')
-            .firstMatch(url.toString());
+    final targetMatch = RegExp(r'www\.furaffinity\.net\/view\/\d+\/#cid:(\d+)$')
+        .firstMatch(url.toString());
     if (targetMatch != null) {
       targetCommentId = int.tryParse(targetMatch.group(1) ?? '');
     }
@@ -223,8 +220,8 @@ class FASubmissionPage implements FAPage {
   static FASubmissionPageMetadata _parseMetadata(
       dom.Element? submissionMainContentNode, dom.Document root) {
     // ── Title ───────────────────────────────────────────────────────
-    final titleEl = submissionMainContentNode
-        ?.querySelector('div div.submission-title h2');
+    final titleEl =
+        submissionMainContentNode?.querySelector('div div.submission-title h2');
     final title = titleEl?.text.trim() ?? '';
 
     // ── Author ──────────────────────────────────────────────────────
@@ -241,14 +238,13 @@ class FASubmissionPage implements FAPage {
       final match = RegExp(r'/user/(.+)/').firstMatch(href);
       author = match?.group(1) ?? '';
       // displayAuthor from span.c-usernameBlockSimple__displayName
-      final displaySpan = artistNode.querySelector(
-          'span.c-usernameBlockSimple__displayName');
+      final displaySpan =
+          artistNode.querySelector('span.c-usernameBlockSimple__displayName');
       displayAuthor = (displaySpan?.text.trim() ?? artistNode.text.trim());
     }
 
     // ── Date ───────────────────────────────────────────────────────
-    final dateNode =
-        descHeaderNode?.querySelector('div div span.popup_date');
+    final dateNode = descHeaderNode?.querySelector('div div span.popup_date');
     final dateResult = parseFADateNode(dateNode);
 
     // ── Stats (Views/Comments/Favorites) ───────────────────────────
@@ -262,19 +258,17 @@ class FASubmissionPage implements FAPage {
               statsNode.querySelector('div[title="Views"] div')?.text.trim() ??
                   '') ??
           0;
-      commentCount = int.tryParse(
-              statsNode
+      commentCount = int.tryParse(statsNode
                   .querySelector('div[title="Comments"] div')
                   ?.text
                   .trim() ??
-                  '') ??
+              '') ??
           0;
-      favoriteCount = int.tryParse(
-              statsNode
+      favoriteCount = int.tryParse(statsNode
                   .querySelector('div[title="Favorites"] div')
                   ?.text
                   .trim() ??
-                  '') ??
+              '') ??
           0;
     }
 
@@ -316,9 +310,8 @@ class FASubmissionPage implements FAPage {
     final folders = <FAFolder>[];
     for (final node in folderNodes) {
       final href = node.attributes['href'] ?? '';
-      final folderUrl = Uri.parse(href.startsWith('http')
-          ? href
-          : '${FAURLs.baseUrl}$href');
+      final folderUrl =
+          Uri.parse(href.startsWith('http') ? href : '${FAURLs.baseUrl}$href');
       folders.add(FAFolder(
         title: node.text.trim(),
         url: folderUrl,
@@ -357,8 +350,10 @@ class FASubmissionPage implements FAPage {
     if (statsNode == null) return {};
     final spans = statsNode.querySelectorAll('> span');
     if (spans.length < 2) return {};
-    final categories = spans[0].querySelectorAll('> span').map((e) => e.text.trim()).toList();
-    final values = spans[1].querySelectorAll('> span').map((e) => e.text.trim()).toList();
+    final categories =
+        spans[0].querySelectorAll('> span').map((e) => e.text.trim()).toList();
+    final values =
+        spans[1].querySelectorAll('> span').map((e) => e.text.trim()).toList();
     if (categories.isEmpty || categories.length != values.length) return {};
     return Map.fromIterables(categories, values);
   }

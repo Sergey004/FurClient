@@ -15,7 +15,6 @@ import '../session/online_fa_session.dart';
 /// For Flutter apps, use [FALoginWebView] widget (requires `webview_flutter`).
 /// This class provides the core logic without UI dependencies.
 class FALoginManager {
-
   /// The login URL where users enter their credentials.
   Uri get loginUrl => Uri.parse(FAURLs.homeUrl);
 

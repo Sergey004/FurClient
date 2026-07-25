@@ -177,8 +177,7 @@ class Submission {
 
   static Submission? parseSubmissionDetails(
       String htmlString, String submissionId) {
-    final page = fa.FASubmissionPage.parse(
-        htmlString,
+    final page = fa.FASubmissionPage.parse(htmlString,
         Uri.parse('https://www.furaffinity.net/view/$submissionId/'));
     return Submission.fromFASubmissionPage(page, submissionId);
   }

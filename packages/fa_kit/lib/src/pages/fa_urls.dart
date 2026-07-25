@@ -21,8 +21,7 @@ class FAURLs {
   static String get submissionsNewUrl => '$submissionsUrl/new@72';
 
   /// Submissions starting from a specific submission ID.
-  static String submissionsFromUrl(int sid) =>
-      '$submissionsUrl/new~$sid@72';
+  static String submissionsFromUrl(int sid) => '$submissionsUrl/new~$sid@72';
 
   /// Notifications page.
   static String get notificationsUrl => '$_baseUrl/msg/others/';
@@ -34,15 +33,13 @@ class FAURLs {
   static String get notesSentUrl => '$_baseUrl/controls/switchbox/sent/';
 
   /// Notes archive.
-  static String get notesArchiveUrl =>
-      '$_baseUrl/controls/switchbox/archive/';
+  static String get notesArchiveUrl => '$_baseUrl/controls/switchbox/archive/';
 
   /// Notes trash.
   static String get notesTrashUrl => '$_baseUrl/controls/switchbox/trash/';
 
   /// User page.
-  static String userUrl(String username) =>
-      '$_baseUrl/user/$username/';
+  static String userUrl(String username) => '$_baseUrl/user/$username/';
 
   /// User avatar URL (.gif). Returns null for empty username.
   static String? avatarUrl(String username) {
@@ -57,16 +54,14 @@ class FAURLs {
   }
 
   /// User gallery.
-  static String galleryUrl(String username) =>
-      '$_baseUrl/gallery/$username/';
+  static String galleryUrl(String username) => '$_baseUrl/gallery/$username/';
 
   /// User favorites / scraps.
   static String favoritesUrl(String username) =>
       '$_baseUrl/favorites/$username/';
 
   /// User journals list.
-  static String journalsUrl(String username) =>
-      '$_baseUrl/journals/$username/';
+  static String journalsUrl(String username) => '$_baseUrl/journals/$username/';
 
   /// Submission detail page.
   static String submissionUrl(int sid) => '$_baseUrl/view/$sid/';

@@ -105,8 +105,8 @@ FASubmissionsPageItem? _parseFigure(dom.Element figure) {
     if (thumbImg == null) return null;
     final thumbSrc = thumbImg.attributes['src'] ?? '';
     if (thumbSrc.isEmpty) return null;
-    final thumbnailUrl = Uri.parse(
-        thumbSrc.startsWith('//') ? 'https:$thumbSrc' : thumbSrc);
+    final thumbnailUrl =
+        Uri.parse(thumbSrc.startsWith('//') ? 'https:$thumbSrc' : thumbSrc);
 
     // Width / height ratio
     final thumbWidthStr = thumbImg.attributes['data-width'] ?? '1';

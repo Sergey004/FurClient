@@ -29,8 +29,7 @@ class FANotificationHeader {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FANotificationHeader && id == other.id;
+      identical(this, other) || other is FANotificationHeader && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
@@ -79,16 +78,13 @@ class FANotificationsPage {
 
     return FANotificationsPage(
       submissionCommentHeaders: submissionCommentNodes
-          .map((li) => _parseCommentNotification(
-              li,
+          .map((li) => _parseCommentNotification(li,
               urlNodeSelector: 'strong i a',
               idPattern: r'/view/\d+/#cid:(\d+)'))
           .toList(),
       journalCommentHeaders: journalCommentNodes
-          .map((li) => _parseCommentNotification(
-              li,
-              urlNodeSelector: 'b i a',
-              idPattern: r'/journal/\d+/#cid:(\d+)'))
+          .map((li) => _parseCommentNotification(li,
+              urlNodeSelector: 'b i a', idPattern: r'/journal/\d+/#cid:(\d+)'))
           .toList(),
       shoutHeaders: shoutNodes
           .map((li) => _parseShoutNotification(li, document))
@@ -113,19 +109,20 @@ class FANotificationsPage {
     final authorHref = authorNode?.attributes['href'] ?? '';
     final authorMatch = RegExp(r'/user/(.+)/').firstMatch(authorHref);
     final author = authorMatch?.group(1) ?? '';
-    final displayAuthor =
-        authorNode?.querySelector('span.c-usernameBlockSimple__displayName')?.text.trim() ??
-            authorNode?.text.trim() ??
-            '';
+    final displayAuthor = authorNode
+            ?.querySelector('span.c-usernameBlockSimple__displayName')
+            ?.text
+            .trim() ??
+        authorNode?.text.trim() ??
+        '';
 
     final commentTargetNode = li.querySelector(urlNodeSelector);
     final title = commentTargetNode?.text.trim() ?? '';
     final urlStr = commentTargetNode?.attributes['href'] ?? '';
     final idMatch = RegExp(idPattern).firstMatch(urlStr);
     final id = int.tryParse(idMatch?.group(1) ?? '') ?? 0;
-    final url = Uri.parse(urlStr.startsWith('http')
-        ? urlStr
-        : '${FAURLs.baseUrl}$urlStr');
+    final url = Uri.parse(
+        urlStr.startsWith('http') ? urlStr : '${FAURLs.baseUrl}$urlStr');
 
     return FANotificationHeader(
       id: id,
@@ -186,9 +183,8 @@ class FANotificationsPage {
     final baseNode = tableNode.querySelector('div.user-submitted-links');
     final linkNode = baseNode?.querySelector('a');
     final urlStr = linkNode?.attributes['href'] ?? '';
-    final url = Uri.parse(urlStr.startsWith('http')
-        ? urlStr
-        : '${FAURLs.baseUrl}$urlStr');
+    final url = Uri.parse(
+        urlStr.startsWith('http') ? urlStr : '${FAURLs.baseUrl}$urlStr');
 
     final idMatch = RegExp(r'/journal/(\d+)/').firstMatch(urlStr);
     final id = int.tryParse(idMatch?.group(1) ?? '') ?? 0;
@@ -200,10 +196,12 @@ class FANotificationsPage {
     final authorHref = authorNode?.attributes['href'] ?? '';
     final authorMatch = RegExp(r'/user/(.+)/').firstMatch(authorHref);
     final author = authorMatch?.group(1) ?? '';
-    final displayAuthor =
-        authorNode?.querySelector('span.c-usernameBlockSimple__displayName')?.text.trim() ??
-            authorNode?.text.trim() ??
-            '';
+    final displayAuthor = authorNode
+            ?.querySelector('span.c-usernameBlockSimple__displayName')
+            ?.text
+            .trim() ??
+        authorNode?.text.trim() ??
+        '';
 
     final datetimeNode = tableNode.querySelector('span span.popup_date');
     final dateResult = parseFADateNode(datetimeNode);

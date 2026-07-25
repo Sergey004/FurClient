@@ -2,8 +2,7 @@ import 'dart:io';
 import 'package:fa_kit/fa_kit.dart';
 import 'package:test/test.dart';
 
-String fixture(String name) =>
-    File('test/fixtures/$name').readAsStringSync();
+String fixture(String name) => File('test/fixtures/$name').readAsStringSync();
 
 void main() {
   group('FANotificationsPage', () {

@@ -2,8 +2,7 @@ import 'dart:io';
 import 'package:fa_kit/fa_kit.dart';
 import 'package:test/test.dart';
 
-String fixture(String name) =>
-    File('test/fixtures/$name').readAsStringSync();
+String fixture(String name) => File('test/fixtures/$name').readAsStringSync();
 
 void main() {
   group('FASubmissionPage', () {
@@ -53,10 +52,9 @@ void main() {
     });
 
     test('parses submission with comments', () {
-      final html =
-          fixture('www.furaffinity.net-view-48519387-comments.html');
-      final url = Uri.parse(
-          'https://www.furaffinity.net/view/48519387/#cid:166652794');
+      final html = fixture('www.furaffinity.net-view-48519387-comments.html');
+      final url =
+          Uri.parse('https://www.furaffinity.net/view/48519387/#cid:166652794');
       final page = FASubmissionPage.parse(html, url);
 
       expect(page.comments.length, 10);
@@ -96,10 +94,9 @@ void main() {
     });
 
     test('parses submission with hidden comment', () {
-      final html = fixture(
-          'www.furaffinity.net-view-49917619-comment-hidden.html');
-      final url =
-          Uri.parse('https://www.furaffinity.net/view/49917619/');
+      final html =
+          fixture('www.furaffinity.net-view-49917619-comment-hidden.html');
+      final url = Uri.parse('https://www.furaffinity.net/view/49917619/');
       final page = FASubmissionPage.parse(html, url);
 
       expect(page.comments.length, 12);
@@ -119,10 +116,9 @@ void main() {
     });
 
     test('parses submission with disabled comments', () {
-      final html = fixture(
-          'www.furaffinity.net-view-52209828-disabled-comments.html');
-      final url =
-          Uri.parse('https://www.furaffinity.net/view/52209828/');
+      final html =
+          fixture('www.furaffinity.net-view-52209828-disabled-comments.html');
+      final url = Uri.parse('https://www.furaffinity.net/view/52209828/');
       final page = FASubmissionPage.parse(html, url);
 
       expect(page.acceptsNewComments, false);
@@ -131,10 +127,8 @@ void main() {
 
   group('buildCommentsTree from submission fixture', () {
     test('complex hierarchy builds correctly', () {
-      final html =
-          fixture('www.furaffinity.net-view-48519387-comments.html');
-      final url =
-          Uri.parse('https://www.furaffinity.net/view/48519387/');
+      final html = fixture('www.furaffinity.net-view-48519387-comments.html');
+      final url = Uri.parse('https://www.furaffinity.net/view/48519387/');
       final page = FASubmissionPage.parse(html, url);
 
       final tree = buildCommentsTree(page.comments);

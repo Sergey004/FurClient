@@ -72,8 +72,8 @@ FAPageComment parsePageComment(dom.Element node, CommentType type) {
   // htmlMessage: primary selector with fallback (as in FAPageComment.swift)
   final primaryMsg = node.querySelector(
       'comment-container div.comment-content comment-user-text div.user-submitted-links');
-  final fallbackMsg = node.querySelector(
-      'comment-container div.comment-content comment-user-text');
+  final fallbackMsg = node
+      .querySelector('comment-container div.comment-content comment-user-text');
   final htmlMessage = (primaryMsg ?? fallbackMsg)?.innerHtml.trim() ?? '';
 
   // Author / displayAuthor / datetime

@@ -478,8 +478,7 @@ class FAClient {
       debugPrint('=== HTML: no "comment" string found, length=${html.length}');
     }
     final submission = Submission.parseSubmissionDetails(html, id);
-    final comments =
-        _buildCommentTree(FAComment.parseComments(html));
+    final comments = _buildCommentTree(FAComment.parseComments(html));
     debugPrint(
         '=== getSubmissionWithComments: ${comments.length} comments parsed');
     // Dump first comment for debug
@@ -1110,9 +1109,8 @@ class FAClient {
                   cid: int.tryParse(c.id) ?? 0,
                   indentation: c.indentLevel,
                   author: c.author,
-                  displayAuthor: c.displayName.isNotEmpty
-                      ? c.displayName
-                      : c.author,
+                  displayAuthor:
+                      c.displayName.isNotEmpty ? c.displayName : c.author,
                   datetime: c.datetime,
                   naturalDatetime: c.naturalDatetime,
                   htmlMessage: c.htmlText))

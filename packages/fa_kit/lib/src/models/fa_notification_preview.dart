@@ -35,7 +35,8 @@ class FANotificationPreview {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is FANotificationPreview && id == other.id;
+      identical(this, other) ||
+      other is FANotificationPreview && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
@@ -64,12 +65,9 @@ class FANotificationPreviews {
       journalComments: page.journalCommentHeaders
           .map(FANotificationPreview.fromHeader)
           .toList(),
-      shouts: page.shoutHeaders
-          .map(FANotificationPreview.fromHeader)
-          .toList(),
-      journals: page.journalHeaders
-          .map(FANotificationPreview.fromHeader)
-          .toList(),
+      shouts: page.shoutHeaders.map(FANotificationPreview.fromHeader).toList(),
+      journals:
+          page.journalHeaders.map(FANotificationPreview.fromHeader).toList(),
     );
   }
 }

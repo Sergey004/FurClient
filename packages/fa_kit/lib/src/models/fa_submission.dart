@@ -42,7 +42,8 @@ class FASubmissionPreview implements Comparable<FASubmissionPreview> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is FASubmissionPreview && sid == other.sid;
+      identical(this, other) ||
+      other is FASubmissionPreview && sid == other.sid;
 
   @override
   int get hashCode => sid.hashCode;
@@ -102,7 +103,8 @@ class FASubmission {
   int get favoriteCount => metadata.favoriteCount;
 
   /// Create a copy with toggled favorite status.
-  FASubmission withToggledFavorite({required bool isFavorite, Uri? favoriteUrl}) {
+  FASubmission withToggledFavorite(
+      {required bool isFavorite, Uri? favoriteUrl}) {
     return FASubmission(
       url: url,
       previewImageUrl: previewImageUrl,

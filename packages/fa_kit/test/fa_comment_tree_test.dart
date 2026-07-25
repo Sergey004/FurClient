@@ -1,5 +1,6 @@
 import 'package:fa_kit/fa_kit.dart';
-import 'package:fa_kit/src/models/fa_comment.dart' show OrphanedCommentException;
+import 'package:fa_kit/src/models/fa_comment.dart'
+    show OrphanedCommentException;
 import 'package:test/test.dart';
 
 FAVisiblePageComment _visible(int cid, int indentation) {
@@ -29,8 +30,8 @@ void main() {
       final tree = buildCommentsTree(pages);
 
       expect(tree.length, 3);
-      expect(tree.map((c) => c.cid).toList(),
-          [166652793, 166653891, 166658565]);
+      expect(
+          tree.map((c) => c.cid).toList(), [166652793, 166653891, 166658565]);
       for (final root in tree) {
         expect(root.answers, isEmpty);
       }
@@ -137,18 +138,15 @@ void main() {
       final tree = buildCommentsTree(pages);
 
       // Leaf: full chain from top-level ancestor
-      expect(
-          tree.recursivePathTo(166658565)?.map((c) => c.cid).toList(),
+      expect(tree.recursivePathTo(166658565)?.map((c) => c.cid).toList(),
           [166652793, 166653891, 166658565]);
 
       // Mid-level node
-      expect(
-          tree.recursivePathTo(166652794)?.map((c) => c.cid).toList(),
+      expect(tree.recursivePathTo(166652794)?.map((c) => c.cid).toList(),
           [166652793, 166652794]);
 
       // Top-level root: just itself
-      expect(
-          tree.recursivePathTo(166656182)?.map((c) => c.cid).toList(),
+      expect(tree.recursivePathTo(166656182)?.map((c) => c.cid).toList(),
           [166656182]);
 
       // Missing cid

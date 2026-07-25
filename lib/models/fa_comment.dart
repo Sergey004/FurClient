@@ -57,8 +57,7 @@ class FAComment {
           json['naturalDatetime'] as String? ?? (json['time'] as String? ?? ''),
       indentLevel: json['indentLevel'] as int? ?? 0,
       replies: (json['replies'] as List<dynamic>?)
-              ?.map(
-                  (r) => FAComment.fromJson(r as Map<String, dynamic>))
+              ?.map((r) => FAComment.fromJson(r as Map<String, dynamic>))
               .toList() ??
           [],
       isHidden: json['isHidden'] as bool? ?? false,
@@ -71,7 +70,8 @@ class FAComment {
   /// FAKit comment tree (after `buildCommentsTree`).
   ///
   /// [avatarUrl] — computed separately (FA uses `a.furaffinity.net/{user}.gif`).
-  factory FAComment.fromFAComment(fa.FAComment faKomment, {String avatarUrl = ''}) {
+  factory FAComment.fromFAComment(fa.FAComment faKomment,
+      {String avatarUrl = ''}) {
     if (faKomment is fa.FAVisibleComment) {
       return FAComment(
         id: faKomment.cid.toString(),
@@ -97,9 +97,8 @@ class FAComment {
         datetime: null,
         naturalDatetime: '',
         indentLevel: faKomment.indentation,
-        replies: faKomment.answers
-            .map((r) => FAComment.fromFAComment(r))
-            .toList(),
+        replies:
+            faKomment.answers.map((r) => FAComment.fromFAComment(r)).toList(),
         isHidden: true,
       );
     }

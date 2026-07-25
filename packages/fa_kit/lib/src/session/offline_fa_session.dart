@@ -39,8 +39,8 @@ class OfflineFASession extends FASession {
     FASubmissionPreview(
       sid: 12345678,
       url: Uri.parse('https://www.furaffinity.net/view/12345678/'),
-      thumbnailUrl: Uri.parse(
-          'https://t.furaffinity.net/12345678@600-12345678.jpg'),
+      thumbnailUrl:
+          Uri.parse('https://t.furaffinity.net/12345678@600-12345678.jpg'),
       thumbnailWidthOnHeightRatio: 1.33,
       title: 'Amazing Artwork',
       author: 'someartist',
@@ -49,8 +49,8 @@ class OfflineFASession extends FASession {
     FASubmissionPreview(
       sid: 12345677,
       url: Uri.parse('https://www.furaffinity.net/view/12345677/'),
-      thumbnailUrl: Uri.parse(
-          'https://t.furaffinity.net/12345677@600-12345677.jpg'),
+      thumbnailUrl:
+          Uri.parse('https://t.furaffinity.net/12345677@600-12345677.jpg'),
       thumbnailWidthOnHeightRatio: 0.75,
       title: 'Cool Sketch',
       author: 'anotherartist',
@@ -59,8 +59,8 @@ class OfflineFASession extends FASession {
     FASubmissionPreview(
       sid: 12345676,
       url: Uri.parse('https://www.furaffinity.net/view/12345676/'),
-      thumbnailUrl: Uri.parse(
-          'https://t.furaffinity.net/12345676@600-12345676.jpg'),
+      thumbnailUrl:
+          Uri.parse('https://t.furaffinity.net/12345676@600-12345676.jpg'),
       thumbnailWidthOnHeightRatio: 1.0,
       title: 'Photo Submission',
       author: 'photographer',
@@ -70,8 +70,8 @@ class OfflineFASession extends FASession {
 
   static final FASubmission _demoSubmission = FASubmission(
     url: _demoSubmissionUrl,
-    previewImageUrl: Uri.parse(
-        'https://t.furaffinity.net/12345678@600-12345678.jpg'),
+    previewImageUrl:
+        Uri.parse('https://t.furaffinity.net/12345678@600-12345678.jpg'),
     fullResolutionMediaUrl:
         Uri.parse('https://d.furaffinity.net/art/someartist/full-12345678.png'),
     widthOnHeightRatio: 1.33,
@@ -84,7 +84,7 @@ class OfflineFASession extends FASession {
     comments: [
       FAVisibleComment(
         indentation: 0,
-          cid: 1001,
+        cid: 1001,
         author: 'commenter1',
         displayAuthor: 'Commenter One',
         datetime: DateTime(2024, 1, 15, 10, 30),
@@ -93,7 +93,7 @@ class OfflineFASession extends FASession {
         answers: [
           FAVisibleComment(
             indentation: 0,
-          cid: 1002,
+            cid: 1002,
             author: 'someartist',
             displayAuthor: 'SomeArtist',
             datetime: DateTime(2024, 1, 15, 12, 0),
@@ -102,8 +102,8 @@ class OfflineFASession extends FASession {
           ),
         ],
       ),
-FAHiddenComment(
-          cid: 1003,
+      FAHiddenComment(
+        cid: 1003,
         indentation: 0,
         htmlMessage: '<p>[Hidden by admin]</p>',
       ),
@@ -138,12 +138,13 @@ FAHiddenComment(
     title: 'Demo Journal Title',
     datetime: DateTime(2024, 1, 10, 14, 0),
     naturalDatetime: 'Jan 10, 2024 02:00 PM',
-    htmlDescription: '<p>This is a <b>demo journal</b> entry with some content.</p>'
+    htmlDescription:
+        '<p>This is a <b>demo journal</b> entry with some content.</p>'
         '<p>It can have multiple paragraphs and <a href="https://example.com">links</a>.</p>',
     comments: [
-FAVisibleComment(
+      FAVisibleComment(
         indentation: 0,
-          cid: 2001,
+        cid: 2001,
         author: 'reader1',
         displayAuthor: 'Reader One',
         datetime: DateTime(2024, 1, 10, 16, 0),
@@ -158,14 +159,13 @@ FAVisibleComment(
   static final FAUser _demoUser = FAUser(
     name: 'someartist',
     displayName: 'SomeArtist',
-    bannerUrl: Uri.parse(
-        'https://a.furaffinity.net/someartist-banner.png'),
+    bannerUrl: Uri.parse('https://a.furaffinity.net/someartist-banner.png'),
     htmlDescription:
         '<p>Hi, I\'m a <b>demo artist</b>!</p><p>Check out my gallery.</p>',
     shouts: [
       FAVisibleComment(
         indentation: 0,
-          cid: 3001,
+        cid: 3001,
         author: 'visitor1',
         displayAuthor: 'Visitor One',
         datetime: DateTime(2024, 1, 5, 9, 0),
@@ -215,7 +215,8 @@ FAVisibleComment(
     ),
   ];
 
-  static final FANotificationPreviews _demoNotifications = FANotificationPreviews(
+  static final FANotificationPreviews _demoNotifications =
+      FANotificationPreviews(
     submissionComments: [
       FANotificationPreview(
         id: 9001,
@@ -284,7 +285,8 @@ FAVisibleComment(
   );
 
   static final FAWatchlist _demoWatchlist = FAWatchlist(
-    currentUser: FAWatchlistUserModel(name: 'someartist', displayName: 'SomeArtist'),
+    currentUser:
+        FAWatchlistUserModel(name: 'someartist', displayName: 'SomeArtist'),
     watchDirection: FAWatchDirection.watching,
     users: [
       FAWatchlistUserModel(name: 'user1', displayName: 'User One'),
@@ -297,8 +299,7 @@ FAVisibleComment(
   // ── FASession Implementation ──
 
   @override
-  Future<List<FASubmissionPreview>> submissionPreviews(
-      {int? fromSid}) async {
+  Future<List<FASubmissionPreview>> submissionPreviews({int? fromSid}) async {
     return List.from(_demoSubmissionPreviews);
   }
 
@@ -461,8 +462,7 @@ FAVisibleComment(
   }
 
   @override
-  Future<FANotificationPreviews>
-      nukeAllSubmissionCommentNotifications() async {
+  Future<FANotificationPreviews> nukeAllSubmissionCommentNotifications() async {
     return FANotificationPreviews(
       submissionComments: [],
       journalComments: [],
@@ -472,8 +472,7 @@ FAVisibleComment(
   }
 
   @override
-  Future<FANotificationPreviews>
-      nukeAllJournalCommentNotifications() async {
+  Future<FANotificationPreviews> nukeAllJournalCommentNotifications() async {
     return FANotificationPreviews(
       submissionComments: [],
       journalComments: [],
