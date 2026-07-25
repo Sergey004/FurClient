@@ -340,6 +340,11 @@ class FASubmissionPage implements FAPage {
     );
   }
 
+  /// Normalize whitespace in a string by collapsing runs of whitespace
+  /// (including newlines) into a single space, then trimming.
+  static String _normalizeWhitespace(String s) =>
+      s.replaceAll(RegExp(r'\s+'), ' ').trim();
+
   /// Parse the `submission-content-stats` table into a `{category: value}` map.
   ///
   /// Mirrors `submissionContentStats(in:)` in FASubmissionPage.swift:143-157.
@@ -348,7 +353,8 @@ class FASubmissionPage implements FAPage {
     final statsNode = submissionMainContentNode
         ?.querySelector('div div.submission-content-stats');
     if (statsNode == null) return {};
-    final spans = statsNode.children.where((e) => e.localName == 'span').toList();
+    final spans =
+        statsNode.children.where((e) => e.localName == 'span').toList();
     if (spans.length < 2) return {};
     final categories = spans[0]
         .children
