@@ -313,7 +313,7 @@ class FASubmissionPage implements FAPage {
       final folderUrl =
           Uri.parse(href.startsWith('http') ? href : '${FAURLs.baseUrl}$href');
       folders.add(FAFolder(
-        title: node.text.trim(),
+        title: _normalizeWhitespace(node.text),
         url: folderUrl,
         isActive: false,
         id: href,
@@ -348,12 +348,18 @@ class FASubmissionPage implements FAPage {
     final statsNode = submissionMainContentNode
         ?.querySelector('div div.submission-content-stats');
     if (statsNode == null) return {};
-    final spans = statsNode.querySelectorAll('> span');
+    final spans = statsNode.children.where((e) => e.localName == 'span').toList();
     if (spans.length < 2) return {};
-    final categories =
-        spans[0].querySelectorAll('> span').map((e) => e.text.trim()).toList();
-    final values =
-        spans[1].querySelectorAll('> span').map((e) => e.text.trim()).toList();
+    final categories = spans[0]
+        .children
+        .where((e) => e.localName == 'span')
+        .map((e) => e.text.trim())
+        .toList();
+    final values = spans[1]
+        .children
+        .where((e) => e.localName == 'span')
+        .map((e) => e.text.trim())
+        .toList();
     if (categories.isEmpty || categories.length != values.length) return {};
     return Map.fromIterables(categories, values);
   }

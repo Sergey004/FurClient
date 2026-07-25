@@ -1,5 +1,7 @@
 import 'package:fa_kit/fa_kit.dart' as fa;
 
+import 'fa_comment.dart';
+
 /// A journal entry with full content and comments.
 class FAJournal {
   final int id;

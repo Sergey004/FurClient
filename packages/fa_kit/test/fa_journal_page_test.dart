@@ -36,7 +36,7 @@ void main() {
       expect(c6.author, 'flamekillaxxx');
       expect(c6.displayAuthor, 'flamekillaXxX');
       expect(c6.indentation, 3);
-      expect(c6.htmlMessage, contains('Good luck'));
+      expect(c6.htmlMessage, contains('Best of luck'));
     });
 
     test('parses journal with disabled comments', () {

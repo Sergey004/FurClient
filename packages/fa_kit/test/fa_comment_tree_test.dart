@@ -1,6 +1,4 @@
 import 'package:fa_kit/fa_kit.dart';
-import 'package:fa_kit/src/models/fa_comment.dart'
-    show OrphanedCommentException;
 import 'package:test/test.dart';
 
 FAVisiblePageComment _visible(int cid, int indentation) {

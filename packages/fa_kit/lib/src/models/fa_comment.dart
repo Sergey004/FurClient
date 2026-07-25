@@ -229,15 +229,21 @@ List<FAComment> buildCommentsTree(List<FAPageComment> flatComments) {
   }
 
   // Attach children to parents (rebuild each parent with its answers).
-  for (final entry in children.entries) {
-    final parent = index[entry.key];
-    if (parent != null) {
-      final updatedChildren = entry.value;
-      if (parent is FAVisibleComment) {
-        index[entry.key] = parent.copyWith(answers: updatedChildren);
-      } else if (parent is FAHiddenComment) {
-        index[entry.key] = parent.copyWith(answers: updatedChildren);
-      }
+  // Process in descending key order so deep nodes get their answers
+  // assigned before their parents snapshot them.
+  final sortedKeys = children.keys.toList()..sort((a, b) => b.compareTo(a));
+  for (final key in sortedKeys) {
+    final parent = index[key];
+    if (parent == null) continue;
+    // Resolve each child to its up-to-date instance (with grandchildren).
+    final updatedChildren = <FAComment>[];
+    for (final child in children[key]!) {
+      updatedChildren.add(index[child.cid] ?? child);
+    }
+    if (parent is FAVisibleComment) {
+      index[key] = parent.copyWith(answers: updatedChildren);
+    } else if (parent is FAHiddenComment) {
+      index[key] = parent.copyWith(answers: updatedChildren);
     }
   }
 

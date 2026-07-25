@@ -63,20 +63,31 @@ final RegExp _faDateRegex = RegExp(
   caseSensitive: false,
 );
 
-/// Lookup table for month abbreviations.
+/// Lookup table for month names (both abbreviated and full).
 const Map<String, int> _monthLookup = {
   'jan': 1,
+  'january': 1,
   'feb': 2,
+  'february': 2,
   'mar': 3,
+  'march': 3,
   'apr': 4,
+  'april': 4,
   'may': 5,
   'jun': 6,
+  'june': 6,
   'jul': 7,
+  'july': 7,
   'aug': 8,
+  'august': 8,
   'sep': 9,
+  'september': 9,
   'oct': 10,
+  'october': 10,
   'nov': 11,
+  'november': 11,
   'dec': 12,
+  'december': 12,
 };
 
 /// Result of parsing a FA date node.
@@ -94,8 +105,9 @@ class FADateResult {
 /// "October 10, 2022 01:45:09 PM") while the element text contains the
 /// relative form (e.g. "3 years ago").
 FADateResult parseFADateNode(dom.Element? node) {
-  if (node == null)
+  if (node == null) {
     return const FADateResult(datetime: null, naturalDatetime: '');
+  }
   final datetime = parseFADatetime(node.attributes['title']);
   final naturalDatetime = node.text.trim();
   return FADateResult(datetime: datetime, naturalDatetime: naturalDatetime);

@@ -1,4 +1,3 @@
-import 'package:html/parser.dart' as html_parser;
 import 'package:fa_kit/fa_kit.dart' as fa;
 
 import '../services/fa_urls.dart';

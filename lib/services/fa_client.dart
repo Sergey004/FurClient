@@ -191,43 +191,6 @@ class FAClient {
     return merged.values.toList();
   }
 
-  /// Check if response is a genuine Cloudflare challenge page.
-  /// CF challenge pages are small (< 30KB). Normal FA pages are 100KB+.
-  /// Only throws if CF-specific markers are found in a small response body.
-  void _checkCloudflare(Response response) {
-    final cfMitigated = response.headers.value('cf-mitigated');
-    if (cfMitigated == 'challenge') {
-      throw CloudflareError();
-    }
-
-    final body = response.data?.toString() ?? '';
-    if (response.statusCode != 403 && response.statusCode != 503) return;
-
-    // CF challenge pages are typically small — a real FA page is 100KB+
-    if (body.length > 30000) {
-      debugPrint(
-          '=== HTTP ${response.statusCode} with ${body.length}B body — not a CF challenge (too large)');
-      return;
-    }
-
-    final lower = body.toLowerCase();
-    final hasCfMarkers = lower.contains('just a moment') ||
-        lower.contains('checking your browser') ||
-        lower.contains('cf-browser-verification') ||
-        lower.contains('challenges.cloudflare.com') ||
-        lower.contains('cf_chl_page') ||
-        (lower.contains('cf-turnstile') && lower.contains('challenge')) ||
-        (lower.contains('cloudflare') &&
-            lower.contains('verify you are human'));
-
-    if (hasCfMarkers) {
-      debugPrint(
-          '=== CF challenge detected (HTTP ${response.statusCode}, body ${body.length}B)');
-      throw CloudflareError();
-    }
-    debugPrint('=== HTTP ${response.statusCode} — not a CF challenge');
-  }
-
   Future<String> _getHtml(String url, {bool waitForAjax = false}) async {
     await _ensureInitialized();
 
@@ -466,28 +429,21 @@ class FAClient {
     final url = FAUrls.viewSubmission(id);
     // waitForAjax: comments load via JavaScript, need extra wait
     final html = await _getHtml(url, waitForAjax: true);
-    // Debug: dump comment section HTML to see real structure
-    final commentStart = html.indexOf('comment');
-    if (commentStart > 0) {
-      final start = commentStart > 200 ? commentStart - 200 : 0;
-      final end =
-          commentStart + 2000 < html.length ? commentStart + 2000 : html.length;
-      debugPrint('=== HTML comment section (pos $commentStart):');
-      debugPrint('=== ${html.substring(start, end)}');
-    } else {
-      debugPrint('=== HTML: no "comment" string found, length=${html.length}');
-    }
-    final submission = Submission.parseSubmissionDetails(html, id);
-    final comments = _buildCommentTree(FAComment.parseComments(html));
-    debugPrint(
-        '=== getSubmissionWithComments: ${comments.length} comments parsed');
-    // Dump first comment for debug
-    if (comments.isNotEmpty) {
-      final c = comments.first;
+    try {
+      final page = fa.FASubmissionPage.parse(
+          html, Uri.parse('https://www.furaffinity.net/view/$id/'));
+      final submission = Submission.fromFASubmissionPage(page, id);
+      final comments = fa
+          .buildCommentsTree(page.comments)
+          .map((c) => FAComment.fromFAComment(c))
+          .toList();
       debugPrint(
-          '=== First comment: id=${c.id}, author=${c.author}, text=${c.text.length}chars, time=${c.time}, indent=${c.indentLevel}');
+          '=== getSubmissionWithComments: ${comments.length} comments parsed');
+      return (submission: submission, comments: comments);
+    } catch (e) {
+      debugPrint('=== getSubmissionWithComments parse failed: $e');
+      return (submission: null, comments: <FAComment>[]);
     }
-    return (submission: submission, comments: comments);
   }
 
   Future<Submission?> getSubmission(String id) async {
@@ -1091,34 +1047,6 @@ class FAClient {
     } catch (e) {
       debugPrint('=== Error building cookie header: $e');
       return null;
-    }
-  }
-
-  /// Build the comment tree from flat comments using FAKit's
-  /// [buildCommentsTree], then convert each node to the app-level model.
-  static List<FAComment> _buildCommentTree(List<FAComment> flatComments) {
-    if (flatComments.isEmpty) return [];
-    try {
-      final tree = fa.buildCommentsTree(flatComments
-          .map((c) => c.isHidden
-              ? fa.FAHiddenPageComment(
-                  cid: int.tryParse(c.id) ?? 0,
-                  indentation: c.indentLevel,
-                  htmlMessage: c.htmlText)
-              : fa.FAVisiblePageComment(
-                  cid: int.tryParse(c.id) ?? 0,
-                  indentation: c.indentLevel,
-                  author: c.author,
-                  displayAuthor:
-                      c.displayName.isNotEmpty ? c.displayName : c.author,
-                  datetime: c.datetime,
-                  naturalDatetime: c.naturalDatetime,
-                  htmlMessage: c.htmlText))
-          .toList());
-      return tree.map((node) => FAComment.fromFAComment(node)).toList();
-    } catch (e) {
-      debugPrint('=== Failed to build comment tree: $e');
-      return flatComments;
     }
   }
 }

@@ -134,23 +134,32 @@ void main() {
       final tree = buildCommentsTree(page.comments);
       expect(tree.length, 5); // 5 roots (indentation 0)
 
-      // Root 166652793 has 3 children (indent 3) with one grandchild (indent 6)
+      // Root 166652793 has 1 child (cid 166653891, indent 3).
+      // That child has 1 grandchild (cid 166658565, indent 6).
+      // The grandchild has 1 great-grandchild (cid 166663244, indent 9).
       final rootC0 = tree.firstWhere((c) => c.cid == 166652793);
-      expect(rootC0.answers.length, 3);
+      expect(rootC0.answers.length, 1);
 
-      // First child (cid 166653891) has one answer (cid 166658565)
       final child0 = rootC0.answers[0];
       expect(child0.cid, 166653891);
       expect(child0.answers.length, 1);
       expect(child0.answers.first.cid, 166658565);
+      expect(child0.answers.first.answers.first.cid, 166663244);
 
-      // Third child (cid 166652794) has one answer (cid 166658865)
-      final child2 = rootC0.answers[2];
-      expect(child2.cid, 166652794);
-      expect(child2.answers.length, 1);
-      expect(child2.answers.first.cid, 166658577);
+      // Root 166652794 has 1 child (cid 166656182, indent 3) with
+      // one grandchild (cid 166658577, indent 6).
+      final rootC1 = tree.firstWhere((c) => c.cid == 166652794);
+      expect(rootC1.answers.length, 1);
+      expect(rootC1.answers.first.cid, 166656182);
+      expect(rootC1.answers.first.answers.first.cid, 166658577);
 
-      // Total recursive count
+      // Remaining roots are leaves.
+      for (final rootCid in [166653340, 166656573, 166657876]) {
+        final r = tree.firstWhere((c) => c.cid == rootCid);
+        expect(r.answers, isEmpty);
+      }
+
+      // Total recursive count.
       final total = tree.fold<int>(0, (sum, c) => sum + c.recursiveCount);
       expect(total, 10);
     });

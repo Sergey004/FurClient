@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:fa_kit/fa_kit.dart' as fa;
 
 class FAComment {
