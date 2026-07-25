@@ -97,7 +97,7 @@ class FASubmission {
   String get author => metadata.author;
   String get displayAuthor => metadata.displayAuthor;
   String get title => metadata.title;
-  DateTime get datetime => metadata.datetime;
+  DateTime? get datetime => metadata.datetime;
   String get naturalDatetime => metadata.naturalDatetime;
   int get favoriteCount => metadata.favoriteCount;
 

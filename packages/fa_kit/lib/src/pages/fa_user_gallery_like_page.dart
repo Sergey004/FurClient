@@ -1,6 +1,7 @@
 import 'package:html/parser.dart' as parser;
 import 'fa_page.dart';
 import 'fa_submissions_page.dart';
+import 'fa_submission_page.dart' show Rating;
 
 /// Parsed user gallery/scraps page.
 class FAUserGalleryLikePage implements FAPage {
@@ -75,6 +76,7 @@ class FAUserGalleryLikePage implements FAPage {
           title: title,
           author: author,
           displayAuthor: authorLink?.text.trim() ?? author,
+          rating: Rating.general,
         ));
       } catch (_) {
         previews.add(null);

@@ -101,7 +101,7 @@ export 'src/models/dynamic_thumbnail.dart';
 // Pages (low-level)
 export 'src/pages/fa_urls.dart';
 export 'src/pages/fa_page.dart';
-export 'src/pages/fa_pages_error.dart';
+export 'src/pages/fa_pages_error.dart' hide Rating;
 export 'src/pages/fa_home_page.dart';
 export 'src/pages/fa_submission_page.dart';
 export 'src/pages/fa_submissions_page.dart';

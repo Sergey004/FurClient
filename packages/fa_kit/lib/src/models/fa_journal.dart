@@ -7,7 +7,7 @@ class FAJournal {
   final String author;
   final String displayAuthor;
   final String title;
-  final DateTime datetime;
+  final DateTime? datetime;
   final String naturalDatetime;
   final String htmlDescription;
   final List<FAComment> comments;

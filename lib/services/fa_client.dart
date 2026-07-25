@@ -17,6 +17,8 @@ import 'fa_urls.dart';
 import 'fa_enhanced_client.dart';
 import '../main.dart' show webViewEnvironment;
 
+import 'package:fa_kit/fa_kit.dart' as fa;
+
 class CloudflareError implements Exception {
   final String message;
   CloudflareError()
@@ -476,7 +478,8 @@ class FAClient {
       debugPrint('=== HTML: no "comment" string found, length=${html.length}');
     }
     final submission = Submission.parseSubmissionDetails(html, id);
-    final comments = FAComment.parseComments(html);
+    final comments =
+        _buildCommentTree(FAComment.parseComments(html));
     debugPrint(
         '=== getSubmissionWithComments: ${comments.length} comments parsed');
     // Dump first comment for debug
@@ -1089,6 +1092,35 @@ class FAClient {
     } catch (e) {
       debugPrint('=== Error building cookie header: $e');
       return null;
+    }
+  }
+
+  /// Build the comment tree from flat comments using FAKit's
+  /// [buildCommentsTree], then convert each node to the app-level model.
+  static List<FAComment> _buildCommentTree(List<FAComment> flatComments) {
+    if (flatComments.isEmpty) return [];
+    try {
+      final tree = fa.buildCommentsTree(flatComments
+          .map((c) => c.isHidden
+              ? fa.FAHiddenPageComment(
+                  cid: int.tryParse(c.id) ?? 0,
+                  indentation: c.indentLevel,
+                  htmlMessage: c.htmlText)
+              : fa.FAVisiblePageComment(
+                  cid: int.tryParse(c.id) ?? 0,
+                  indentation: c.indentLevel,
+                  author: c.author,
+                  displayAuthor: c.displayName.isNotEmpty
+                      ? c.displayName
+                      : c.author,
+                  datetime: c.datetime,
+                  naturalDatetime: c.naturalDatetime,
+                  htmlMessage: c.htmlText))
+          .toList());
+      return tree.map((node) => FAComment.fromFAComment(node)).toList();
+    } catch (e) {
+      debugPrint('=== Failed to build comment tree: $e');
+      return flatComments;
     }
   }
 }

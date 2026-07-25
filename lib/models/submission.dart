@@ -1,4 +1,5 @@
 import 'package:html/parser.dart' as html_parser;
+import 'package:fa_kit/fa_kit.dart' as fa;
 
 import '../services/fa_urls.dart';
 
@@ -6,6 +7,7 @@ class Submission {
   final String id;
   final String title;
   final String author;
+  final String displayName;
   final String category;
   final String imageUrl;
   final int views;
@@ -14,8 +16,10 @@ class Submission {
   final String description;
   final List<String> tags;
   final String date;
+  final DateTime? sortDate;
+  final String naturalDate;
   final bool isNsfw;
-  final String rating; // 'general', 'mature', 'adult'
+  final String rating;
   final String url;
   final bool isFlash;
   final String flashUrl;
@@ -30,6 +34,7 @@ class Submission {
     required this.id,
     required this.title,
     required this.author,
+    this.displayName = '',
     required this.category,
     required this.imageUrl,
     required this.views,
@@ -38,6 +43,8 @@ class Submission {
     required this.description,
     required this.tags,
     required this.date,
+    this.sortDate,
+    this.naturalDate = '',
     required this.isNsfw,
     this.rating = 'general',
     required this.url,
@@ -51,6 +58,7 @@ class Submission {
         'id': id,
         'title': title,
         'author': author,
+        'displayName': displayName,
         'category': category,
         'imageUrl': imageUrl,
         'views': views,
@@ -59,6 +67,8 @@ class Submission {
         'description': description,
         'tags': tags,
         'date': date,
+        'sortDate': sortDate?.toIso8601String(),
+        'naturalDate': naturalDate,
         'isNsfw': isNsfw,
         'rating': rating,
         'url': url,
@@ -72,6 +82,7 @@ class Submission {
         id: json['id'] as String,
         title: json['title'] as String,
         author: json['author'] as String,
+        displayName: json['displayName'] as String? ?? '',
         category: json['category'] as String? ?? 'Digital',
         imageUrl: json['imageUrl'] as String? ?? '',
         views: json['views'] as int? ?? 0,
@@ -80,6 +91,10 @@ class Submission {
         description: json['description'] as String? ?? '',
         tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
         date: json['date'] as String? ?? '',
+        sortDate: json['sortDate'] != null
+            ? DateTime.tryParse(json['sortDate'] as String)
+            : null,
+        naturalDate: json['naturalDate'] as String? ?? '',
         isNsfw: json['isNsfw'] as bool? ?? false,
         rating: json['rating'] as String? ?? 'general',
         url: json['url'] as String? ?? '',
@@ -89,207 +104,90 @@ class Submission {
         favoriteUrl: json['favoriteUrl'] as String? ?? '',
       );
 
-  static List<Submission> parseSubmissionsPage(String htmlString) {
-    final document = html_parser.parse(htmlString);
-    final submissions = <Submission>[];
-
-    // iOS селектор из FASubmissionsPage.swift и FAUserGalleryLikePage.swift:
-    // figure[id^="sid-"] внутри section.gallery-section или messagecenter
-    final figures = document.querySelectorAll('figure[id^="sid-"]');
-
-    for (final fig in figures) {
-      final id = fig.id.replaceFirst('sid-', '');
-      if (id.isEmpty) continue;
-
-      // iOS: figure b u a img
-      final img = fig.querySelector('b u a img') ?? fig.querySelector('img');
-      var imageUrl = img?.attributes['src'] ?? '';
-      if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
-
-      // iOS: figcaption p a — первый = title, второй = author
-      final captionLinks = fig.querySelectorAll('figcaption p a');
-      final title = captionLinks.isNotEmpty
-          ? captionLinks[0].text.trim()
-          : fig.attributes['title'] ?? 'Untitled';
-
-      String author = 'Unknown';
-      if (captionLinks.length >= 2) {
-        final authorHref = captionLinks[1].attributes['href'] ?? '';
-        final authorMatch = RegExp(r'/user/([^/]+)/').firstMatch(authorHref);
-        author = authorMatch?.group(1) ?? captionLinks[1].text.trim();
-      }
-
-      final isAdult = fig.querySelector('[data-rating="adult"]') != null ||
-          fig.classes.contains('r-adult');
-      final isMature = fig.querySelector('[data-rating="mature"]') != null ||
-          fig.classes.contains('r-mature');
-      final isNsfw = isAdult || isMature;
-      final rating = isAdult
+  /// Build from the FAKit submission page (detail view).
+  factory Submission.fromFASubmissionPage(
+      fa.FASubmissionPage page, String submissionId) {
+    final m = page.metadata;
+    return Submission(
+      id: submissionId,
+      title: m.title,
+      author: m.author,
+      displayName: m.displayAuthor,
+      category: m.category.isNotEmpty ? m.category : 'Digital',
+      imageUrl: page.fullResolutionMediaUrl?.toString() ??
+          page.previewImageUrl.toString(),
+      views: m.viewCount,
+      faves: m.favoriteCount,
+      commentsCount: m.commentCount,
+      description: page.htmlDescription,
+      tags: m.keywords,
+      date: m.naturalDatetime,
+      sortDate: m.datetime,
+      naturalDate: m.naturalDatetime,
+      isNsfw: m.rating == fa.Rating.adult || m.rating == fa.Rating.mature,
+      rating: m.rating == fa.Rating.adult
           ? 'adult'
-          : isMature
+          : m.rating == fa.Rating.mature
               ? 'mature'
-              : 'general';
+              : 'general',
+      url: 'https://www.furaffinity.net/view/$submissionId/',
+      isFavorite: page.isFavorite,
+      favoriteUrl: page.favoriteUrl?.toString() ?? '',
+    );
+  }
 
-      submissions.add(Submission(
-        id: id,
-        title: title,
-        author: author,
-        category: 'Digital',
-        imageUrl: imageUrl,
-        views: 0,
-        faves: 0,
-        commentsCount: 0,
-        description: '',
-        tags: [],
-        date: DateTime.now().toIso8601String(),
-        isNsfw: isNsfw,
-        rating: rating,
-        url: 'https://www.furaffinity.net/view/$id/',
-        isFavorite: false,
-        favoriteUrl: '',
-      ));
-    }
+  /// Build from the FAKit submissions list item (browse/gallery/feed preview).
+  factory Submission.fromFASubmissionsPageItem(fa.FASubmissionsPageItem item) {
+    final ratingStr = item.rating == fa.Rating.adult
+        ? 'adult'
+        : item.rating == fa.Rating.mature
+            ? 'mature'
+            : 'general';
+    return Submission(
+      id: item.sid.toString(),
+      title: item.title,
+      author: item.author,
+      displayName: item.displayAuthor,
+      category: 'Digital',
+      imageUrl: item.thumbnailUrl.toString(),
+      views: 0,
+      faves: 0,
+      commentsCount: 0,
+      description: '',
+      tags: [],
+      date: '',
+      sortDate: null,
+      naturalDate: '',
+      isNsfw: item.rating != fa.Rating.general,
+      rating: ratingStr,
+      url: item.url.toString(),
+    );
+  }
 
-    return submissions;
+  // ── Legacy parsers (deprecated, kept only for backward compatibility) ──
+
+  static List<Submission> parseSubmissionsPage(String htmlString) {
+    final page = fa.FASubmissionsPage.parse(
+        htmlString, Uri.parse('https://www.furaffinity.net'));
+    return page.submissions
+        .whereNotNull()
+        .map((item) => Submission.fromFASubmissionsPageItem(item))
+        .toList();
   }
 
   static Submission? parseSubmissionDetails(
       String htmlString, String submissionId) {
-    final document = html_parser.parse(htmlString);
-
-    // iOS: div.submission-area img#submissionImg — data-preview-src / data-fullview-src
-    final imgEl =
-        document.querySelector('div.submission-area img#submissionImg');
-    var imageUrl = imgEl?.attributes['data-fullview-src'] ??
-        imgEl?.attributes['data-preview-src'] ??
-        imgEl?.attributes['src'] ??
-        '';
-    if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
-
-    // Parse Flash SWF: div.submission-area > object[data] or embed[src] with .swf
-    String flashUrl = '';
-    bool isFlash = false;
-    final submissionArea = document.querySelector('div.submission-area');
-    if (submissionArea != null) {
-      final objectEl = submissionArea.querySelector('object[data]');
-      final embedEl = submissionArea.querySelector('embed[src]');
-      final swfEl = objectEl ?? embedEl;
-      if (swfEl != null) {
-        final swfSrc =
-            swfEl.attributes['data'] ?? swfEl.attributes['src'] ?? '';
-        if (swfSrc.toLowerCase().endsWith('.swf')) {
-          isFlash = true;
-          flashUrl = swfSrc.startsWith('//') ? 'https:$swfSrc' : swfSrc;
-        }
-      }
-    }
-
-    // iOS: div.submission-title h2
-    final titleEl = document.querySelector('div.submission-title h2');
-    final title = titleEl?.text.trim() ?? 'Untitled';
-
-    // iOS: span.c-usernameBlockSimple a
-    final authorEl = document.querySelector('span.c-usernameBlockSimple a');
-    String author = 'Unknown';
-    if (authorEl != null) {
-      final href = authorEl.attributes['href'] ?? '';
-      final m = RegExp(r'/user/([^/]+)/').firstMatch(href);
-      author = m?.group(1) ?? authorEl.text.trim();
-    }
-
-    // iOS: div.submission-description-text
-    final descEl = document.querySelector('div.submission-description-text');
-    final description = descEl?.text.trim() ?? '';
-
-    // iOS: div[title="Views"] div, div[title="Favorites"] div, div[title="Comments"] div
-    int views = 0, faves = 0, comments = 0;
-    final viewsEl = document.querySelector('div[title="Views"] div');
-    final favesEl = document.querySelector('div[title="Favorites"] div');
-    final commentsEl = document.querySelector('div[title="Comments"] div');
-    views = int.tryParse(viewsEl?.text.trim() ?? '') ?? 0;
-    faves = int.tryParse(favesEl?.text.trim() ?? '') ?? 0;
-    comments = int.tryParse(commentsEl?.text.trim() ?? '') ?? 0;
-
-    // iOS: span.tags span[data-tag-name]
-    final tagEls =
-        document.querySelectorAll('div.submission-tags div span.tags');
-    final tags = tagEls
-        .map((e) {
-          final tagBlock = e.querySelector('[data-tag-name]');
-          return tagBlock?.attributes['data-tag-name'] ?? e.text.trim();
-        })
-        .where((t) => t.isNotEmpty)
-        .toList();
-
-    // iOS: div[class*="c-contentRating"]
-    final ratingEl = document.querySelector('[class*="c-contentRating"]');
-    final ratingText = ratingEl?.text.trim() ?? '';
-    final isNsfw = ratingText == 'Adult' || ratingText == 'Mature';
-    final rating = ratingText == 'Adult'
-        ? 'adult'
-        : ratingText == 'Mature'
-            ? 'mature'
-            : 'general';
-
-    // iOS: span.popup_date
-    final dateEl = document.querySelector('span.popup_date');
-    final date = dateEl?.attributes['title'] ?? dateEl?.text.trim() ?? '';
-
-    // Parse favorite button: look for /fav/ID/ or /unfav/ID/ link
-    bool isFavorite = false;
-    String favoriteUrl = '';
-    final favLinks =
-        document.querySelectorAll('a[href*="/unfav/"], a[href*="/fav/"]');
-    if (favLinks.isNotEmpty) {
-      // The first matching link is the active action
-      final favHref = favLinks.first.attributes['href'] ?? '';
-      if (favHref.contains('/unfav/')) {
-        isFavorite = true;
-        favoriteUrl = favHref;
-      } else if (favHref.contains('/fav/')) {
-        isFavorite = false;
-        favoriteUrl = favHref;
-      }
-    }
-    // Fallback: check for button elements too
-    if (favoriteUrl.isEmpty) {
-      final favBtns = document.querySelectorAll(
-          'button[data-action="fav"], button[data-action="unfav"]');
-      if (favBtns.isNotEmpty) {
-        final action = favBtns.first.attributes['data-action'] ?? '';
-        final sid = favBtns.first.attributes['data-id'] ?? submissionId;
-        if (action == 'unfav') {
-          isFavorite = true;
-          favoriteUrl = '/unfav/$sid/';
-        } else {
-          favoriteUrl = '/fav/$sid/';
-        }
-      }
-    }
-
-    return Submission(
-      id: submissionId,
-      title: title,
-      author: author,
-      category: 'Digital',
-      imageUrl: imageUrl,
-      views: views,
-      faves: faves,
-      commentsCount: comments,
-      description: description,
-      tags: tags,
-      date: date,
-      isNsfw: isNsfw,
-      rating: rating,
-      url: 'https://www.furaffinity.net/view/$submissionId/',
-      isFlash: isFlash,
-      flashUrl: flashUrl,
-      isFavorite: isFavorite,
-      favoriteUrl: favoriteUrl,
-    );
+    final page = fa.FASubmissionPage.parse(
+        htmlString,
+        Uri.parse('https://www.furaffinity.net/view/$submissionId/'));
+    return Submission.fromFASubmissionPage(page, submissionId);
   }
 
   static List<Submission> parseSearchResults(String htmlString) {
     return parseSubmissionsPage(htmlString);
   }
+}
+
+extension _NonNull<T> on Iterable<T?> {
+  Iterable<T> whereNotNull() => where((e) => e != null).cast<T>();
 }

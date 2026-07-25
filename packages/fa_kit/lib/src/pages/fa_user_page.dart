@@ -81,56 +81,19 @@ class FAUserPage implements FAPage {
     final htmlDescription = descEl?.innerHtml ?? '';
 
     // Shouts (guestbook comments)
+    // div#site-content div#page-userpage section.userpage-right-column
+    //   div.userpage-section-right div.comment_container
     final shouts = <FAPageComment>[];
     const shoutsQuery =
         'div#site-content div#page-userpage section.userpage-right-column div.userpage-section-right div.comment_container';
     final shoutElements = mainWindow?.querySelectorAll(shoutsQuery) ??
-        document.querySelectorAll('div.shout-container, div.comment, .shout');
+        document.querySelectorAll('div.comment_container');
 
     for (final shoutEl in shoutElements) {
       try {
-        final cidMatch = RegExp(r'cid=(\d+)').firstMatch(shoutEl.outerHtml);
-        final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
-        if (cid == 0) continue;
-
-        final indentEl =
-            shoutEl.querySelector('.comment-indentation, .comment-avatar');
-        int indentation = 0;
-        if (indentEl != null) {
-          final widthAttr = indentEl.attributes['width'] ?? '0';
-          indentation = (double.tryParse(widthAttr) ?? 0).toInt() ~/ 16;
-        }
-
-        final authorLink =
-            shoutEl.querySelector('a.comment-username, a[href*="/user/"]');
-        final author = authorLink != null
-            ? (RegExp(r'/user/([^/]+)/')
-                    .firstMatch(authorLink.attributes['href'] ?? '')
-                    ?.group(1) ??
-                '')
-            : '';
-        final displayAuthor = authorLink?.text.trim() ?? '';
-
-        final dateEl = shoutEl.querySelector('span.popup_date, span.date');
-        final naturalDatetime = dateEl?.text.trim() ?? '';
-        final datetimeAttr = dateEl?.attributes['title'] ?? '';
-        final datetime = DateTime.tryParse(datetimeAttr) ?? DateTime.now();
-
-        final messageEl =
-            shoutEl.querySelector('div.comment-text, .shout-text');
-        final htmlMessage = messageEl?.innerHtml ?? '';
-
-        shouts.add(FAVisiblePageComment(
-          cid: cid,
-          indentation: indentation,
-          author: author,
-          displayAuthor: displayAuthor,
-          datetime: datetime,
-          naturalDatetime: naturalDatetime,
-          htmlMessage: htmlMessage,
-        ));
+        shouts.add(parsePageComment(shoutEl, CommentType.shout));
       } catch (_) {
-        // Skip
+        // Skip malformed shout entries
       }
     }
 

@@ -29,7 +29,8 @@ enum FAPagesErrorType {
   parserFailure,
 }
 
-/// Content rating on FurAffinity.
+/// Content rating on FurAffinity. (DEPRECATED — use Rating from fa_submission_page.dart)
+@Deprecated('Use Rating from fa_submission_page.dart')
 enum Rating {
   general,
   mature,

@@ -1,14 +1,55 @@
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart' as dom;
 import 'fa_page.dart';
-import 'fa_pages_error.dart';
+import 'fa_urls.dart';
+import '../utils/fa_date_parser.dart';
+
+/// Rating of a submission.
+///
+/// Mirrors the `Rating` enum in FASubmissionPage.swift:11-42.
+enum Rating {
+  general,
+  mature,
+  adult;
+
+  /// Parse from a FA rating string ("General", "Mature", "Adult").
+  static Rating? fromString(String? raw) {
+    if (raw == null) return null;
+    switch (raw.trim().toLowerCase()) {
+      case 'general':
+        return Rating.general;
+      case 'mature':
+        return Rating.mature;
+      case 'adult':
+        return Rating.adult;
+      default:
+        return null;
+    }
+  }
+
+  /// Parse from a `<figure>` CSS class list — e.g. "r-general t-image".
+  static Rating? fromFigureClass(String? classAttribute) {
+    if (classAttribute == null) return null;
+    for (final token in classAttribute.split(' ')) {
+      switch (token) {
+        case 'r-general':
+          return Rating.general;
+        case 'r-mature':
+          return Rating.mature;
+        case 'r-adult':
+          return Rating.adult;
+      }
+    }
+    return null;
+  }
+}
 
 /// Metadata for a submission.
 class FASubmissionPageMetadata {
   final String title;
   final String author;
   final String displayAuthor;
-  final DateTime datetime;
+  final DateTime? datetime;
   final String naturalDatetime;
   final int viewCount;
   final int commentCount;
@@ -69,79 +110,97 @@ class FASubmissionPage implements FAPage {
   });
 
   /// Parse the submission detail page HTML.
+  ///
+  /// Mirrors `FASubmissionPage.init(data:url:)` in
+  /// FASubmissionPage.swift:168-256.
   static FASubmissionPage parse(String html, Uri url) {
     final document = parser.parse(html);
 
-    // Parse metadata from the info section
-    final metadata = _parseMetadata(document, url);
+    // ── Submission page content node ────────────────────────────────
+    // body#pageid-submission div#main-window div#site-content div#submission_page
+    //   div div.submission-page-content
+    final submissionPageContentNode = document.querySelector(
+        'body#pageid-submission div#main-window div#site-content div#submission_page div div.submission-page-content');
+    final submissionMainContentNode =
+        submissionPageContentNode?.querySelector('div#submission-main-content');
 
-    // Parse preview image
-    final previewImg = document.querySelector('#submissionImg') ??
-        document.querySelector('.submission-img-container img') ??
-        document.querySelector('img[data-preview]');
-    Uri previewImageUrl = Uri.parse('https://www.furaffinity.net/');
-    double widthOnHeightRatio = 1.0;
-    if (previewImg != null) {
-      final src = previewImg.attributes['src'] ?? '';
-      previewImageUrl = Uri.parse(src.startsWith('//')
-          ? 'https:$src'
-          : src.startsWith('http')
-              ? src
-              : 'https://www.furaffinity.net$src');
-      final w = double.tryParse(previewImg.attributes['width'] ?? '1') ?? 1;
-      final h = double.tryParse(previewImg.attributes['height'] ?? '1') ?? 1;
-      widthOnHeightRatio = h > 0 ? w / h : 1.0;
-    }
-
-    // Parse full resolution download link
+    // ── Preview image ────────────────────────────────────────────────
+    // div.submission-area img#submissionImg → data-preview-src / data-fullview-src
+    final submissionContentNode =
+        submissionMainContentNode?.querySelector('div div.submission-content');
+    final imgEl =
+        submissionContentNode?.querySelector('div.submission-area img#submissionImg');
+    final previewSrc = imgEl?.attributes['data-preview-src'] ?? '';
+    final fullViewSrc = imgEl?.attributes['data-fullview-src'] ?? '';
+    Uri previewImageUrl = Uri.parse(FAURLs.baseUrl);
     Uri? fullResUrl;
-    final downloadLink = document.querySelector('a[href*="/download/"]');
-    if (downloadLink != null) {
-      final href = downloadLink.attributes['href'] ?? '';
-      if (href.isNotEmpty) {
-        fullResUrl = Uri.parse(href.startsWith('http')
-            ? href
-            : 'https://www.furaffinity.net$href');
-      }
+    double widthOnHeightRatio = 1.0;
+    if (previewSrc.isNotEmpty) {
+      previewImageUrl = Uri.parse(
+          previewSrc.startsWith('//') ? 'https:$previewSrc' : previewSrc);
+    }
+    if (fullViewSrc.isNotEmpty) {
+      final full = fullViewSrc.startsWith('//')
+          ? 'https:$fullViewSrc'
+          : fullViewSrc;
+      fullResUrl = Uri.parse(full);
     }
 
-    // Parse description
-    final descElement = document.querySelector('div#submission-description') ??
-        document.querySelector('.submission-description') ??
-        document.querySelector('div.description');
-    String htmlDescription = descElement?.innerHtml ?? '';
-
-    // Parse favorite status
+    // ── Favorite button ─────────────────────────────────────────────
+    // div#submission-options a.button with text "+Fav" or "-Fav"
     bool isFavorite = false;
     Uri? favoriteUrl;
-    final favButton = document.querySelector('a.favorite-button') ??
-        document.querySelector('a[title="Favorite"]') ??
-        document.querySelector('button.favorite-button') ??
-        document.querySelector('a[href*="/favorites/"]');
-    if (favButton != null) {
-      final href = favButton.attributes['href'] ?? '';
-      if (href.isNotEmpty) {
-        favoriteUrl = Uri.parse(href.startsWith('http')
-            ? href
-            : 'https://www.furaffinity.net$href');
-        // If the link contains "remove", it's currently favorited
-        isFavorite = href.contains('/remove/') || href.contains('unfav');
+    final optionButtons = submissionContentNode?.querySelectorAll(
+        'div.submission-content-inner div#submission-options a.button');
+    if (optionButtons != null) {
+      for (final btn in optionButtons) {
+        final text = btn.text.trim();
+        if (text == '+Fav' || text == '-Fav') {
+          final href = btn.attributes['href'] ?? '';
+          if (href.isNotEmpty) {
+            favoriteUrl = Uri.parse(href.startsWith('http')
+                ? href
+                : '${FAURLs.baseUrl}$href');
+            isFavorite = text == '-Fav';
+          }
+          break;
+        }
       }
     }
 
-    // Parse comments
-    final comments = _parseComments(document);
+    // ── Description (HTML) ──────────────────────────────────────────
+    // div.submission-details ... div.submission-description-text
+    final descEl = submissionMainContentNode?.querySelector(
+        'div div.submission-details div section.submission-description div.section-body div.submission-description-text');
+    final htmlDescription = descEl?.innerHtml.trim() ?? '';
 
-    // Parse comment target from URL hash
+    // ── Comments ────────────────────────────────────────────────────
+    // div.comments-list div#comments-submission div.comment_container
+    final commentNodes = submissionPageContentNode?.querySelectorAll(
+        'div.comments-list div#comments-submission div.comment_container') ??
+        [];
+    final comments = commentNodes
+        .map((node) => parsePageComment(node, CommentType.comment))
+        .toList();
+
+    // ── Target comment from URL ─────────────────────────────────────
     int? targetCommentId;
-    final hashMatch = RegExp(r'cid(\d+)').firstMatch(url.fragment);
-    if (hashMatch != null) {
-      targetCommentId = int.tryParse(hashMatch.group(1)!);
+    final targetMatch =
+        RegExp(r'www\.furaffinity\.net\/view\/\d+\/#cid:(\d+)$')
+            .firstMatch(url.toString());
+    if (targetMatch != null) {
+      targetCommentId = int.tryParse(targetMatch.group(1) ?? '');
     }
 
-    // Check if comments are accepted
-    final commentForm = document.querySelector('form[action*="reply"]');
-    final acceptsNewComments = commentForm != null;
+    // ── Accepts new comments? ──────────────────────────────────────
+    final responseBox = submissionPageContentNode
+        ?.querySelector('div.comments-list div#responsebox');
+    final responseText = responseBox?.text ?? '';
+    final acceptsNewComments =
+        !responseText.contains('Comment posting has been disabled');
+
+    // ── Metadata ───────────────────────────────────────────────────
+    final metadata = _parseMetadata(submissionMainContentNode, document);
 
     return FASubmissionPage(
       previewImageUrl: previewImageUrl,
@@ -157,88 +216,113 @@ class FASubmissionPage implements FAPage {
     );
   }
 
-  static FASubmissionPageMetadata _parseMetadata(dom.Document document, Uri url) {
-    String title = '';
+  /// Parse metadata from the submission page.
+  ///
+  /// Mirrors `FASubmissionPage.Metadata.init(root:)` in
+  /// FASubmissionPage.swift:258-330.
+  static FASubmissionPageMetadata _parseMetadata(
+      dom.Element? submissionMainContentNode, dom.Document root) {
+    // ── Title ───────────────────────────────────────────────────────
+    final titleEl = submissionMainContentNode
+        ?.querySelector('div div.submission-title h2');
+    final title = titleEl?.text.trim() ?? '';
+
+    // ── Author ──────────────────────────────────────────────────────
+    // div.submission-description-artist → span.c-usernameBlockSimple a
+    final descHeaderNode = submissionMainContentNode?.querySelector(
+        'div div.submission-details div section.submission-description div.section-header.submission-description-header');
+    final artistNode = descHeaderNode
+        ?.querySelector('div.submission-description-artist')
+        ?.querySelector('div span span.c-usernameBlockSimple a');
     String author = '';
     String displayAuthor = '';
-    DateTime datetime = DateTime.now();
-    String naturalDatetime = '';
+    if (artistNode != null) {
+      final href = artistNode.attributes['href'] ?? '';
+      final match = RegExp(r'/user/(.+)/').firstMatch(href);
+      author = match?.group(1) ?? '';
+      // displayAuthor from span.c-usernameBlockSimple__displayName
+      final displaySpan = artistNode.querySelector(
+          'span.c-usernameBlockSimple__displayName');
+      displayAuthor = (displaySpan?.text.trim() ?? artistNode.text.trim());
+    }
+
+    // ── Date ───────────────────────────────────────────────────────
+    final dateNode =
+        descHeaderNode?.querySelector('div div span.popup_date');
+    final dateResult = parseFADateNode(dateNode);
+
+    // ── Stats (Views/Comments/Favorites) ───────────────────────────
+    final statsNode = submissionMainContentNode
+        ?.querySelector('div div div.submission-page-stats');
     int viewCount = 0;
     int commentCount = 0;
     int favoriteCount = 0;
-    Rating rating = Rating.general;
-    String category = '';
-    String theme = '';
-    String species = '';
-    String resolution = '';
-    String fileSize = '';
+    if (statsNode != null) {
+      viewCount = int.tryParse(
+              statsNode.querySelector('div[title="Views"] div')?.text.trim() ??
+                  '') ??
+          0;
+      commentCount = int.tryParse(
+              statsNode
+                  .querySelector('div[title="Comments"] div')
+                  ?.text
+                  .trim() ??
+                  '') ??
+          0;
+      favoriteCount = int.tryParse(
+              statsNode
+                  .querySelector('div[title="Favorites"] div')
+                  ?.text
+                  .trim() ??
+                  '') ??
+          0;
+    }
+
+    // ── Rating ─────────────────────────────────────────────────────
+    final ratingEl = statsNode?.querySelector('div[class*="c-contentRating"]');
+    final rating = Rating.fromString(ratingEl?.text) ?? Rating.general;
+
+    // ── Content stats (category/theme/species/resolution/fileSize) ─
+    final stats = _submissionContentStats(submissionMainContentNode);
+    final category = stats['Category'] ?? '';
+    final theme = stats['Theme'] ?? '';
+    final species = stats['Species'] ?? '';
+    final resolution = stats['Resolution'] ?? '';
+    final fileSize = stats['File Size'] ?? '';
+
+    // ── Keywords / tags ────────────────────────────────────────────
+    final keywordNodes = submissionMainContentNode
+            ?.querySelectorAll('div div.submission-tags div span.tags') ??
+        [];
     final keywords = <String>[];
-    final folders = <FAFolder>[];
-
-    // Title
-    final titleEl = document.querySelector('h2.title') ??
-        document.querySelector('h2') ??
-        document.querySelector('div.submission-title');
-    if (titleEl != null) {
-      title = titleEl.text.trim();
-    }
-
-    // Author
-    final authorLink = document.querySelector('a[href*="/user/"]');
-    if (authorLink != null) {
-      final href = authorLink.attributes['href'] ?? '';
-      final match = RegExp(r'/user/([^/]+)/').firstMatch(href);
-      author = match?.group(1) ?? '';
-      displayAuthor = authorLink.text.trim();
-    }
-
-    // Stats (views, comments, favorites)
-    final statsContainer = document.querySelector('div.stats') ??
-        document.querySelector('section.stats') ??
-        document.querySelector('.submission-stats');
-    if (statsContainer != null) {
-      final statsText = statsContainer.text;
-      final viewsMatch = RegExp(r'Views:\s*(\d+)').firstMatch(statsText);
-      final commentsMatch = RegExp(r'Comments:\s*(\d+)').firstMatch(statsText);
-      final favsMatch = RegExp(r'Favorites:\s*(\d+)').firstMatch(statsText);
-      viewCount = int.tryParse(viewsMatch?.group(1) ?? '0') ?? 0;
-      commentCount = int.tryParse(commentsMatch?.group(1) ?? '0') ?? 0;
-      favoriteCount = int.tryParse(favsMatch?.group(1) ?? '0') ?? 0;
-    }
-
-    // Rating
-    final ratingEl = document.querySelector('span.rating') ??
-        document.querySelector('div.rating-box');
-    if (ratingEl != null) {
-      rating = Rating.fromString(ratingEl.text.trim());
-    }
-
-    // Date/time
-    final dateEl = document.querySelector('span.popup_date') ??
-        document.querySelector('span.date') ??
-        document.querySelector('time');
-    if (dateEl != null) {
-      naturalDatetime = dateEl.text.trim();
-      final ts = dateEl.attributes['title'] ?? dateEl.attributes['datetime'] ?? '';
-      if (ts.isNotEmpty) {
-        datetime = DateTime.tryParse(ts) ?? DateTime.now();
+    for (final node in keywordNodes) {
+      final tagBlock = node.querySelector('[data-tag-name]');
+      if (tagBlock != null) {
+        final tag = tagBlock.attributes['data-tag-name'];
+        if (tag != null && tag.isNotEmpty) keywords.add(tag);
+      } else {
+        final tagInvalid = node.querySelector('.tag-invalid');
+        if (tagInvalid != null) {
+          final text = tagInvalid.text.trim();
+          if (text.isNotEmpty) keywords.add(text);
+        }
       }
     }
 
-    // Keywords / tags
-    final tagElements = document.querySelectorAll('a.tags-link, a.keyword, a[href*="/search/"]');
-    for (final tag in tagElements) {
-      keywords.add(tag.text.trim());
-    }
-
-    // Folders
-    final folderElements = document.querySelectorAll('a[href*="/folder/"]');
-    for (final folder in folderElements) {
-      final href = folder.attributes['href'] ?? '';
+    // ── Folders ────────────────────────────────────────────────────
+    final folderNodes = submissionMainContentNode?.querySelectorAll(
+            'div div#submission-sidebar-lower div.submission-controls-lower div.folder-list-container div div.submission-folder a') ??
+        [];
+    final folders = <FAFolder>[];
+    for (final node in folderNodes) {
+      final href = node.attributes['href'] ?? '';
+      final folderUrl = Uri.parse(href.startsWith('http')
+          ? href
+          : '${FAURLs.baseUrl}$href');
       folders.add(FAFolder(
-        title: folder.text.trim(),
-        url: Uri.parse(href.startsWith('http') ? href : 'https://www.furaffinity.net$href'),
-        isActive: folder.classes.contains('active'),
+        title: node.text.trim(),
+        url: folderUrl,
+        isActive: false,
         id: href,
       ));
     }
@@ -247,8 +331,8 @@ class FASubmissionPage implements FAPage {
       title: title,
       author: author,
       displayAuthor: displayAuthor,
-      datetime: datetime,
-      naturalDatetime: naturalDatetime,
+      datetime: dateResult.datetime,
+      naturalDatetime: dateResult.naturalDatetime,
       viewCount: viewCount,
       commentCount: commentCount,
       favoriteCount: favoriteCount,
@@ -263,68 +347,19 @@ class FASubmissionPage implements FAPage {
     );
   }
 
-  static List<FAPageComment> _parseComments(dom.Document document) {
-    final comments = <FAPageComment>[];
-    final commentElements = document.querySelectorAll(
-        'div.comment-container, div.comment, li.comment');
-
-    for (final commentEl in commentElements) {
-      try {
-        // Check if hidden
-        final hiddenText = commentEl.querySelector('.comment-hidden, .hidden-comment');
-        if (hiddenText != null) {
-          final cidMatch = RegExp(r'cid=(\d+)').firstMatch(
-              commentEl.outerHtml);
-          final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
-          comments.add(FAHiddenPageComment(
-            cid: cid,
-            indentation: 0,
-            htmlMessage: hiddenText.text.trim(),
-          ));
-          continue;
-        }
-
-        // Parse visible comment
-        final cidMatch = RegExp(r'cid=(\d+)').firstMatch(commentEl.outerHtml);
-        final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
-
-        final indentEl = commentEl.querySelector('.comment-indentation, .comment-avatar');
-        int indentation = 0;
-        if (indentEl != null) {
-          final widthAttr = indentEl.attributes['width'] ??
-              indentEl.attributes['data-indentation'] ?? '0';
-          indentation = (double.tryParse(widthAttr) ?? 0).toInt() ~/ 16; // 16px per indent
-        }
-
-        final authorLink = commentEl.querySelector('a.comment-username, a[href*="/user/"]');
-        final author = authorLink != null
-            ? (RegExp(r'/user/([^/]+)/').firstMatch(
-                authorLink.attributes['href'] ?? '')?.group(1) ?? '')
-            : '';
-        final displayAuthor = authorLink?.text.trim() ?? '';
-
-        final dateEl = commentEl.querySelector('span.comment-date, span.popup_date');
-        final naturalDatetime = dateEl?.text.trim() ?? '';
-        final datetimeAttr = dateEl?.attributes['title'] ?? dateEl?.attributes['datetime'] ?? '';
-        final datetime = DateTime.tryParse(datetimeAttr) ?? DateTime.now();
-
-        final messageEl = commentEl.querySelector('div.comment-text, div.comment_message');
-        final htmlMessage = messageEl?.innerHtml ?? '';
-
-        comments.add(FAVisiblePageComment(
-          cid: cid,
-          indentation: indentation,
-          author: author,
-          displayAuthor: displayAuthor,
-          datetime: datetime,
-          naturalDatetime: naturalDatetime,
-          htmlMessage: htmlMessage,
-        ));
-      } catch (_) {
-        // Skip malformed comments
-      }
-    }
-
-    return comments;
+  /// Parse the `submission-content-stats` table into a `{category: value}` map.
+  ///
+  /// Mirrors `submissionContentStats(in:)` in FASubmissionPage.swift:143-157.
+  static Map<String, String> _submissionContentStats(
+      dom.Element? submissionMainContentNode) {
+    final statsNode = submissionMainContentNode
+        ?.querySelector('div div.submission-content-stats');
+    if (statsNode == null) return {};
+    final spans = statsNode.querySelectorAll('> span');
+    if (spans.length < 2) return {};
+    final categories = spans[0].querySelectorAll('> span').map((e) => e.text.trim()).toList();
+    final values = spans[1].querySelectorAll('> span').map((e) => e.text.trim()).toList();
+    if (categories.isEmpty || categories.length != values.length) return {};
+    return Map.fromIterables(categories, values);
   }
 }

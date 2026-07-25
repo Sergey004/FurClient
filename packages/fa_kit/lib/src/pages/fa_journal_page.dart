@@ -1,12 +1,15 @@
 import 'package:html/parser.dart' as parser;
 import 'fa_page.dart';
+import '../utils/fa_date_parser.dart';
 
 /// Parsed journal detail page.
+///
+/// Mirrors `FAJournalPage` in FAJournalPage.swift:11-76.
 class FAJournalPage implements FAPage {
   final String author;
   final String displayAuthor;
   final String title;
-  final DateTime datetime;
+  final DateTime? datetime;
   final String naturalDatetime;
   final String htmlDescription;
   final List<FAPageComment> comments;
@@ -26,129 +29,83 @@ class FAJournalPage implements FAPage {
   });
 
   /// Parse the journal detail page HTML.
+  ///
+  /// Mirrors `FAJournalPage.init(data:url:)` in
+  /// FAJournalPage.swift:24-76.
   static FAJournalPage parse(String html, Uri url) {
     final document = parser.parse(html);
 
-    // Title
-    final titleEl = document.querySelector('h2.title') ??
-        document.querySelector('h2') ??
-        document.querySelector('.journal-title');
-    final title = titleEl?.text.trim() ?? '';
+    // html body#pageid-journal div#main-window div#site-content
+    final siteContentNode = document.querySelector(
+        'html body#pageid-journal div#main-window div#site-content');
 
-    // Author
+    // ── Author ──────────────────────────────────────────────────────
+    // userpage-nav-header userpage-nav-user-details username
+    //   div.c-usernameBlock a.c-usernameBlock__displayName
+    final userNode = siteContentNode?.querySelector(
+        'userpage-nav-header userpage-nav-user-details username div.c-usernameBlock a.c-usernameBlock__displayName');
     String author = '';
     String displayAuthor = '';
-    final authorLink = document.querySelector('a[href*="/user/"]');
-    if (authorLink != null) {
-      final href = authorLink.attributes['href'] ?? '';
-      final match = RegExp(r'/user/([^/]+)/').firstMatch(href);
+    if (userNode != null) {
+      final href = userNode.attributes['href'] ?? '';
+      final match = RegExp(r'/user/(.+)/').firstMatch(href);
       author = match?.group(1) ?? '';
-      displayAuthor = authorLink.text.trim();
+      displayAuthor = userNode.text.trim();
     }
 
-    // Date/time
-    DateTime datetime = DateTime.now();
-    String naturalDatetime = '';
-    final dateEl = document.querySelector('span.popup_date') ??
-        document.querySelector('span.date') ??
-        document.querySelector('time');
-    if (dateEl != null) {
-      naturalDatetime = dateEl.text.trim();
-      final ts =
-          dateEl.attributes['title'] ?? dateEl.attributes['datetime'] ?? '';
-      if (ts.isNotEmpty) {
-        datetime = DateTime.tryParse(ts) ?? DateTime.now();
-      }
-    }
+    // ── Section node ────────────────────────────────────────────────
+    final sectionNode =
+        siteContentNode?.querySelector('div#columnpage div.content section');
 
-    // Description / content
-    final descEl = document.querySelector('div#journal-description') ??
-        document.querySelector('.journal-content') ??
-        document.querySelector('.journal-body');
-    final htmlDescription = descEl?.innerHtml ?? '';
+    // ── Title ───────────────────────────────────────────────────────
+    // div.section-header div#c-journalTitleTop span#c-journalTitleTop__subject
+    final titleEl = sectionNode?.querySelector(
+        'div.section-header div#c-journalTitleTop span#c-journalTitleTop__subject');
+    final title = titleEl?.text.trim() ?? '';
 
-    // Comments (reuse same logic as submission comments)
-    final comments = <FAPageComment>[];
-    final commentElements = document
-        .querySelectorAll('div.comment-container, div.comment, li.comment');
+    // ── Date ────────────────────────────────────────────────────────
+    // div.section-header div span.popup_date
+    final dateEl =
+        sectionNode?.querySelector('div.section-header div span.popup_date');
+    final dateResult = parseFADateNode(dateEl);
 
-    for (final commentEl in commentElements) {
-      try {
-        final hiddenText =
-            commentEl.querySelector('.comment-hidden, .hidden-comment');
-        if (hiddenText != null) {
-          final cidMatch = RegExp(r'cid=(\d+)').firstMatch(commentEl.outerHtml);
-          final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
-          comments.add(FAHiddenPageComment(
-            cid: cid,
-            indentation: 0,
-            htmlMessage: hiddenText.text.trim(),
-          ));
-          continue;
-        }
+    // ── htmlDescription ───────────────────────────────────────────
+    // div.journal-body-theme div.journal-item
+    final descEl =
+        sectionNode?.querySelector('div.journal-body-theme div.journal-item');
+    final htmlDescription = descEl?.innerHtml.trim() ?? '';
 
-        final cidMatch = RegExp(r'cid=(\d+)').firstMatch(commentEl.outerHtml);
-        final cid = int.tryParse(cidMatch?.group(1) ?? '') ?? 0;
+    // ── Comments ───────────────────────────────────────────────────
+    // div#columnpage div.content div#comments-journal div.comment_container
+    final commentNodes = siteContentNode?.querySelectorAll(
+            'div#columnpage div.content div#comments-journal div.comment_container') ??
+        [];
+    final comments = commentNodes
+        .map((node) => parsePageComment(node, CommentType.comment))
+        .toList();
 
-        final indentEl =
-            commentEl.querySelector('.comment-indentation, .comment-avatar');
-        int indentation = 0;
-        if (indentEl != null) {
-          final widthAttr = indentEl.attributes['width'] ?? '0';
-          indentation = (double.tryParse(widthAttr) ?? 0).toInt() ~/ 16;
-        }
-
-        final cAuthorLink =
-            commentEl.querySelector('a.comment-username, a[href*="/user/"]');
-        final cAuthor = cAuthorLink != null
-            ? (RegExp(r'/user/([^/]+)/')
-                    .firstMatch(cAuthorLink.attributes['href'] ?? '')
-                    ?.group(1) ??
-                '')
-            : '';
-        final cDisplayAuthor = cAuthorLink?.text.trim() ?? '';
-
-        final cDateEl =
-            commentEl.querySelector('span.comment-date, span.popup_date');
-        final cNaturalDatetime = cDateEl?.text.trim() ?? '';
-        final cDatetimeAttr = cDateEl?.attributes['title'] ?? '';
-        final cDatetime = DateTime.tryParse(cDatetimeAttr) ?? DateTime.now();
-
-        final messageEl =
-            commentEl.querySelector('div.comment-text, div.comment_message');
-        final htmlMessage = messageEl?.innerHtml ?? '';
-
-        comments.add(FAVisiblePageComment(
-          cid: cid,
-          indentation: indentation,
-          author: cAuthor,
-          displayAuthor: cDisplayAuthor,
-          datetime: cDatetime,
-          naturalDatetime: cNaturalDatetime,
-          htmlMessage: htmlMessage,
-        ));
-      } catch (_) {
-        // Skip malformed comments
-      }
-    }
-
-    // Target comment from URL
+    // ── Target comment from URL ───────────────────────────────────
     int? targetCommentId;
-    final hashMatch = RegExp(r'cid(\d+)').firstMatch(url.fragment);
-    if (hashMatch != null) {
-      targetCommentId = int.tryParse(hashMatch.group(1)!);
+    final targetMatch =
+        RegExp(r'www\.furaffinity\.net\/journal\/\d+\/#cid:(\d+)$')
+            .firstMatch(url.toString());
+    if (targetMatch != null) {
+      targetCommentId = int.tryParse(targetMatch.group(1) ?? '');
     }
 
-    // Accepts new comments?
-    final commentForm = document.querySelector('form[action*="reply"]');
-    final acceptsNewComments = commentForm != null;
+    // ── Accepts new comments? ──────────────────────────────────
+    final responseBox =
+        siteContentNode?.querySelector('div#columnpage div#responsebox');
+    final responseText = responseBox?.text ?? '';
+    final acceptsNewComments =
+        !responseText.contains('Comment posting has been disabled');
 
     return FAJournalPage(
       author: author,
       displayAuthor: displayAuthor,
       title: title,
-      datetime: datetime,
-      naturalDatetime: naturalDatetime,
+      datetime: dateResult.datetime,
+      naturalDatetime: dateResult.naturalDatetime,
       htmlDescription: htmlDescription,
       comments: comments,
       targetCommentId: targetCommentId,

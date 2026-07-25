@@ -6,7 +6,7 @@ class FANotificationPreview {
   final String author;
   final String displayAuthor;
   final String title;
-  final DateTime datetime;
+  final DateTime? datetime;
   final String naturalDatetime;
   final Uri url;
 

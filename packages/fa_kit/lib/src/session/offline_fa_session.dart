@@ -1,6 +1,5 @@
 import '../pages/fa_submission_page.dart';
 import '../pages/fa_user_journals_page.dart';
-import '../pages/fa_pages_error.dart';
 import '../pages/fa_watchlist_page.dart';
 import '../models/fa_submission.dart';
 import '../models/fa_comment.dart';
@@ -84,7 +83,8 @@ class OfflineFASession extends FASession {
     favoriteUrl: Uri.parse('https://www.furaffinity.net/fav/12345678/'),
     comments: [
       FAVisibleComment(
-        cid: 1001,
+        indentation: 0,
+          cid: 1001,
         author: 'commenter1',
         displayAuthor: 'Commenter One',
         datetime: DateTime(2024, 1, 15, 10, 30),
@@ -92,7 +92,8 @@ class OfflineFASession extends FASession {
         htmlMessage: '<p>Great artwork!</p>',
         answers: [
           FAVisibleComment(
-            cid: 1002,
+            indentation: 0,
+          cid: 1002,
             author: 'someartist',
             displayAuthor: 'SomeArtist',
             datetime: DateTime(2024, 1, 15, 12, 0),
@@ -101,8 +102,9 @@ class OfflineFASession extends FASession {
           ),
         ],
       ),
-      FAHiddenComment(
-        cid: 1003,
+FAHiddenComment(
+          cid: 1003,
+        indentation: 0,
         htmlMessage: '<p>[Hidden by admin]</p>',
       ),
     ],
@@ -139,8 +141,9 @@ class OfflineFASession extends FASession {
     htmlDescription: '<p>This is a <b>demo journal</b> entry with some content.</p>'
         '<p>It can have multiple paragraphs and <a href="https://example.com">links</a>.</p>',
     comments: [
-      FAVisibleComment(
-        cid: 2001,
+FAVisibleComment(
+        indentation: 0,
+          cid: 2001,
         author: 'reader1',
         displayAuthor: 'Reader One',
         datetime: DateTime(2024, 1, 10, 16, 0),
@@ -161,7 +164,8 @@ class OfflineFASession extends FASession {
         '<p>Hi, I\'m a <b>demo artist</b>!</p><p>Check out my gallery.</p>',
     shouts: [
       FAVisibleComment(
-        cid: 3001,
+        indentation: 0,
+          cid: 3001,
         author: 'visitor1',
         displayAuthor: 'Visitor One',
         datetime: DateTime(2024, 1, 5, 9, 0),

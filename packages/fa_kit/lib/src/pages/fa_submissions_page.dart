@@ -1,8 +1,13 @@
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart' as dom;
 import 'fa_page.dart';
+import 'fa_submission_page.dart' show Rating;
+import 'fa_urls.dart';
 
-/// A single submission in a submissions list page.
+/// A single submission in a submissions list page (browse/gallery/feed).
+///
+/// Mirrors `FASubmissionsPage.Submission` in
+/// FASubmissionsPage.swift:12-32.
 class FASubmissionsPageItem {
   final int sid;
   final Uri url;
@@ -11,6 +16,7 @@ class FASubmissionsPageItem {
   final String title;
   final String author;
   final String displayAuthor;
+  final Rating rating;
 
   FASubmissionsPageItem({
     required this.sid,
@@ -20,10 +26,13 @@ class FASubmissionsPageItem {
     required this.title,
     required this.author,
     required this.displayAuthor,
+    required this.rating,
   });
 }
 
-/// Parsed submissions list page (browse/gallery views).
+/// Parsed submissions list page (browse / gallery / favorites / scraps / feed).
+///
+/// Mirrors `FASubmissionsPage` in FASubmissionsPage.swift:11-75.
 class FASubmissionsPage implements FAPage {
   final List<FASubmissionsPageItem?> submissions;
   final Uri? nextPageUrl;
@@ -36,80 +45,36 @@ class FASubmissionsPage implements FAPage {
   });
 
   /// Parse the submissions list page HTML.
+  ///
+  /// Mirrors `FASubmissionsPage.init(data:url:)` in
+  /// FASubmissionsPage.swift:40-75.
   static FASubmissionsPage parse(String html, Uri url) {
     final document = parser.parse(html);
 
-    final submissions = <FASubmissionsPageItem?>[];
-    final figureElements = document.querySelectorAll('figure');
+    // ── Submission figures ────────────────────────────────────────
+    // figure[id^="sid-"]
+    final figureElements = document.querySelectorAll('figure[id^="sid-"]');
+    final submissions =
+        figureElements.map((figure) => _parseFigure(figure)).toList();
 
-    for (final figure in figureElements) {
-      try {
-        final link = figure.querySelector('a');
-        if (link == null) continue;
-        final href = link.attributes['href'] ?? '';
-
-        final sidMatch = RegExp(r'/view/(\d+)/').firstMatch(href);
-        if (sidMatch == null) continue;
-        final sid = int.parse(sidMatch.group(1)!);
-
-        final submissionUrl = Uri.parse(href.startsWith('http')
-            ? href
-            : 'https://www.furaffinity.net$href');
-
-        final img = link.querySelector('img');
-        if (img == null) continue;
-        final src = img.attributes['src'] ?? img.attributes['data-src'] ?? '';
-        final thumbnailUrl = Uri.parse(src.startsWith('//')
-            ? 'https:$src'
-            : src.startsWith('http')
-                ? src
-                : 'https://www.furaffinity.net$src');
-
-        final imgWidth = double.tryParse(img.attributes['width'] ?? '1') ?? 1;
-        final imgHeight = double.tryParse(img.attributes['height'] ?? '1') ?? 1;
-        final ratio = imgHeight > 0 ? imgWidth / imgHeight : 1.0;
-
-        final title = img.attributes['alt'] ?? img.attributes['title'] ?? '';
-        final author = _extractAuthorFromFigure(figure) ?? '';
-        final displayAuthor = _extractDisplayAuthorFromFigure(figure) ?? author;
-
-        submissions.add(FASubmissionsPageItem(
-          sid: sid,
-          url: submissionUrl,
-          thumbnailUrl: thumbnailUrl,
-          thumbnailWidthOnHeightRatio: ratio,
-          title: title,
-          author: author,
-          displayAuthor: displayAuthor,
-        ));
-      } catch (_) {
-        // Skip malformed entries
-        submissions.add(null);
-      }
-    }
-
-    // Parse pagination links
+    // ── Pagination links ──────────────────────────────────────────
+    // Look for Prev / Next buttons in the page body.
+    // FA uses various containers (div.aligncenter, pagination) — search all
+    // <a> elements for the "Prev" / "Next" text.
     Uri? nextPageUrl;
     Uri? previousPageUrl;
-    final pagination = document.querySelector('div.pagination');
-    if (pagination != null) {
-      final nextLink = pagination.querySelector('a.next');
-      if (nextLink != null) {
-        final href = nextLink.attributes['href'] ?? '';
-        if (href.isNotEmpty) {
-          nextPageUrl = Uri.parse(href.startsWith('http')
-              ? href
-              : 'https://www.furaffinity.net$href');
-        }
-      }
-      final prevLink = pagination.querySelector('a.prev, a.previous');
-      if (prevLink != null) {
-        final href = prevLink.attributes['href'] ?? '';
-        if (href.isNotEmpty) {
-          previousPageUrl = Uri.parse(href.startsWith('http')
-              ? href
-              : 'https://www.furaffinity.net$href');
-        }
+
+    final allButtons = document.querySelectorAll('a');
+    for (final btn in allButtons) {
+      final text = btn.text.trim();
+      final href = btn.attributes['href'] ?? '';
+      if (href.isEmpty) continue;
+      if (text.startsWith('Prev') && previousPageUrl == null) {
+        previousPageUrl = Uri.parse(
+            href.startsWith('http') ? href : '${FAURLs.baseUrl}$href');
+      } else if (text.startsWith('Next') && nextPageUrl == null) {
+        nextPageUrl = Uri.parse(
+            href.startsWith('http') ? href : '${FAURLs.baseUrl}$href');
       }
     }
 
@@ -119,25 +84,63 @@ class FASubmissionsPage implements FAPage {
       previousPageUrl: previousPageUrl,
     );
   }
+}
 
-  static String? _extractAuthorFromFigure(dom.Element figure) {
-    // Try to find author from various locations in the figure element
-    final authorLink = figure.querySelector('a[href*="/user/"]');
-    if (authorLink != null) {
-      final href = authorLink.attributes['href'] ?? '';
-      final match = RegExp(r'/user/([^/]+)/').firstMatch(href);
-      return match?.group(1);
-    }
-    return null;
-  }
+/// Parse a single `<figure id="sid-N">` submission thumbnail.
+///
+/// Mirrors `FASubmissionsPage.Submission.init(_:)` in
+/// FASubmissionsPage.swift:77-109.
+FASubmissionsPageItem? _parseFigure(dom.Element figure) {
+  try {
+    final idAttr = figure.attributes['id'] ?? '';
+    if (!idAttr.startsWith('sid-')) return null;
+    final sid = int.tryParse(idAttr.substring(4));
+    if (sid == null) return null;
 
-  static String? _extractDisplayAuthorFromFigure(dom.Element figure) {
-    final authorLink = figure.querySelector('a[href*="/user/"]');
-    if (authorLink != null) {
-      return authorLink.text.trim();
-    }
+    final url = Uri.parse('${FAURLs.baseUrl}/view/$sid/');
+
+    // Thumbnail: figure b u a img
+    final thumbImg = figure.querySelector('b u a img') ??
+        figure.querySelector('a[href*="/view/"] img');
+    if (thumbImg == null) return null;
+    final thumbSrc = thumbImg.attributes['src'] ?? '';
+    if (thumbSrc.isEmpty) return null;
+    final thumbnailUrl = Uri.parse(
+        thumbSrc.startsWith('//') ? 'https:$thumbSrc' : thumbSrc);
+
+    // Width / height ratio
+    final thumbWidthStr = thumbImg.attributes['data-width'] ?? '1';
+    final thumbHeightStr = thumbImg.attributes['data-height'] ?? '1';
+    final thumbWidth = double.tryParse(thumbWidthStr) ?? 1.0;
+    final thumbHeight = double.tryParse(thumbHeightStr) ?? 1.0;
+    final ratio = thumbHeight > 0 ? thumbWidth / thumbHeight : 1.0;
+
+    // figcaption p a — first = title, second = author
+    final captionLinks = figure.querySelectorAll('figcaption p a');
+    if (captionLinks.length < 2) return null;
+
+    final title = captionLinks[0].text.trim();
+
+    final authorHref = captionLinks[1].attributes['href'] ?? '';
+    final authorMatch = RegExp(r'/user/(.+)/').firstMatch(authorHref);
+    final author = authorMatch?.group(1) ?? '';
+    final displayAuthor = captionLinks[1].text.trim();
+
+    // Rating from <figure> class (r-general / r-mature / r-adult).
+    final rating =
+        Rating.fromFigureClass(figure.attributes['class']) ?? Rating.general;
+
+    return FASubmissionsPageItem(
+      sid: sid,
+      url: url,
+      thumbnailUrl: thumbnailUrl,
+      thumbnailWidthOnHeightRatio: ratio,
+      title: title,
+      author: author,
+      displayAuthor: displayAuthor,
+      rating: rating,
+    );
+  } catch (_) {
     return null;
   }
 }
-
-
