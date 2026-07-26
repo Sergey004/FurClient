@@ -12,6 +12,7 @@ import '../widgets/fullscreen_image_viewer.dart';
 import '../services/download_service.dart';
 import '../services/search_history.dart';
 import '../widgets/flash_player_widget.dart';
+import '../widgets/fur_html_widget.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
   final FAClient client;
@@ -595,13 +596,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Text(
+              child: FurHtmlWidget(
                 sub.description,
-                style: const TextStyle(
-                  color: AppColors.textDim,
-                  fontSize: 14,
-                  height: 1.6,
-                ),
+                style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.6),
               ),
             ),
           ],
@@ -801,13 +798,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
+                FurHtmlWidget(
                   comment.text,
-                  style: const TextStyle(
-                    color: AppColors.textDim,
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
+                  compact: true,
+                  style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.5),
                 ),
               ],
             ),

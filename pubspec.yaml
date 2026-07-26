@@ -39,6 +39,8 @@ dependencies:
   upgrader: ^13.5.0
   package_info_plus: ^10.2.1
   url_launcher: ^6.3.1
+  flutter_widget_from_html_core: ^0.15.2
+  fwfh_text_style: ^2.0.2+1
   flutter_driver:
     sdk: flutter
 

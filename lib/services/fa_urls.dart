@@ -18,13 +18,22 @@ class FAUrls {
 
   static Uri submissionsUrl(int sid) => Uri.parse(submissionsFrom(sid));
 
-  static String browse({String filter = 'all', int? page}) {
+  static String browse({
+    String filter = 'all',
+    int? page,
+    String sortBy = 'datet',
+    String sortDirection = 'desc',
+  }) {
     final params = <String>[];
     if (filter != 'all' && filterMap.containsKey(filter)) {
       params.add('type=${filterMap[filter]}');
     }
     if (page != null && page > 1) {
       params.add('page=$page');
+    }
+    if (sortBy != 'datet' || sortDirection != 'desc') {
+      params.add('sort_by=$sortBy');
+      params.add('sort_direction=$sortDirection');
     }
     final query = params.isNotEmpty ? '?${params.join('&')}' : '';
     return '$baseUrl/browse/$query';
@@ -58,12 +67,37 @@ class FAUrls {
   static String user(String username) => '$baseUrl/user/$username/';
   static String avatar(String username) =>
       'https://a.furaffinity.net/$username.gif';
-  static String gallery(String username) => '$baseUrl/gallery/$username/';
-  static Uri userGalleryUrl(String username) => Uri.parse(gallery(username));
+  static String gallery(String username, {int? page,
+      String sortBy = 'datet', String sortDirection = 'desc'}) {
+    final params = <String>[];
+    if (page != null && page > 1) params.add('page=$page');
+    if (sortBy != 'datet' || sortDirection != 'desc') {
+      params.add('sort_by=$sortBy');
+      params.add('sort_direction=$sortDirection');
+    }
+    final q = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return '$baseUrl/gallery/$username/$q';
+  }
+  static Uri userGalleryUrl(String username, {int? page,
+      String sortBy = 'datet', String sortDirection = 'desc'}) =>
+      Uri.parse(gallery(username, page: page,
+          sortBy: sortBy, sortDirection: sortDirection));
 
-  static String favorites(String username) => '$baseUrl/favorites/$username/';
-  static Uri userFavoritesUrl(String username) =>
-      Uri.parse(favorites(username));
+  static String favorites(String username, {int? page,
+      String sortBy = 'datet', String sortDirection = 'desc'}) {
+    final params = <String>[];
+    if (page != null && page > 1) params.add('page=$page');
+    if (sortBy != 'datet' || sortDirection != 'desc') {
+      params.add('sort_by=$sortBy');
+      params.add('sort_direction=$sortDirection');
+    }
+    final q = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return '$baseUrl/favorites/$username/$q';
+  }
+  static Uri userFavoritesUrl(String username, {int? page,
+      String sortBy = 'datet', String sortDirection = 'desc'}) =>
+      Uri.parse(favorites(username, page: page,
+          sortBy: sortBy, sortDirection: sortDirection));
 
   static String journals(String username) => '$baseUrl/journals/$username/';
   static Uri userJournalsUrl(String username) => Uri.parse(journals(username));

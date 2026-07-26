@@ -410,14 +410,22 @@ class FAClient {
     await _enhancedClient.clearData();
   }
 
-  Future<List<Submission>> getSubmissions(int page, String category) async {
-    final url = FAUrls.browse(filter: category, page: page);
+  Future<List<Submission>> getSubmissions(int page, String category,
+      {String sortBy = 'datet', String sortDirection = 'desc'}) async {
+    final url = FAUrls.browse(
+      filter: category,
+      page: page,
+      sortBy: sortBy,
+      sortDirection: sortDirection,
+    );
     final html = await _getHtml(url);
     return Submission.parseSubmissionsPage(html);
   }
 
-  Future<List<Submission>> getGallery(String username, {int page = 1}) async {
-    final url = '${FAUrls.gallery(username)}?page=$page';
+  Future<List<Submission>> getGallery(String username, {int page = 1,
+      String sortBy = 'datet', String sortDirection = 'desc'}) async {
+    final url = FAUrls.gallery(username, page: page,
+        sortBy: sortBy, sortDirection: sortDirection);
     final html = await _getHtml(url);
     return Submission.parseSubmissionsPage(html);
   }

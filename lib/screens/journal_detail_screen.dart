@@ -9,6 +9,7 @@ import '../widgets/caption_buttons.dart';
 import '../utils/platform_utils.dart';
 import '../utils/fa_image_loader.dart';
 import 'profile_screen.dart';
+import '../widgets/fur_html_widget.dart';
 
 /// Native screen for viewing a journal's full content and comments.
 class JournalDetailScreen extends StatefulWidget {
@@ -269,13 +270,9 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.border),
             ),
-            child: Text(
+            child: FurHtmlWidget(
               j.content,
-              style: const TextStyle(
-                color: AppColors.textDim,
-                fontSize: 14,
-                height: 1.7,
-              ),
+              style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.7),
             ),
           ),
 
@@ -386,13 +383,10 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
+                FurHtmlWidget(
                   comment.text,
-                  style: const TextStyle(
-                    color: AppColors.textDim,
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
+                  compact: true,
+                  style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.5),
                 ),
               ],
             ),

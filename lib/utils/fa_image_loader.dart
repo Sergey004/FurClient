@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:fa_kit/fa_kit.dart';
 import 'webview_image_fetcher.dart';
+import 'fa_image_cache.dart';
 import '../utils/cookie_store.dart';
 import '../widgets/adaptive/adaptive_progress.dart';
 
@@ -101,22 +102,32 @@ class _FAImageState extends State<FAImage> {
       _bytes = null;
     });
 
+    // Cached fetch — dedups concurrent requests and persists bytes on disk.
+    final bytes = await FAImageCache.instance.load(imageUrl, _fetchFromNetwork);
+    if (!mounted) return;
+    if (bytes != null && bytes.isNotEmpty) {
+      setState(() {
+        _bytes = bytes;
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+    }
+  }
+
+  /// Performs the actual network fetch.  Called by [FAImageCache] only on a
+  /// cache miss, and deduped per URL across concurrent widgets.
+  Future<Uint8List?> _fetchFromNetwork() async {
+    final imageUrl = _resolvedUrl;
+
     // Use WebView-based image fetching on all platforms.
     // WebView shares cookies + browser TLS fingerprint, so CF doesn't block it.
     try {
-      debugPrint('=== FAImage: using WebView fetcher for $imageUrl');
       final bytes = await WebViewImageFetcher.instance.fetchImage(imageUrl);
-      if (bytes != null && bytes.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _bytes = bytes;
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-      debugPrint(
-          '=== FAImage: WebView fetch returned null, falling back to HTTP');
+      if (bytes != null && bytes.isNotEmpty) return bytes;
     } catch (e) {
       debugPrint('=== FAImage: WebView fetch error: $e');
     }
@@ -128,15 +139,12 @@ class _FAImageState extends State<FAImage> {
         final client = io.HttpClient()
           ..connectionTimeout = const Duration(seconds: 30);
         final request = await client.getUrl(Uri.parse(imageUrl));
-        debugPrint('=== FAImage request to: $imageUrl');
         _requestHeaders.forEach((k, v) => request.headers.set(k, v));
         final response = await request.close();
 
         if (response.statusCode == 403 && attempt < 2) {
           client.close();
           debugPrint('FAImage retry $attempt after 403');
-
-          // Если это первая попытка и 403, ждем чтобы FACeline мог решить Cloudflare
           if (attempt == 0) {
             await Future.delayed(const Duration(seconds: 3));
           } else {
@@ -158,14 +166,7 @@ class _FAImageState extends State<FAImage> {
         );
         final bytes = await completer.future;
         client.close();
-
-        if (mounted) {
-          setState(() {
-            _bytes = bytes;
-            _isLoading = false;
-          });
-        }
-        return;
+        return bytes;
       } catch (e) {
         debugPrint('FAImage error (attempt $attempt): $e');
         if (attempt < 2) {
@@ -173,13 +174,7 @@ class _FAImageState extends State<FAImage> {
         }
       }
     }
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-      });
-    }
+    return null;
   }
 
   @override
