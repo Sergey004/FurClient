@@ -44,7 +44,8 @@ class FAImageCache {
   ///
   /// Callers should treat `null` as "fetch failed/empty" and fall back to
   /// their own error UI.
-  Future<Uint8List?> load(String url, Future<Uint8List?> Function() fetch) async {
+  Future<Uint8List?> load(
+      String url, Future<Uint8List?> Function() fetch) async {
     final key = _canonical(url);
     if (key.isEmpty) return null;
 
@@ -152,6 +153,7 @@ class FAImageCache {
 }
 
 /// Convenience function for callers that want the bytes only.
-Future<Uint8List?> faImageLoad(String url, Future<Uint8List?> Function() fetch) {
+Future<Uint8List?> faImageLoad(
+    String url, Future<Uint8List?> Function() fetch) {
   return FAImageCache.instance.load(url, fetch);
 }

@@ -422,10 +422,12 @@ class FAClient {
     return Submission.parseSubmissionsPage(html);
   }
 
-  Future<List<Submission>> getGallery(String username, {int page = 1,
-      String sortBy = 'datet', String sortDirection = 'desc'}) async {
-    final url = FAUrls.gallery(username, page: page,
-        sortBy: sortBy, sortDirection: sortDirection);
+  Future<List<Submission>> getGallery(String username,
+      {int page = 1,
+      String sortBy = 'datet',
+      String sortDirection = 'desc'}) async {
+    final url = FAUrls.gallery(username,
+        page: page, sortBy: sortBy, sortDirection: sortDirection);
     final html = await _getHtml(url);
     return Submission.parseSubmissionsPage(html);
   }
@@ -685,8 +687,11 @@ class FAClient {
 
   /// Fetch a user's favorites page.
   Future<List<Submission>> getUserFavorites(String username,
-      {int page = 1}) async {
-    final url = '${FAUrls.favorites(username)}?page=$page';
+      {int page = 1,
+      String sortBy = 'datet',
+      String sortDirection = 'desc'}) async {
+    final url = FAUrls.favorites(username,
+        page: page, sortBy: sortBy, sortDirection: sortDirection);
     final html = await _getHtml(url);
     return Submission.parseSubmissionsPage(html);
   }

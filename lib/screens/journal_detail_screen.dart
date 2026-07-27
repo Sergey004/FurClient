@@ -272,7 +272,8 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
             ),
             child: FurHtmlWidget(
               j.content,
-              style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.7),
+              style: const TextStyle(
+                  color: AppColors.textDim, fontSize: 14, height: 1.7),
             ),
           ),
 
@@ -386,7 +387,8 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
                 FurHtmlWidget(
                   comment.text,
                   compact: true,
-                  style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.5),
+                  style: const TextStyle(
+                      color: AppColors.textDim, fontSize: 14, height: 1.5),
                 ),
               ],
             ),

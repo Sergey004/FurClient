@@ -598,7 +598,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               ),
               child: FurHtmlWidget(
                 sub.description,
-                style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.6),
+                style: const TextStyle(
+                    color: AppColors.textDim, fontSize: 14, height: 1.6),
               ),
             ),
           ],
@@ -801,7 +802,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 FurHtmlWidget(
                   comment.text,
                   compact: true,
-                  style: const TextStyle(color: AppColors.textDim, fontSize: 14, height: 1.5),
+                  style: const TextStyle(
+                      color: AppColors.textDim, fontSize: 14, height: 1.5),
                 ),
               ],
             ),
