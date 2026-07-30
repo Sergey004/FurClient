@@ -6,6 +6,7 @@ import '../services/fa_client.dart';
 import '../services/search_history.dart';
 import '../theme/theme_provider.dart';
 import '../screens/gallery_screen.dart';
+import '../screens/watch_feed_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/profile_screen.dart';
@@ -41,6 +42,12 @@ class _MaterialShellState extends State<MaterialShell> {
       accent: AppColors.fluentCyan,
     ),
     _NavItem(
+      icon: Icons.subscriptions_outlined,
+      selectedIcon: Icons.subscriptions,
+      label: 'Watch',
+      accent: AppColors.cupertinoPurple,
+    ),
+    _NavItem(
       icon: Icons.search_outlined,
       selectedIcon: Icons.search,
       label: 'Search',
@@ -50,7 +57,7 @@ class _MaterialShellState extends State<MaterialShell> {
       icon: Icons.notifications_outlined,
       selectedIcon: Icons.notifications,
       label: 'Notifications',
-      accent: AppColors.cupertinoPurple,
+      accent: AppColors.fluentCyan,
     ),
     _NavItem(
       icon: Icons.person_outline,
@@ -75,7 +82,7 @@ class _MaterialShellState extends State<MaterialShell> {
 
   void _onExternalSearch() {
     if (SearchHistory.externalQuery.value != null && mounted) {
-      setState(() => _currentIndex = 1);
+      setState(() => _currentIndex = 2);
     }
   }
 
@@ -109,6 +116,8 @@ class _MaterialShellState extends State<MaterialShell> {
   List<Widget> _buildScreens() {
     return [
       GalleryScreen(
+          client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+      WatchFeedScreen(
           client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
       SearchScreen(
           client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),

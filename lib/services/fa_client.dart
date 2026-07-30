@@ -36,6 +36,15 @@ class FAClient {
   bool _initialized = false;
   Completer<void>? _initCompleter;
 
+  // Persistent headless WebView for watch feed — reused across requests to
+  // maintain CF clearance cookies. Without this, each HeadlessInAppWebView
+  // creates a fresh WebView2 context that CF challenges anew, and the 'a'
+  // auth cookie is dropped after the challenge on Windows.
+  HeadlessInAppWebView? _feedWebView;
+  InAppWebViewController? _feedController;
+  final Completer<void> _feedReady = Completer<void>();
+  int _feedCfAttempts = 0;
+
   // Enhanced client for CDN and multi-strategy support
   final FAEnhancedClient _enhancedClient = FAEnhancedClient.instance;
 
@@ -225,6 +234,231 @@ class FAClient {
     }
   }
 
+  /// Inject session cookies into the platform CookieManager so the
+  /// headless WebView sends them with its request.  Without this the
+  /// HeadlessInAppWebView only has whatever cookies the environment
+  /// accumulated from *previous* WebView pages in the same session;
+  /// if the app was cold-started the auth cookie ('a') is missing.
+  Future<void> _injectSessionCookies(String url) async {
+    if (_session?.cookies == null) return;
+    try {
+      final List<dynamic> raw = jsonDecode(_session!.cookies!);
+      final cookieManager = FAICookieManager.instance;
+      final uri = Uri.parse(url);
+      final origin = '${uri.scheme}://${uri.host}';
+      for (final item in raw) {
+        String? name;
+        String? value;
+        String? domain;
+        String? path;
+        bool? secure;
+        int? expiresMs;
+
+        if (item is Map<String, dynamic>) {
+          name = item['name']?.toString();
+          value = item['value']?.toString();
+          domain = item['domain']?.toString();
+          path = item['path']?.toString() ?? '/';
+          secure = item['isSecure'] as bool?;
+          expiresMs = item['expiresDate'] as int?;
+        } else if (item is List && item.length >= 2) {
+          name = item[0].toString();
+          value = item[1].toString();
+          path = '/';
+        }
+
+        if (name == null || value == null || name.isEmpty || value.isEmpty) {
+          continue;
+        }
+
+        final cookieDomain = domain ?? '.furaffinity.net';
+        final cookiePath = path ?? '/';
+        final isSecure = secure ?? true;
+
+        // Expiry far in the future so the cookie doesn't expire during
+        // the session.  FA's 'a' cookie has a very long TTL anyway.
+        final expiry = expiresMs != null && expiresMs > 0
+            ? DateTime.fromMillisecondsSinceEpoch(expiresMs)
+            : DateTime.now().add(const Duration(days: 365));
+
+        // NOTE: WebView2's SetCookie silently drops cookies flagged as
+        // HttpOnly.  We intentionally pass false here — the HttpOnly flag
+        // only controls JavaScript access (document.cookie); WebView2 will
+        // still include the cookie in HTTP requests regardless.
+        await cookieManager.setCookie(
+          url: WebUri(origin),
+          name: name,
+          value: value,
+          domain: cookieDomain,
+          path: cookiePath,
+          expiresDate: expiry.millisecondsSinceEpoch,
+          isSecure: isSecure,
+          isHttpOnly: false,
+        );
+      }
+      final names = raw
+          .whereType<Map<String, dynamic>>()
+          .map((m) => m['name']?.toString() ?? '?')
+          .toList();
+      debugPrint(
+          '=== Injected session cookies into CookieManager for $origin: $names');
+    } catch (e) {
+      debugPrint('=== Cookie injection error: $e');
+    }
+  }
+
+  /// Build a raw `Cookie:` header value from the session cookies.
+  /// Used to inject auth cookies into URLRequest headers when
+  /// CookieManager.setCookie() fails to persist them (e.g. the 'a' cookie).
+  String? _buildCookieHeader() {
+    if (_session?.cookies == null) return null;
+    try {
+      final List<dynamic> raw = jsonDecode(_session!.cookies!);
+      final parts = <String>[];
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          final name = item['name']?.toString() ?? '';
+          final value = item['value']?.toString() ?? '';
+          if (name.isNotEmpty && value.isNotEmpty) {
+            parts.add('$name=$value');
+          }
+        }
+      }
+      return parts.isEmpty ? null : parts.join('; ');
+    } catch (e) {
+      debugPrint('=== Error building cookie header: $e');
+      return null;
+    }
+  }
+
+  /// Create a persistent headless WebView for authenticated feed pages.
+  /// This WebView stays alive so it maintains CF clearance and auth cookies
+  /// across requests, avoiding the per-request CF challenge on Windows.
+  Future<InAppWebViewController> _ensureFeedWebView() async {
+    if (_feedController != null) return _feedController!;
+
+    // Build cookie header once for the initial request
+    final cookieHeader = _buildCookieHeader();
+
+    _feedWebView = HeadlessInAppWebView(
+      webViewEnvironment: webViewEnvironment,
+      initialSettings: InAppWebViewSettings(javaScriptEnabled: true),
+      onLoadStop: (controller, loadedUrl) async {
+        final html = await controller.getHtml() ?? '';
+
+        if (_isCloudflarePage(html)) {
+          _feedCfAttempts++;
+          debugPrint('=== FeedWebView: CF challenge #$_feedCfAttempts');
+          if (_feedCfAttempts > 5) {
+            if (!_feedReady.isCompleted) {
+              _feedReady.completeError(Exception(
+                  'CF challenge not solved after $_feedCfAttempts attempts'));
+            }
+            return;
+          }
+          await _attemptSolveCloudflareChallenge(controller);
+          await Future.delayed(const Duration(seconds: 5));
+          return; // onLoadStop will fire again after redirect
+        }
+
+        _feedController = controller;
+        debugPrint(
+            '=== FeedWebView: ready (${html.length}B, title=${await _extractTitle(html)})');
+        if (!_feedReady.isCompleted) _feedReady.complete();
+      },
+      onReceivedError: (controller, request, error) {
+        debugPrint('=== FeedWebView error: ${error.description}');
+      },
+      initialUrlRequest: URLRequest(
+        url: WebUri('https://www.furaffinity.net/'),
+        headers: {
+          if (cookieHeader != null) 'Cookie': cookieHeader,
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        },
+      ),
+    );
+
+    await _feedWebView!.run();
+
+    // Wait for CF challenge to resolve and initial page to load
+    try {
+      await _feedReady.future.timeout(
+        const Duration(seconds: 120),
+        onTimeout: () {
+          debugPrint('=== FeedWebView: init timeout');
+        },
+      );
+    } catch (_) {
+      // If CF challenge failed, try without it
+    }
+
+    // Sync cookies acquired during CF challenge/initial load
+    await _syncCookiesFromWebView();
+    await _restoreCookiesFromSession();
+
+    return _feedController!;
+  }
+
+  String? _extractTitle(String html) {
+    final m = RegExp(r'<title[^>]*>([^<]+)</title>', caseSensitive: false)
+        .firstMatch(html);
+    return m?.group(1)?.trim();
+  }
+
+  /// Navigate the persistent feed WebView to a new URL and return its HTML.
+  Future<String> _navigateFeedWebView(String url) async {
+    final controller = await _ensureFeedWebView();
+
+    // Set a one-shot load listener by polling
+    debugPrint('=== FeedWebView: navigating to $url');
+    final navCookieHeader = _buildCookieHeader();
+    final navHeaders = <String, String>{
+      'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    };
+    if (navCookieHeader != null) navHeaders['Cookie'] = navCookieHeader;
+    await controller.loadUrl(
+      urlRequest: URLRequest(
+        url: WebUri(url),
+        headers: navHeaders,
+      ),
+    );
+
+    // Wait for page load via polling
+    await Future.delayed(const Duration(seconds: 3));
+    var html = await controller.getHtml() ?? '';
+    int waitRounds = 0;
+
+    while (_isCloudflarePage(html) && waitRounds < 5) {
+      _feedCfAttempts++;
+      debugPrint('=== FeedWebView: CF challenge on navigate #$_feedCfAttempts');
+      await _attemptSolveCloudflareChallenge(controller);
+      await Future.delayed(const Duration(seconds: 8));
+      html = await controller.getHtml() ?? '';
+      waitRounds++;
+    }
+
+    // Wait for AJAX to load
+    await Future.delayed(const Duration(seconds: 3));
+    final finalHtml = await controller.getHtml() ?? '';
+    final result = finalHtml.length > html.length ? finalHtml : html;
+
+    await _syncCookiesFromWebView();
+    await _restoreCookiesFromSession();
+
+    return result;
+  }
+
+  /// Dispose the persistent feed WebView.
+  void _disposeFeedWebView() {
+    _feedController = null;
+    _feedCfAttempts = 0;
+    final wv = _feedWebView;
+    _feedWebView = null;
+    if (wv != null) wv.dispose();
+  }
+
   /// Fetch HTML using HeadlessInAppWebView.
   /// If [waitForAjax] is true, waits extra time for JS to load comments.
   /// Shares the same WebViewEnvironment as the login WebView, so it has
@@ -234,6 +468,16 @@ class FAClient {
     final completer = Completer<String>();
     HeadlessInAppWebView? headless;
     int solveAttempts = 0;
+
+    // Inject session cookies via CookieManager as a best-effort attempt.
+    await _injectSessionCookies(url);
+
+    // Also build a raw Cookie header so we can attach it directly to the
+    // URLRequest — this bypasses CookieManager entirely and ensures auth
+    // cookies (especially 'a') are sent even if setCookie() dropped them.
+    final cookieHeader = _buildCookieHeader();
+    debugPrint(
+        '=== Cookie header for URLRequest: ${cookieHeader?.substring(0, cookieHeader.length > 200 ? 200 : cookieHeader.length)}...');
 
     headless = HeadlessInAppWebView(
       webViewEnvironment: webViewEnvironment,
@@ -303,6 +547,11 @@ class FAClient {
       },
       initialUrlRequest: URLRequest(
         url: WebUri(url),
+        headers: {
+          if (cookieHeader != null) 'Cookie': cookieHeader,
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        },
       ),
     );
 
@@ -410,24 +659,76 @@ class FAClient {
     await _enhancedClient.clearData();
   }
 
-  Future<List<Submission>> getSubmissions(int page, String category,
-      {String sortBy = 'datet', String sortDirection = 'desc'}) async {
-    final url = FAUrls.browse(
-      filter: category,
-      page: page,
-      sortBy: sortBy,
-      sortDirection: sortDirection,
-    );
+  Future<List<Submission>> getSubmissions(int page, String category) async {
+    final url = FAUrls.browse(filter: category, page: page);
     final html = await _getHtml(url);
     return Submission.parseSubmissionsPage(html);
   }
 
-  Future<List<Submission>> getGallery(String username,
-      {int page = 1,
-      String sortBy = 'datet',
-      String sortDirection = 'desc'}) async {
-    final url = FAUrls.gallery(username,
-        page: page, sortBy: sortBy, sortDirection: sortDirection);
+  /// Fetch the watch feed (`/msg/submissions/`).
+  ///
+  /// Mirrors FurAffinityApp's `OnlineFASession.fetchSubmissionsPage(...)` /
+  /// `FAURLs.submissionsUrl(from:)`: page 1 is the latest 72 submissions;
+  /// subsequent pages are reached via `new~<sid>@72` (everything *older* than
+  /// `<sid>`). Returns the parsed list plus the cursor sid to use for the
+  /// next page (the smallest sid in the returned batch, or `null` once the
+  /// oldest page is reached and there is no "Next" link).
+  Future<({List<Submission> submissions, int? nextSid})> getWatchSubmissions(
+      {int? fromSid}) async {
+    final url = fromSid == null
+        ? FAUrls.latest72SubmissionsUrl.toString()
+        : FAUrls.submissionsFrom(fromSid);
+
+    // On Windows, use the persistent feed WebView so CF clearance cookies
+    // are preserved across calls. On other platforms, use standard fetch.
+    final html = io.Platform.isWindows
+        ? await _navigateFeedWebView(url)
+        : await _getHtml(url, waitForAjax: true);
+
+    debugPrint('=== WatchFeed: fetched ${html.length} chars from $url');
+    // Print the page <title> so we can see if we got a redirect
+    final titleMatch =
+        RegExp(r'<title[^>]*>([^<]+)</title>', caseSensitive: false)
+            .firstMatch(html);
+    final pageTitle = titleMatch?.group(1)?.trim() ?? '(none)';
+    debugPrint('=== WatchFeed: page title = $pageTitle');
+    // Show around the submissions section if present
+    final idx = html.indexOf('messagecenter-submissions');
+    if (idx >= 0) {
+      final start = idx > 100 ? idx - 100 : 0;
+      debugPrint('=== WatchFeed: found messagecenter-submissions at $idx');
+      debugPrint(html.substring(start, (start + 1500).clamp(0, html.length)));
+    } else {
+      debugPrint('=== WatchFeed: NO messagecenter-submissions found');
+      // Skip the <head> and dump the <body> content so we can see
+      // what structure FA actually returns.
+      final bodyIdx = html.indexOf('<body');
+      final dumpFrom = bodyIdx >= 0 ? bodyIdx : 0;
+      debugPrint('=== WatchFeed: body HTML (from $dumpFrom):');
+      debugPrint(
+          html.substring(dumpFrom, (dumpFrom + 5000).clamp(0, html.length)));
+    }
+    final page = fa.FASubmissionsPage.parse(
+        html, Uri.parse('https://www.furaffinity.net'));
+    debugPrint(
+        '=== WatchFeed: parsed ${page.submissions.length} submissions, nextPageUrl=${page.nextPageUrl}');
+    final subs = page.submissions
+        .whereType<fa.FASubmissionsPageItem>()
+        .map(Submission.fromFASubmissionsPageItem)
+        .toList();
+
+    // Next cursor: pull sid out of the "Next" link (`new~<sid>@72`).
+    // No Next link ⇒ oldest page reached.
+    int? nextSid;
+    final nextHref = page.nextPageUrl?.path ?? '';
+    final m = RegExp(r'new~(\d+)@72').firstMatch(nextHref);
+    if (m != null) nextSid = int.tryParse(m.group(1)!);
+
+    return (submissions: subs, nextSid: nextSid);
+  }
+
+  Future<List<Submission>> getGallery(String username, {int page = 1}) async {
+    final url = FAUrls.gallery(username, page: page);
     final html = await _getHtml(url);
     return Submission.parseSubmissionsPage(html);
   }
@@ -469,7 +770,7 @@ class FAClient {
   Future<List<Submission>> search(
     String query, {
     int page = 1,
-    String sortBy = 'relevancyt',
+    String sortBy = 'relevancy',
     String sortDirection = 'desc',
   }) async {
     final url = FAUrls.search(query,
@@ -687,11 +988,8 @@ class FAClient {
 
   /// Fetch a user's favorites page.
   Future<List<Submission>> getUserFavorites(String username,
-      {int page = 1,
-      String sortBy = 'datet',
-      String sortDirection = 'desc'}) async {
-    final url = FAUrls.favorites(username,
-        page: page, sortBy: sortBy, sortDirection: sortDirection);
+      {int page = 1}) async {
+    final url = FAUrls.favorites(username, page: page);
     final html = await _getHtml(url);
     return Submission.parseSubmissionsPage(html);
   }
@@ -1040,26 +1338,5 @@ class FAClient {
       debugPrint('=== Error checking SFW cookie: $e');
     }
     return false;
-  }
-
-  String? _buildCookieHeader() {
-    if (_session?.cookies == null) return null;
-    try {
-      final List<dynamic> raw = jsonDecode(_session!.cookies!);
-      final parts = <String>[];
-      for (final item in raw) {
-        if (item is Map<String, dynamic>) {
-          final name = item['name']?.toString() ?? '';
-          final value = item['value']?.toString() ?? '';
-          if (name.isNotEmpty && value.isNotEmpty) {
-            parts.add('$name=$value');
-          }
-        }
-      }
-      return parts.join('; ');
-    } catch (e) {
-      debugPrint('=== Error building cookie header: $e');
-      return null;
-    }
   }
 }

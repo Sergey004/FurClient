@@ -22,19 +22,26 @@ enum AppThemeMode {
 class ThemeProvider extends ChangeNotifier {
   static const _modeKey = 'app_theme_mode';
 
-  AppThemeMode _mode = AppThemeMode.original;
-  AppThemeMode get mode => _mode;
-
-  ThemeProvider() {
-    _load();
+  /// Singleton instance initialised before runApp so the theme is ready
+  /// from the first frame.
+  static final ThemeProvider instance = ThemeProvider._();
+  ThemeProvider._() {
+    // _load() is async — caller must await _loadFromPrefs() separately
+    // before first build.
   }
 
-  Future<void> _load() async {
+  /// Load theme mode from prefs — call before runApp.
+  Future<void> loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final idx = prefs.getInt(_modeKey) ?? AppThemeMode.original.index;
     _mode = AppThemeMode.values[idx];
-    // don't notify here — first build will pick it up
   }
+
+  /// Legacy constructor for backwards compatibility — delegates to [instance].
+  ThemeProvider() : this._();
+
+  AppThemeMode _mode = AppThemeMode.original;
+  AppThemeMode get mode => _mode;
 
   Future<void> setMode(AppThemeMode newMode) async {
     if (_mode == newMode) return;

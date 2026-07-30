@@ -75,6 +75,9 @@ void main() {
       }
 
       AppTheme.setSystemOverlay();
+      // Pre-init ThemeProvider before runApp so theme is loaded from the
+      // very first frame (splash, restoration screen, etc.).
+      await ThemeProvider.instance.loadFromPrefs();
       if (const bool.fromEnvironment('ENABLE_FLUTTER_DRIVER')) {
         enableFlutterDriverExtension();
       }
@@ -104,7 +107,7 @@ class _FurClientAppState extends State<FurClientApp> {
   final AuthService _authService = AuthService();
   final FAClient _client = FAClient();
   final UpdateService _updateService = UpdateService();
-  final ThemeProvider _themeProvider = ThemeProvider();
+  final ThemeProvider _themeProvider = ThemeProvider.instance;
   bool _isLoggedIn = false;
   bool _isRestoringSession = true;
 
@@ -335,20 +338,28 @@ class _FurClientAppState extends State<FurClientApp> {
   Widget _buildHome() {
     if (_isRestoringSession) {
       if (isWindows) {
-        // Fluent-native restoration screen: no Material Scaffold inside FluentApp.
         return fluent.ScaffoldPage(
-          content: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const fluent.ProgressRing(),
-                const SizedBox(height: 16),
-                Text(
-                  'Restoring session...',
-                  style: TextStyle(color: AppColors.textDim, fontSize: 14),
+          content: Builder(
+            builder: (context) {
+              final colorScheme = Theme.of(context).colorScheme;
+              return ColoredBox(
+                color: colorScheme.surface,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const fluent.ProgressRing(),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Restoring session...',
+                        style:
+                            TextStyle(color: AppColors.textDim, fontSize: 14),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         );
       }

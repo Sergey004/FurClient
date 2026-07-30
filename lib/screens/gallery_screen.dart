@@ -30,6 +30,7 @@ class _GalleryScreenState extends State<GalleryScreen>
   int _currentPage = 1;
   bool _isLoading = false;
   bool _isLoadingMore = false;
+  bool _isRefreshing = false;
   bool _hasMore = true;
   String? _error;
   String _selectedCategory = 'all';
@@ -94,6 +95,42 @@ class _GalleryScreenState extends State<GalleryScreen>
     }
   }
 
+  /// Pull-to-refresh — re-fetches page 1 and merges any *new* submission ids
+  /// at the top, leaving existing items in place so the scroll position stays
+  /// meaningful. Older pages already loaded via `_loadMore` are preserved.
+  /// Mirrors the watch-feed refresh behaviour.
+  Future<void> _onRefresh() async {
+    if (_isRefreshing || _isLoading) return;
+    setState(() => _isRefreshing = true);
+
+    try {
+      final results = await widget.client.getSubmissions(1, _selectedCategory);
+      if (!mounted) return;
+
+      if (_submissions.isEmpty) {
+        setState(() {
+          _submissions = results;
+          _isRefreshing = false;
+          _hasMore = results.isNotEmpty;
+        });
+        return;
+      }
+
+      final existingIds = _submissions.map((s) => s.id).toSet();
+      final fresh = results.where((s) => !existingIds.contains(s.id));
+      if (fresh.isEmpty) {
+        setState(() => _isRefreshing = false);
+        return;
+      }
+      setState(() {
+        _submissions = [...fresh, ..._submissions];
+        _isRefreshing = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
+
   Future<void> _loadMore() async {
     if (_isLoadingMore || _isLoading || !_hasMore) return;
     setState(() => _isLoadingMore = true);
@@ -117,25 +154,9 @@ class _GalleryScreenState extends State<GalleryScreen>
     }
   }
 
-  Future<void> _onRefresh() async {
-    await _loadSubmissions();
-  }
-
   void _onCategoryChanged(String category) {
     if (category == _selectedCategory) return;
     setState(() => _selectedCategory = category);
-    _loadSubmissions();
-  }
-
-  void _onSortChanged(String sortBy) {
-    if (sortBy == _sortBy) return;
-    setState(() => _sortBy = sortBy);
-    _loadSubmissions();
-  }
-
-  void _onDirectionChanged(String direction) {
-    if (direction == _sortDirection) return;
-    setState(() => _sortDirection = direction);
     _loadSubmissions();
   }
 
@@ -169,8 +190,6 @@ class _GalleryScreenState extends State<GalleryScreen>
       body: Column(
         children: [
           _buildCategoryChips(),
-          const SizedBox(height: 4),
-          _buildSortBar(),
           const SizedBox(height: 8),
           Expanded(child: _buildBody()),
         ],
@@ -221,78 +240,6 @@ class _GalleryScreenState extends State<GalleryScreen>
                   checkmarkColor: AppColors.materialLavender,
                 );
               },
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
-  Widget _buildSortBar() {
-    if (isWindows) {
-      return SizedBox(
-        height: 40,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          children: [
-            ..._sortOptions.map((opt) {
-              final (value, label) = opt;
-              final selected = value == _sortBy;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: fluent.ToggleButton(
-                  checked: selected,
-                  onChanged: (_) => _onSortChanged(value),
-                  child: Text(label),
-                ),
-              );
-            }),
-            const SizedBox(width: 8),
-            fluent.ToggleButton(
-              checked: _sortDirection == 'desc',
-              onChanged: (_) => _onDirectionChanged(
-                  _sortDirection == 'desc' ? 'asc' : 'desc'),
-              child: Text(_sortDirection == 'desc' ? '↓ Desc' : '↑ Asc'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      return Theme(
-        data: Theme.of(context),
-        child: Material(
-          color: Colors.transparent,
-          child: SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                ..._sortOptions.map((opt) {
-                  final (value, label) = opt;
-                  final selected = value == _sortBy;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(label),
-                      selected: selected,
-                      onSelected: (_) => _onSortChanged(value),
-                      selectedColor: AppColors.materialLavenderBg,
-                      checkmarkColor: AppColors.materialLavender,
-                    ),
-                  );
-                }),
-                const SizedBox(width: 8),
-                ActionChip(
-                  label: Text(_sortDirection == 'desc' ? '↓ Desc' : '↑ Asc'),
-                  onPressed: () => _onDirectionChanged(
-                      _sortDirection == 'desc' ? 'asc' : 'desc'),
-                  backgroundColor: _sortDirection == 'asc'
-                      ? AppColors.materialLavenderBg
-                      : null,
-                ),
-              ],
             ),
           ),
         ),

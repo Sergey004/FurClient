@@ -43,7 +43,7 @@ class _SearchScreenState extends State<SearchScreen>
   bool _hasMore = true;
   String? _error;
   String _query = '';
-  String _sortBy = 'relevancyt';
+  String _sortBy = 'relevancy';
   String _sortDirection = 'desc';
   bool _hasSearched = false;
   bool _historyLoaded = false;
@@ -296,13 +296,13 @@ class _SearchScreenState extends State<SearchScreen>
           const Text('Sort:',
               style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
           const SizedBox(width: 8),
-          _sortChip('Relevance', 'relevancyt'),
+          _sortChip('Relevance', 'relevancy'),
           const SizedBox(width: 6),
-          _sortChip('Newest', 'datet'),
+          _sortChip('Newest', 'date'),
           const SizedBox(width: 6),
-          _sortChip('Popular', 'popularityt'),
+          _sortChip('Popular', 'popularity'),
           const Spacer(),
-          if (_sortBy != 'relevancyt')
+          if (_sortBy != 'relevancy')
             GestureDetector(
               onTap: () => _toggleSortDirection(),
               child: Container(

@@ -6,6 +6,7 @@ import '../services/fa_client.dart';
 import '../services/search_history.dart';
 import '../theme/theme_provider.dart';
 import '../screens/gallery_screen.dart';
+import '../screens/watch_feed_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/profile_screen.dart';
@@ -43,7 +44,7 @@ class _FluentShellState extends State<FluentShell> {
 
   void _onExternalSearch() {
     if (SearchHistory.externalQuery.value != null && mounted) {
-      setState(() => _currentIndex = 1);
+      setState(() => _currentIndex = 2);
     }
   }
 
@@ -161,6 +162,15 @@ class _FluentShellState extends State<FluentShell> {
             icon: const fluent.Icon(fluent.FluentIcons.photo2),
             title: const fluent.Text('Gallery'),
             body: GalleryScreen(
+              client: widget.client,
+              sfwMode: _sfwMode,
+              onLogout: widget.onLogout,
+            ),
+          ),
+          fluent.PaneItem(
+            icon: const fluent.Icon(fluent.FluentIcons.radio_bullet),
+            title: const fluent.Text('Watch'),
+            body: WatchFeedScreen(
               client: widget.client,
               sfwMode: _sfwMode,
               onLogout: widget.onLogout,

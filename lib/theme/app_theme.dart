@@ -235,7 +235,7 @@ class AppTheme {
     //   surfaceContainerLowest  → most elevated (cards, dialogs)
     //   surfaceContainerLow     → slightly elevated
     //   surfaceContainer        → medium
-    //   surfaceContainerHigh   → slightly recessed
+    //   surfaceContainerHigh    → slightly recessed
     //   surfaceContainerHighest → most recessed (navigation, bottom bar)
     //   surface                 → base scaffold background
     final scaffoldBg = colorScheme.surface;

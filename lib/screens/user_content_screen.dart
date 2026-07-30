@@ -47,20 +47,8 @@ class _UserContentScreenState extends State<UserContentScreen> {
   bool _isLoadingMore = false;
   bool _hasMore = true;
   String? _error;
-  String _sortBy = 'datet';
-  String _sortDirection = 'desc';
 
   final ScrollController _scrollController = ScrollController();
-
-  static const _sortOptions = [
-    ('datet', 'Date'),
-    ('popularityt', 'Popular'),
-    ('relevancyt', 'Relevance'),
-  ];
-
-  bool get _hasSortBar =>
-      widget.contentType == UserContentType.gallery ||
-      widget.contentType == UserContentType.favorites;
 
   @override
   void initState() {
@@ -108,12 +96,10 @@ class _UserContentScreenState extends State<UserContentScreen> {
     try {
       switch (widget.contentType) {
         case UserContentType.gallery:
-          _submissions = await widget.client.getGallery(widget.username,
-              sortBy: _sortBy, sortDirection: _sortDirection);
+          _submissions = await widget.client.getGallery(widget.username);
           break;
         case UserContentType.favorites:
-          _submissions = await widget.client.getUserFavorites(widget.username,
-              sortBy: _sortBy, sortDirection: _sortDirection);
+          _submissions = await widget.client.getUserFavorites(widget.username);
           break;
         case UserContentType.journals:
           _journals = await widget.client.getUserJournals(widget.username);
@@ -146,14 +132,9 @@ class _UserContentScreenState extends State<UserContentScreen> {
 
     try {
       final more = widget.contentType == UserContentType.gallery
-          ? await widget.client.getGallery(widget.username,
-              page: _currentPage,
-              sortBy: _sortBy,
-              sortDirection: _sortDirection)
-          : await widget.client.getUserFavorites(widget.username,
-              page: _currentPage,
-              sortBy: _sortBy,
-              sortDirection: _sortDirection);
+          ? await widget.client.getGallery(widget.username, page: _currentPage)
+          : await widget.client
+              .getUserFavorites(widget.username, page: _currentPage);
       if (mounted) {
         setState(() {
           _submissions.addAll(more);
@@ -177,18 +158,6 @@ class _UserContentScreenState extends State<UserContentScreen> {
         ),
       ),
     );
-  }
-
-  void _onSortChanged(String sortBy) {
-    if (sortBy == _sortBy) return;
-    setState(() => _sortBy = sortBy);
-    _loadContent();
-  }
-
-  void _onDirectionChanged(String direction) {
-    if (direction == _sortDirection) return;
-    setState(() => _sortDirection = direction);
-    _loadContent();
   }
 
   void _navigateToJournal(FAJournalPreview journal) {
@@ -224,7 +193,6 @@ class _UserContentScreenState extends State<UserContentScreen> {
           content: Column(
             children: [
               _buildWindowTitleBar(context),
-              if (_hasSortBar) _buildSortBar(),
               Expanded(child: _buildBody()),
             ],
           ),
@@ -234,12 +202,7 @@ class _UserContentScreenState extends State<UserContentScreen> {
 
     return AdaptiveScaffold(
       appBar: AppBar(title: Text(_pageTitle)),
-      body: Column(
-        children: [
-          if (_hasSortBar) _buildSortBar(),
-          Expanded(child: _buildBody()),
-        ],
-      ),
+      body: _buildBody(),
     );
   }
 
@@ -289,78 +252,6 @@ class _UserContentScreenState extends State<UserContentScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildSortBar() {
-    if (isWindows) {
-      return SizedBox(
-        height: 40,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          children: [
-            ..._sortOptions.map((opt) {
-              final (value, label) = opt;
-              final selected = value == _sortBy;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: fluent.ToggleButton(
-                  checked: selected,
-                  onChanged: (_) => _onSortChanged(value),
-                  child: Text(label),
-                ),
-              );
-            }),
-            const SizedBox(width: 8),
-            fluent.ToggleButton(
-              checked: _sortDirection == 'desc',
-              onChanged: (_) => _onDirectionChanged(
-                  _sortDirection == 'desc' ? 'asc' : 'desc'),
-              child: Text(_sortDirection == 'desc' ? '↓ Desc' : '↑ Asc'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      return Theme(
-        data: Theme.of(context),
-        child: Material(
-          color: Colors.transparent,
-          child: SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                ..._sortOptions.map((opt) {
-                  final (value, label) = opt;
-                  final selected = value == _sortBy;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(label),
-                      selected: selected,
-                      onSelected: (_) => _onSortChanged(value),
-                      selectedColor: AppColors.materialLavenderBg,
-                      checkmarkColor: AppColors.materialLavender,
-                    ),
-                  );
-                }),
-                const SizedBox(width: 8),
-                ActionChip(
-                  label: Text(_sortDirection == 'desc' ? '↓ Desc' : '↑ Asc'),
-                  onPressed: () => _onDirectionChanged(
-                      _sortDirection == 'desc' ? 'asc' : 'desc'),
-                  backgroundColor: _sortDirection == 'asc'
-                      ? AppColors.materialLavenderBg
-                      : null,
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
   }
 
   Widget _buildBody() {

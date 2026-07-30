@@ -111,23 +111,26 @@ class DownloadService {
       final filename = originalName ?? _buildFallbackFilename(title, imageUrl);
       final filePath = '$dirPath/$filename';
 
-      // Handle duplicate filenames
-      final finalPath = await _getUniquePath(filePath);
+      // Check if file already exists — skip download to avoid duplicates
+      final file = File(filePath);
+      if (await file.exists()) {
+        debugPrint('=== DownloadService: SKIP (already exists): $filePath');
+        return filePath;
+      }
 
       // Step 4: Write file
-      final file = File(finalPath);
       await file.writeAsBytes(bytes);
 
       // Verify file was written
       if (await file.exists()) {
         final size = await file.length();
-        debugPrint('=== DownloadService: Saved OK: $finalPath ($size bytes)');
+        debugPrint('=== DownloadService: Saved OK: $filePath ($size bytes)');
       } else {
         debugPrint(
-            '=== DownloadService: ERROR — file not found after write: $finalPath');
+            '=== DownloadService: ERROR — file not found after write: $filePath');
       }
 
-      return finalPath;
+      return filePath;
     } catch (e, stack) {
       debugPrint('=== DownloadService: Download error: $e');
       debugPrint('=== DownloadService: Stack: $stack');
@@ -257,22 +260,5 @@ class DownloadService {
       }
     } catch (_) {}
     return '.png';
-  }
-
-  /// Get a unique file path by appending a number if file already exists.
-  Future<String> _getUniquePath(String filePath) async {
-    final file = File(filePath);
-    if (!file.existsSync()) return filePath;
-
-    final dot = filePath.lastIndexOf('.');
-    final base = dot > 0 ? filePath.substring(0, dot) : filePath;
-    final ext = dot > 0 ? filePath.substring(dot) : '';
-
-    for (int i = 1; i < 1000; i++) {
-      final newPath = '$base ($i)$ext';
-      if (!File(newPath).existsSync()) return newPath;
-    }
-
-    return filePath;
   }
 }

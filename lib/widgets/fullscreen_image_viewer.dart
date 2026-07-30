@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' as io;
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
@@ -176,33 +177,7 @@ class FullscreenImageViewer extends StatelessWidget {
                     ),
                   );
                 }
-                return ExtendedImage.memory(
-                  bytes,
-                  fit: BoxFit.contain,
-                  mode: ExtendedImageMode.gesture,
-                  enableSlideOutPage: true,
-                  initGestureConfigHandler: (state) {
-                    return GestureConfig(
-                      minScale: 0.5,
-                      animationMinScale: 0.3,
-                      maxScale: 8.0,
-                      animationMaxScale: 9.0,
-                      speed: 1.0,
-                      inertialSpeed: 100.0,
-                      initialScale: 1.0,
-                      inPageView: false,
-                      cacheGesture: false,
-                    );
-                  },
-                  onDoubleTap: (ExtendedImageGestureState gestureState) {
-                    final begin =
-                        gestureState.gestureDetails?.totalScale ?? 1.0;
-                    gestureState.handleDoubleTap(
-                      scale: begin > 1.5 ? 1.0 : 2.5,
-                      doubleTapPosition: gestureState.pointerDownPosition,
-                    );
-                  },
-                );
+                return _ImageViewer(bytes: bytes);
               },
             ),
           ),
@@ -278,6 +253,90 @@ class FullscreenImageViewer extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Image viewer widget that decodes image dimensions upfront so the
+/// gesture detector's zoom/pan math uses the actual image bounds, not
+/// the parent container. Without this, zooming on a letterboxed image
+/// leaves empty/clipped regions.
+class _ImageViewer extends StatefulWidget {
+  final Uint8List bytes;
+  const _ImageViewer({required this.bytes});
+
+  @override
+  State<_ImageViewer> createState() => _ImageViewerState();
+}
+
+class _ImageViewerState extends State<_ImageViewer> {
+  ui.Image? _decoded;
+  Future<ui.Image>? _decodeFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _decodeFuture = _decodeImage();
+    _decodeFuture!.then((img) {
+      if (mounted) setState(() => _decoded = img);
+    }).catchError((_) {});
+  }
+
+  Future<ui.Image> _decodeImage() {
+    return ui.instantiateImageCodec(widget.bytes).then((codec) {
+      return codec.getNextFrame().then((frame) => frame.image);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_decoded == null) {
+      return const Center(
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    final w = _decoded!.width.toDouble();
+    final h = _decoded!.height.toDouble();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Compute the on-screen size the image will be rendered at with
+        // BoxFit.contain — gesture math uses this size, not the raw image.
+        final sx = constraints.maxWidth / w;
+        final sy = constraints.maxHeight / h;
+        final scale = sx < sy ? sx : sy;
+        return Center(
+          child: SizedBox(
+            width: w * scale,
+            height: h * scale,
+            child: ExtendedImage.memory(
+              widget.bytes,
+              fit: BoxFit.fill,
+              mode: ExtendedImageMode.gesture,
+              enableSlideOutPage: true,
+              initGestureConfigHandler: (state) {
+                return GestureConfig(
+                  minScale: 0.5,
+                  animationMinScale: 0.3,
+                  maxScale: 8.0,
+                  animationMaxScale: 9.0,
+                  speed: 1.0,
+                  inertialSpeed: 100.0,
+                  initialScale: 1.0,
+                  inPageView: false,
+                  cacheGesture: false,
+                );
+              },
+              onDoubleTap: (ExtendedImageGestureState gestureState) {
+                final begin = gestureState.gestureDetails?.totalScale ?? 1.0;
+                gestureState.handleDoubleTap(
+                  scale: begin > 1.5 ? 1.0 : 2.5,
+                  doubleTapPosition: gestureState.pointerDownPosition,
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
