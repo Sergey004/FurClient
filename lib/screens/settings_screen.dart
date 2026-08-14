@@ -8,7 +8,7 @@ import '../services/fa_client.dart';
 import '../services/update_service.dart';
 import '../utils/platform_utils.dart';
 import '../theme/theme_provider.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import '../utils/app_version.dart';
 import 'dart:io' show Platform;
 import '../widgets/age_gate_dialog.dart';
 
@@ -64,10 +64,10 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _loadVersionInfo() async {
-    final info = await PackageInfo.fromPlatform();
+    final version = await AppVersion.resolve();
     if (mounted) {
       setState(() {
-        _appVersion = info.version;
+        _appVersion = version;
       });
     }
   }
