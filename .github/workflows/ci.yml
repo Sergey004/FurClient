@@ -13,73 +13,51 @@ env:
 jobs:
   # ─── Lint & Analyze ────────────────────────────────────────────
   analyze:
-    name: Analyze
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y \
-            ninja-build \
-            libgtk-3-dev \
-            libblkid-dev \
-            liblzma-dev \
-            cmake \
-            pkg-config
+      - uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: "stable"
-          cache: true
+          channel: stable
 
-      - name: Get dependencies
+      - name: Install dependencies
         run: flutter pub get
 
-      - name: Check formatting
-        run: dart format --set-exit-if-changed lib/ test/
+      - name: Install fa_kit dependencies
+        run: flutter pub get
+        working-directory: packages/fa_kit
 
       - name: Run analyzer
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
 
   # ─── Build Android APK ──────────────────────────────────────────
   build-android:
     name: Android APK
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: analyze
     timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y \
-            ninja-build \
-            libgtk-3-dev \
-            libblkid-dev \
-            liblzma-dev \
-            cmake \
-            pkg-config
-
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
-          distribution: "zulu"
+          distribution: zulu
           java-version: ${{ env.JAVA_VERSION }}
-          cache: "gradle"
+          cache: gradle
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: "stable"
+          channel: stable
           cache: true
 
       - name: Get dependencies
@@ -109,7 +87,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: "stable"
+          channel: stable
           cache: true
 
       - name: Enable Windows desktop
