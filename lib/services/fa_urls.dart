@@ -49,21 +49,57 @@ class FAUrls {
   /// page means more may follow.
   static const int searchPageSize = 72;
 
+  /// All rating checkbox suffixes the `/search/` form exposes
+  /// (`rating-general`, `rating-mature`, `rating-adult`).
+  static const List<String> allSearchRatings = ['general', 'mature', 'adult'];
+
+  /// All content-type checkbox suffixes the `/search/` form exposes
+  /// (`type-art`, `type-music`, ...). Mirrors
+  /// FASearchQuery.ContentType.allCases.
+  static const List<String> allSearchContentTypes = [
+    'art',
+    'music',
+    'flash',
+    'story',
+    'photo',
+    'poetry',
+  ];
+
+  /// Builds the `GET /search/` URL. Mirrors FurAffinityApp's
+  /// `FAURLs.searchUrl(for:)` exactly — including the `rating-*`,
+  /// `type-*` and `range` parameters. Omitting these (as the previous
+  /// implementation did) leaves the server to apply its own defaults for
+  /// ratings/content types, which silently narrows the result set that
+  /// sorting is then applied to and makes "date"/"popularity" sort look
+  /// broken or incomplete.
+  ///
+  /// Defaults mirror FASearchQuery.default: all ratings, all content
+  /// types, last 5 years — the same defaults the `/search/` web form uses.
   static String search(
     String query, {
     int page = 1,
     String sortBy = 'relevancy',
     String sortDirection = 'desc',
+    List<String> ratings = allSearchRatings,
+    List<String> contentTypes = allSearchContentTypes,
+    String range = '5years',
   }) {
     final q = Uri.encodeComponent(query);
     final parts = <String>[
       'q=$q',
       'order-by=$sortBy',
       'order-direction=$sortDirection',
-      'mode=extended',
-      'page=$page',
-      'perpage=$searchPageSize',
+      'range=$range',
     ];
+    for (final rating in ratings) {
+      parts.add('rating-$rating=1');
+    }
+    for (final type in contentTypes) {
+      parts.add('type-$type=1');
+    }
+    parts.add('mode=extended');
+    parts.add('page=$page');
+    parts.add('perpage=$searchPageSize');
     return '$baseUrl/search/?${parts.join('&')}';
   }
 

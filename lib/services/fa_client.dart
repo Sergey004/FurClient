@@ -782,16 +782,25 @@ class FAClient {
   /// Toggle favorite on a submission.
   /// [favoriteUrl] is the action URL parsed from the submission page
   /// (e.g. "/fav/123456/?key=abc" to fave, "/unfav/123456/?key=abc" to unfave).
-  /// Returns true if the action succeeded.
-  Future<bool> toggleFavorite(String favoriteUrl) async {
+  /// [submissionId] is needed to re-parse the response as a submission page.
+  ///
+  /// Mirrors FurAffinityApp's OnlineFASession.toggleFavorite(for:): the
+  /// fav/unfav link is a plain GET (it's an `<a href>` on the page, not a
+  /// form) and the *response* is re-parsed to get the fresh state —
+  /// including the new favoriteUrl with its updated `?key=`. Guessing the
+  /// next favoriteUrl client-side (swapping /fav/ <-> /unfav/) drops that
+  /// key and breaks a second toggle within the same session.
+  ///
+  /// Returns the updated [Submission] on success, or null on failure.
+  Future<Submission?> toggleFavorite(
+      String favoriteUrl, String submissionId) async {
     final url = favoriteUrl.startsWith('http')
         ? favoriteUrl
         : '${FAUrls.baseUrl}$favoriteUrl';
 
-    debugPrint('=== toggleFavorite: POST via WebView $url');
+    debugPrint('=== toggleFavorite: GET via WebView $url');
 
-    // FA fav/unfav requires POST with cookies — always use WebView to bypass CF.
-    final completer = Completer<bool>();
+    final completer = Completer<String?>();
     HeadlessInAppWebView? headless;
 
     headless = HeadlessInAppWebView(
@@ -810,13 +819,14 @@ class FAClient {
             await Future.delayed(const Duration(seconds: 3));
             final retryHtml = await controller.getHtml() ?? '';
             if (!_isCloudflarePage(retryHtml)) {
-              if (!completer.isCompleted) completer.complete(true);
+              if (!completer.isCompleted) completer.complete(retryHtml);
             }
             return;
           }
 
-          // If we got a real page back (not CF), the action succeeded
-          if (!completer.isCompleted) completer.complete(html.isNotEmpty);
+          if (!completer.isCompleted) {
+            completer.complete(html.isNotEmpty ? html : null);
+          }
         } catch (e) {
           debugPrint('=== toggleFavorite onLoadStop error: $e');
           if (!completer.isCompleted) completer.completeError(e);
@@ -829,9 +839,8 @@ class FAClient {
       },
       initialUrlRequest: URLRequest(
         url: WebUri(url),
-        method: 'POST',
+        // GET — /fav/ и /unfav/ на FA обычные <a href> ссылки, не форма.
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
           'Referer': FAUrls.baseUrl,
         },
       ),
@@ -840,11 +849,11 @@ class FAClient {
     await headless.run();
 
     try {
-      final success = await completer.future.timeout(
+      final html = await completer.future.timeout(
         const Duration(seconds: 30),
         onTimeout: () {
           debugPrint('=== toggleFavorite: timeout');
-          return false;
+          return null;
         },
       );
       await headless.dispose();
@@ -852,12 +861,25 @@ class FAClient {
       // Sync cookies after action
       await _syncCookiesFromWebView();
 
-      debugPrint('=== toggleFavorite: result=$success');
-      return success;
+      if (html == null || html.isEmpty) {
+        debugPrint('=== toggleFavorite: empty response');
+        return null;
+      }
+
+      // Парсим ответ как submission page — получаем актуальный favoriteUrl
+      // (с новым key) и isFavorite/faves из ответа сервера, а не из догадки.
+      final page = fa.FASubmissionPage.parse(
+        html,
+        Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
+      );
+      final submission = Submission.fromFASubmissionPage(page, submissionId);
+      debugPrint(
+          '=== toggleFavorite: result isFavorite=${submission.isFavorite}, faves=${submission.faves}');
+      return submission;
     } catch (e) {
       await headless.dispose();
       debugPrint('=== toggleFavorite error: $e');
-      return false;
+      return null;
     }
   }
 
