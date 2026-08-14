@@ -1,10 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fa_kit/fa_kit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../services/fa_client.dart';
+import '../services/download_service.dart';
 import '../utils/fa_image_loader.dart';
 
 class SubmissionCard extends StatefulWidget {
@@ -47,17 +49,63 @@ class _SubmissionCardState extends State<SubmissionCard> {
 
   Future<void> _onFav() async {
     if (_isFaving) return;
-    setState(() => _isFaving = true);
+    final wasFav = _current.isFavorite;
+    // Optimistic update for instant, real-time feedback.
+    setState(() {
+      _isFaving = true;
+      _current = _current.copyWith(
+        isFavorite: !wasFav,
+        faves: _current.faves + (wasFav ? -1 : 1),
+      );
+    });
     try {
       final updated = _current.favoriteUrl.isNotEmpty
           ? await widget.client.toggleFavorite(_current.favoriteUrl, _current.id)
           : await widget.client.toggleFavoriteById(_current.id);
-      if (mounted && updated != null) {
+      if (!mounted) return;
+      if (updated != null) {
+        // Reconcile with the server's parsed state.
         setState(() => _current = updated);
         widget.onFavoriteChanged?.call(updated);
+        await _maybeAutoDownload();
+      } else {
+        // Site toggle failed — revert the optimistic change.
+        setState(() {
+          _current = _current.copyWith(
+            isFavorite: wasFav,
+            faves: _current.faves + (wasFav ? 1 : -1),
+          );
+        });
       }
     } finally {
       if (mounted) setState(() => _isFaving = false);
+    }
+  }
+
+  /// Mirror the detail screen: when the user faves a post and the
+  /// `auto_download_on_fave` setting is enabled, download the image.
+  Future<void> _maybeAutoDownload() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final autoDownload = prefs.getBool('auto_download_on_fave') ?? false;
+      if (!autoDownload) return;
+      final sub = _current;
+      if (sub.imageUrl.isEmpty) return;
+      final path = await DownloadService.instance.downloadImage(
+        imageUrl: sub.imageUrl,
+        title: sub.title,
+        author: sub.author,
+        rating: sub.rating,
+      );
+      if (mounted) {
+        if (path != null) {
+          debugPrint('=== card auto-download saved: ${path.split('/').last}');
+        } else {
+          debugPrint('=== card auto-download failed');
+        }
+      }
+    } catch (e) {
+      debugPrint('=== card auto-download error: $e');
     }
   }
 

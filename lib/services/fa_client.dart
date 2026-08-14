@@ -876,25 +876,113 @@ class FAClient {
 
   /// Toggle favorite for a submission given only its id.
   ///
-  /// Resolves the action URL from the *site* (the submission's view page),
-  /// then delegates to [toggleFavorite]. Used by grid cards, which don't
-  /// carry the per-item `favoriteUrl`/`?key=` produced by list parsing.
+  /// Performs the toggle in a *single authenticated WebView session*: it
+  /// loads the submission's view page, reads the real favorite action URL
+  /// (with the server-issued `?key=`), then navigates to it — exactly like
+  /// clicking the link in a browser. Used by grid cards, which don't carry
+  /// the per-item `favoriteUrl`/`?key=` produced by list parsing.
   ///
-  /// Returns the updated [Submission] on success, or null on failure.
+  /// Returns the updated [Submission] (server-parsed) on success, or null
+  /// on failure.
   Future<Submission?> toggleFavoriteById(String submissionId) async {
+    final viewUrl = '${FAUrls.baseUrl}/view/$submissionId/';
+    final cookieHeader = _buildCookieHeader();
+    debugPrint('=== toggleFavoriteById: load view page $viewUrl');
+
+    // Ensure auth cookies are sent for this WebView session.
+    await _injectSessionCookies(viewUrl);
+
+    final completer = Completer<Submission?>();
+    HeadlessInAppWebView? headless;
+    String? favoriteUrl;
+
+    headless = HeadlessInAppWebView(
+      webViewEnvironment: webViewEnvironment,
+      initialSettings: InAppWebViewSettings(
+        javaScriptEnabled: true,
+      ),
+      onLoadStop: (controller, loadedUrl) async {
+        try {
+          final html = await controller.getHtml() ?? '';
+          if (_isCloudflarePage(html)) {
+            debugPrint('=== toggleFavoriteById: CF challenge, waiting...');
+            await Future.delayed(const Duration(seconds: 3));
+            final retryHtml = await controller.getHtml() ?? '';
+            if (_isCloudflarePage(retryHtml)) return;
+          }
+
+          if (favoriteUrl == null) {
+            // Step 1: view page loaded — extract the favorite action URL.
+            final page = fa.FASubmissionPage.parse(
+              html,
+              Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
+            );
+            final sub = Submission.fromFASubmissionPage(page, submissionId);
+            favoriteUrl = sub.favoriteUrl;
+            if (favoriteUrl == null || favoriteUrl!.isEmpty) {
+              debugPrint('=== toggleFavoriteById: no favoriteUrl on page');
+              if (!completer.isCompleted) completer.complete(null);
+              return;
+            }
+            final favFull = favoriteUrl!.startsWith('http')
+                ? favoriteUrl!
+                : '${FAUrls.baseUrl}$favoriteUrl';
+            debugPrint('=== toggleFavoriteById: navigating to $favFull');
+            await controller.loadUrl(
+              urlRequest: URLRequest(
+                url: WebUri(favFull),
+                headers: {'Referer': FAUrls.baseUrl},
+              ),
+            );
+          } else {
+            // Step 2: fav/unfav action completed — parse the result page.
+            final page = fa.FASubmissionPage.parse(
+              html,
+              Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
+            );
+            final submission =
+                Submission.fromFASubmissionPage(page, submissionId);
+            debugPrint(
+                '=== toggleFavoriteById: result isFavorite=${submission.isFavorite}, faves=${submission.faves}');
+            if (!completer.isCompleted) completer.complete(submission);
+          }
+        } catch (e) {
+          debugPrint('=== toggleFavoriteById onLoadStop error: $e');
+          if (!completer.isCompleted) completer.completeError(e);
+        }
+      },
+      onReceivedHttpError: (controller, request, response) async {
+        if (!(request.isForMainFrame ?? false)) return;
+        debugPrint('=== toggleFavoriteById: HTTP ${response.statusCode}');
+      },
+      initialUrlRequest: URLRequest(
+        url: WebUri(viewUrl),
+        headers: {
+          'Referer': FAUrls.baseUrl,
+          if (cookieHeader != null && cookieHeader.isNotEmpty)
+            'Cookie': cookieHeader,
+        },
+      ),
+    );
+
+    await headless.run();
+
     try {
-      final html = await _getHtml('${FAUrls.baseUrl}/view/$submissionId/');
-      final page = fa.FASubmissionPage.parse(
-        html,
-        Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
+      final result = await completer.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint('=== toggleFavoriteById: timeout');
+          return null;
+        },
       );
-      final sub = Submission.fromFASubmissionPage(page, submissionId);
-      if (sub.favoriteUrl.isEmpty) {
-        debugPrint('=== toggleFavoriteById: no favoriteUrl on page');
-        return null;
-      }
-      return await toggleFavorite(sub.favoriteUrl, submissionId);
+      await headless.dispose();
+
+      // Sync cookies after action.
+      await _syncCookiesFromWebView();
+
+      return result;
     } catch (e) {
+      await headless.dispose();
       debugPrint('=== toggleFavoriteById error: $e');
       return null;
     }

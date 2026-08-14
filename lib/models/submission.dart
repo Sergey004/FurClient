@@ -53,6 +53,35 @@ class Submission {
     this.favoriteUrl = '',
   });
 
+  Submission copyWith({
+    bool? isFavorite,
+    int? faves,
+    String? favoriteUrl,
+  }) =>
+      Submission(
+        id: id,
+        title: title,
+        author: author,
+        displayName: displayName,
+        category: category,
+        imageUrl: imageUrl,
+        views: views,
+        faves: faves ?? this.faves,
+        commentsCount: commentsCount,
+        description: description,
+        tags: tags,
+        date: date,
+        sortDate: sortDate,
+        naturalDate: naturalDate,
+        isNsfw: isNsfw,
+        rating: rating,
+        url: url,
+        isFlash: isFlash,
+        flashUrl: flashUrl,
+        isFavorite: isFavorite ?? this.isFavorite,
+        favoriteUrl: favoriteUrl ?? this.favoriteUrl,
+      );
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
