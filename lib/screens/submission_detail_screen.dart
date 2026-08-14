@@ -104,12 +104,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     setState(() => _isFaving = true);
     bool success = false;
     try {
-      success = await widget.client.toggleFavorite(sub.favoriteUrl);
-      if (mounted && success) {
+      final updated = await widget.client.toggleFavorite(
+          sub.favoriteUrl, sub.id);
+      if (mounted && updated != null) {
+        success = true;
         setState(() {
-          // Toggle local state: swap between /fav/ and /unfav/
-          final wasFav = sub.isFavorite;
-          final sid = sub.id;
+          // Use server-parsed state: isFavorite, faves, and the fresh
+          // favoriteUrl (with updated ?key=) so a second toggle works.
           _submission = Submission(
             id: sub.id,
             title: sub.title,
@@ -117,7 +118,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             category: sub.category,
             imageUrl: sub.imageUrl,
             views: sub.views,
-            faves: sub.faves + (wasFav ? -1 : 1),
+            faves: updated.faves,
             commentsCount: sub.commentsCount,
             description: sub.description,
             tags: sub.tags,
@@ -125,8 +126,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             isNsfw: sub.isNsfw,
             rating: sub.rating,
             url: sub.url,
-            isFavorite: !wasFav,
-            favoriteUrl: wasFav ? '/fav/$sid/' : '/unfav/$sid/',
+            isFavorite: updated.isFavorite,
+            favoriteUrl: updated.favoriteUrl,
           );
         });
       }

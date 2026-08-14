@@ -450,15 +450,6 @@ class FAClient {
     return result;
   }
 
-  /// Dispose the persistent feed WebView.
-  void _disposeFeedWebView() {
-    _feedController = null;
-    _feedCfAttempts = 0;
-    final wv = _feedWebView;
-    _feedWebView = null;
-    if (wv != null) wv.dispose();
-  }
-
   /// Fetch HTML using HeadlessInAppWebView.
   /// If [waitForAjax] is true, waits extra time for JS to load comments.
   /// Shares the same WebViewEnvironment as the login WebView, so it has
@@ -879,6 +870,32 @@ class FAClient {
     } catch (e) {
       await headless.dispose();
       debugPrint('=== toggleFavorite error: $e');
+      return null;
+    }
+  }
+
+  /// Toggle favorite for a submission given only its id.
+  ///
+  /// Resolves the action URL from the *site* (the submission's view page),
+  /// then delegates to [toggleFavorite]. Used by grid cards, which don't
+  /// carry the per-item `favoriteUrl`/`?key=` produced by list parsing.
+  ///
+  /// Returns the updated [Submission] on success, or null on failure.
+  Future<Submission?> toggleFavoriteById(String submissionId) async {
+    try {
+      final html = await _getHtml('${FAUrls.baseUrl}/view/$submissionId/');
+      final page = fa.FASubmissionPage.parse(
+        html,
+        Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
+      );
+      final sub = Submission.fromFASubmissionPage(page, submissionId);
+      if (sub.favoriteUrl.isEmpty) {
+        debugPrint('=== toggleFavoriteById: no favoriteUrl on page');
+        return null;
+      }
+      return await toggleFavorite(sub.favoriteUrl, submissionId);
+    } catch (e) {
+      debugPrint('=== toggleFavoriteById error: $e');
       return null;
     }
   }

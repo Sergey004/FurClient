@@ -7,11 +7,12 @@ import '../widgets/adaptive/adaptive.dart';
 import '../services/fa_client.dart';
 import '../utils/fa_image_loader.dart';
 
-class SubmissionCard extends StatelessWidget {
+class SubmissionCard extends StatefulWidget {
   final Submission submission;
   final FAClient client;
   final bool sfwMode;
   final VoidCallback onTap;
+  final ValueChanged<Submission>? onFavoriteChanged;
 
   const SubmissionCard({
     super.key,
@@ -19,14 +20,58 @@ class SubmissionCard extends StatelessWidget {
     required this.client,
     this.sfwMode = false,
     required this.onTap,
+    this.onFavoriteChanged,
   });
+
+  @override
+  State<SubmissionCard> createState() => _SubmissionCardState();
+}
+
+class _SubmissionCardState extends State<SubmissionCard> {
+  late Submission _current;
+  bool _isFaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.submission;
+  }
+
+  @override
+  void didUpdateWidget(covariant SubmissionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.submission != widget.submission) {
+      _current = widget.submission;
+    }
+  }
+
+  Future<void> _onFav() async {
+    if (_isFaving) return;
+    setState(() => _isFaving = true);
+    try {
+      final updated = _current.favoriteUrl.isNotEmpty
+          ? await widget.client.toggleFavorite(_current.favoriteUrl, _current.id)
+          : await widget.client.toggleFavoriteById(_current.id);
+      if (mounted && updated != null) {
+        setState(() => _current = updated);
+        widget.onFavoriteChanged?.call(updated);
+      }
+    } finally {
+      if (mounted) setState(() => _isFaving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: _current.isFavorite
+              ? BorderSide(color: AppColors.notifFave, width: 2)
+              : BorderSide.none,
+        ),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -45,11 +90,11 @@ class SubmissionCard extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-          child: submission.imageUrl.isNotEmpty
+          child: _current.imageUrl.isNotEmpty
               ? FAImage(
-                  url: submission.imageUrl,
+                  url: _current.imageUrl,
                   dynamicThumbnail: DynamicThumbnail(
-                    Uri.parse(submission.imageUrl),
+                    Uri.parse(_current.imageUrl),
                   ),
                   fit: BoxFit.cover,
                   placeholder: Container(
@@ -76,7 +121,7 @@ class SubmissionCard extends StatelessWidget {
                   ),
                 ),
         ),
-        if (submission.isNsfw && sfwMode)
+        if (_current.isNsfw && widget.sfwMode)
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
             child: BackdropFilter(
@@ -107,6 +152,42 @@ class SubmissionCard extends StatelessWidget {
               ),
             ),
           ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: _onFav,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.bgCard.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: _isFaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: AdaptiveProgress(
+                          strokeWidth: 2,
+                          color: AppColors.notifFave,
+                        ),
+                      )
+                    : Icon(
+                        _current.isFavorite
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: _current.isFavorite
+                            ? AppColors.notifFave
+                            : AppColors.textDim,
+                        size: 18,
+                      ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -118,7 +199,7 @@ class SubmissionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            submission.title,
+            _current.title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -128,10 +209,10 @@ class SubmissionCard extends StatelessWidget {
               height: 1.3,
             ),
           ),
-          if (submission.author.isNotEmpty) ...[
+          if (_current.author.isNotEmpty) ...[
             const SizedBox(height: 3),
             Text(
-              submission.author,
+              _current.author,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
