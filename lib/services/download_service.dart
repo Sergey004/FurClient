@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/webview_image_fetcher.dart';
+import '../utils/notifications.dart';
 
 /// Downloads FA images to device storage.
 ///
@@ -75,6 +76,12 @@ class DownloadService {
         }
       }
 
+      // Show background notification for download start
+      await showDownloadNotification(
+        title: 'Download started',
+        body: 'Fetching: $imageUrl',
+      );
+
       // Step 1: Download image bytes via WebView (bypasses CF)
       debugPrint('=== DownloadService: Fetching image: $imageUrl');
       var bytes = await WebViewImageFetcher.instance.fetchImage(imageUrl);
@@ -91,6 +98,10 @@ class DownloadService {
       if (bytes == null || bytes.isEmpty) {
         debugPrint(
             '=== DownloadService: Failed to fetch image bytes after retry');
+        await showDownloadNotification(
+          title: 'Download failed',
+          body: 'Image fetch failed after retry.',
+        );
         return null;
       }
       debugPrint('=== DownloadService: Fetched ${bytes.length} bytes');
@@ -115,6 +126,10 @@ class DownloadService {
       final file = File(filePath);
       if (await file.exists()) {
         debugPrint('=== DownloadService: SKIP (already exists): $filePath');
+        await showDownloadNotification(
+          title: 'Already saved',
+          body: 'Image already exists.',
+        );
         return filePath;
       }
 
@@ -125,6 +140,10 @@ class DownloadService {
       if (await file.exists()) {
         final size = await file.length();
         debugPrint('=== DownloadService: Saved OK: $filePath ($size bytes)');
+        await showDownloadNotification(
+          title: 'Download complete',
+          body: 'Saved: ${filePath.split('/').last}',
+        );
       } else {
         debugPrint(
             '=== DownloadService: ERROR — file not found after write: $filePath');
@@ -133,6 +152,10 @@ class DownloadService {
       return filePath;
     } catch (e, stack) {
       debugPrint('=== DownloadService: Download error: $e');
+      await showDownloadNotification(
+        title: 'Download failed',
+        body: 'Could not save image.',
+      );
       debugPrint('=== DownloadService: Stack: $stack');
       return null;
     }

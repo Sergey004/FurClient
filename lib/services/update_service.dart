@@ -24,12 +24,21 @@ class UpdateService extends ChangeNotifier {
   double _downloadProgress = 0;
   String? _latestVersion;
   String? _currentVersion;
+  String? _selectedVersion;
+  List<String> _availableVersions = [];
 
   UpdateStatus get status => _status;
   String? get errorMessage => _errorMessage;
   double get downloadProgress => _downloadProgress;
   String? get latestVersion => _latestVersion;
   String? get currentVersion => _currentVersion;
+  String? get selectedVersion => _selectedVersion;
+  List<String> get availableVersions => List.unmodifiable(_availableVersions);
+
+  void selectVersion(String version) {
+    _selectedVersion = version;
+    notifyListeners();
+  }
 
   /// GitHub repo in `owner/repo` format.
   static const String _repo = 'Sergey004/FurClient';
@@ -107,9 +116,9 @@ class UpdateService extends ChangeNotifier {
   // ── Internal ──────────────────────────────────────────────────────────
 
   Future<void> _checkGitHub() async {
+    // Fetch all releases to support version selection.
     final uri =
-        Uri.parse('https://api.github.com/repos/$_repo/releases/latest');
-
+        Uri.parse('https://api.github.com/repos/$_repo/releases');
     final response = await http.get(uri, headers: _githubHeaders);
 
     if (response.statusCode == 404) {
@@ -122,9 +131,20 @@ class UpdateService extends ChangeNotifier {
       throw Exception('GitHub API returned ${response.statusCode}');
     }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final tagName = data['tag_name'] as String? ?? '';
-    _latestVersion = tagName.replaceFirst('v', '');
+    final releases = jsonDecode(response.body) as List<dynamic>;
+    final versions = <String>[];
+    for (final item in releases) {
+      final tag = (item['tag_name'] as String?) ?? '';
+      if (tag.isNotEmpty) {
+        versions.add(tag.replaceFirst('v', ''));
+      }
+    }
+
+    // Sort by semver (ascending) — latest is the highest.
+    versions.sort((a, b) => _compareVersions(a, b));
+    _availableVersions = versions.reversed.toList(); // highest first
+    _latestVersion = versions.isNotEmpty ? versions.last : null;
+    _selectedVersion ??= _latestVersion;
 
     if (_currentVersion == null) return;
 
@@ -138,9 +158,15 @@ class UpdateService extends ChangeNotifier {
 
   /// Manual download + `.bat` installer for portable installs.
   Future<void> _downloadAndInstallManual() async {
-    // Find the zip asset from the latest release
-    final uri =
-        Uri.parse('https://api.github.com/repos/$_repo/releases/latest');
+    // Use selected version, or fall back to latest.
+    final versionTag = _selectedVersion != null
+        ? 'v$_selectedVersion'
+        : 'v$_latestVersion';
+    final useLatest = _selectedVersion == null;
+    final endpoint = useLatest
+        ? 'https://api.github.com/repos/$_repo/releases/latest'
+        : 'https://api.github.com/repos/$_repo/releases/tags/$versionTag';
+    final uri = Uri.parse(endpoint);
 
     final response = await http.get(uri, headers: _githubHeaders);
 
@@ -251,6 +277,23 @@ del /f /q "%~f0"
       return false;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Returns negative if [a] < [b], positive if [a] > [b], 0 if equal.
+  int _compareVersions(String a, String b) {
+    try {
+      final aParts = a.split('.').map(int.parse).toList();
+      final bParts = b.split('.').map(int.parse).toList();
+      final len = aParts.length > bParts.length ? aParts.length : bParts.length;
+      for (var i = 0; i < len; i++) {
+        final av = i < aParts.length ? aParts[i] : 0;
+        final bv = i < bParts.length ? bParts[i] : 0;
+        if (av != bv) return av.compareTo(bv);
+      }
+      return 0;
+    } catch (_) {
+      return a.compareTo(b);
     }
   }
 }

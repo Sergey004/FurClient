@@ -23,6 +23,7 @@ import 'utils/platform_utils.dart';
 import 'package:upgrader/upgrader.dart';
 import 'utils/fa_image_proxy.dart';
 import 'package:path_provider/path_provider.dart';
+import 'utils/notifications.dart';
 import 'package:flutter_driver/driver_extension.dart';
 
 WebViewEnvironment? webViewEnvironment;
@@ -37,6 +38,7 @@ void main() {
       }
 
       if (Platform.isWindows) {
+        await initNotifications();
         final availableVersion = await WebViewEnvironment.getAvailableVersion();
         assert(availableVersion != null, 'WebView2 Runtime not found.');
         final dir = await getApplicationSupportDirectory();

@@ -824,6 +824,64 @@ class _SettingsScreenState extends State<SettingsScreen>
                                     .colorScheme
                                     .onSurfaceVariant,
                             fontSize: 13)),
+                    // Version picker: show all available releases.
+                    if (svc.availableVersions.isNotEmpty &&
+                        (status == UpdateStatus.available ||
+                            status == UpdateStatus.upToDate))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: PopupMenuButton<String>(
+                          initialValue: svc.selectedVersion ?? svc.latestVersion,
+                          tooltip: 'Select version',
+                          onSelected: (v) => svc.selectVersion(v),
+                          itemBuilder: (context) {
+                            final versions = svc.availableVersions;
+                            return versions.map((v) {
+                              return PopupMenuItem<String>(
+                                value: v,
+                                child: Text('v$v'),
+                              );
+                            }).toList();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .outlineVariant
+                                      .withValues(alpha: 0.15)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'v${svc.selectedVersion ?? svc.latestVersion ?? '...'}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 14,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     if (status == UpdateStatus.downloading)
                       Padding(
                         padding: const EdgeInsets.only(top: 6),
