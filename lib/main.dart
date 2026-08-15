@@ -35,6 +35,7 @@ void main() {
 
       if (Platform.isAndroid) {
         await InAppWebViewController.setWebContentsDebuggingEnabled(true);
+        await requestNotificationPermissions();
       }
 
       if (Platform.isWindows) {

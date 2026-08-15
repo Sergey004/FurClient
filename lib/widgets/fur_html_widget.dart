@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:extended_image/extended_image.dart';
 import '../utils/fa_image_proxy.dart';
@@ -52,9 +53,15 @@ class FurHtmlWidget extends StatelessWidget {
 
   Future<bool> _onLinkTap(String url) async {
     debugPrint('FurHtmlWidget: link tapped: $url');
-    // Returning true would prevent default handling. We return false so
-    // fwfh opens the URL via url_launcher.  (TODO: in-app navigation.)
-    return false;
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('FurHtmlWidget: launch error: $e');
+    }
+    return true; // handled
   }
 }
 
