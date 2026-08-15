@@ -35,6 +35,12 @@ void main() {
 
       if (Platform.isAndroid) {
         await InAppWebViewController.setWebContentsDebuggingEnabled(true);
+        try {
+          await initNotifications();
+          await requestNotificationPermissions();
+        } catch (e) {
+          debugPrint('Notification init error: $e');
+        }
       }
 
       if (Platform.isWindows) {

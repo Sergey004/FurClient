@@ -305,10 +305,17 @@ class _ImageViewerState extends State<_ImageViewer> {
         final sy = constraints.maxHeight / h;
         final scale = sx < sy ? sx : sy;
         return Center(
-          child: SizedBox(
-            width: w * scale,
-            height: h * scale,
-            child: ExtendedImage.memory(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white24, width: 1),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.black26,
+            ),
+            child: SizedBox(
+              width: w * scale,
+              height: h * scale,
+              child: ExtendedImage.memory(
               widget.bytes,
               fit: BoxFit.fill,
               mode: ExtendedImageMode.gesture,
@@ -335,7 +342,8 @@ class _ImageViewerState extends State<_ImageViewer> {
               },
             ),
           ),
-        );
+        ),
+      );
       },
     );
   }

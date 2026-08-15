@@ -24,6 +24,14 @@ Future<void> initNotifications() async {
   );
 }
 
+Future<void> requestNotificationPermissions() async {
+  final AndroidFlutterLocalNotificationsPlugin? androidPlugin = notificationsPlugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+  if (androidPlugin != null) {
+    await androidPlugin.requestNotificationsPermission();
+  }
+}
+
 Future<void> showDownloadNotification({
   required String title,
   required String body,
