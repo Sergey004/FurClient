@@ -32,6 +32,28 @@ Future<void> requestNotificationPermissions() async {
   }
 }
 
+Future<void> showFavoriteNotification({required String title}) async {
+  final androidDetails = AndroidNotificationDetails(
+    'download_channel',
+    'Favorites',
+    channelDescription: 'Post favorites',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+    onlyAlertOnce: true,
+  );
+  final windowsDetails = WindowsNotificationDetails();
+  final details = NotificationDetails(
+    android: androidDetails,
+    windows: windowsDetails,
+  );
+  await notificationsPlugin.show(
+    1,
+    'Added to favorites',
+    title,
+    details,
+  );
+}
+
 Future<void> showDownloadNotification({
   required String title,
   required String body,

@@ -1144,6 +1144,23 @@ class FAClient {
     return FAJournalPreview.parseJournalList(html);
   }
 
+  /// Fetch current user's favorites and return set of submission IDs.
+  /// Used to restore `isFavorite` on any submission list after restart.
+  Future<Set<String>> loadFavoriteIds() async {
+    final username = _session?.username ?? 'me';
+    try {
+      final url = FAUrls.favorites(username);
+      final html = await _getHtml(url);
+      return Submission.parseSubmissionsPage(html)
+          .map((s) => s.id)
+          .where((id) => id.isNotEmpty)
+          .toSet();
+    } catch (e) {
+      debugPrint('=== loadFavoriteIds error: $e');
+      return <String>{};
+    }
+  }
+
   /// Fetch a user's favorites page.
   Future<List<Submission>> getUserFavorites(String username,
       {int page = 1}) async {

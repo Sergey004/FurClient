@@ -105,6 +105,10 @@ class DownloadService {
         return null;
       }
       debugPrint('=== DownloadService: Fetched ${bytes.length} bytes');
+      await showDownloadNotification(
+        title: 'Image loaded',
+        body: '${bytes.length} bytes fetched',
+      );
 
       // Step 2: Build path — /Download/furaffinity/{rating}/{author}/
       final safeAuthor = author.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_').trim();
@@ -142,7 +146,7 @@ class DownloadService {
         debugPrint('=== DownloadService: Saved OK: $filePath ($size bytes)');
         await showDownloadNotification(
           title: 'Download complete',
-          body: 'Saved: ${filePath.split('/').last}',
+          body: 'Saved: ${filePath.split('/').last} (${size} bytes)',
         );
       } else {
         debugPrint(

@@ -13,6 +13,7 @@ import '../services/download_service.dart';
 import '../services/search_history.dart';
 import '../widgets/flash_player_widget.dart';
 import '../widgets/fur_html_widget.dart';
+import '../utils/notifications.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
   final FAClient client;
