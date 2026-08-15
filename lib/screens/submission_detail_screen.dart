@@ -13,7 +13,7 @@ import '../services/download_service.dart';
 import '../services/search_history.dart';
 import '../widgets/flash_player_widget.dart';
 import '../widgets/fur_html_widget.dart';
-import '../utils/notifications.dart';
+//import '../utils/notifications.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
   final FAClient client;
@@ -105,8 +105,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     setState(() => _isFaving = true);
     bool success = false;
     try {
-      final updated = await widget.client.toggleFavorite(
-          sub.favoriteUrl, sub.id);
+      final updated =
+          await widget.client.toggleFavorite(sub.favoriteUrl, sub.id);
       if (mounted && updated != null) {
         success = true;
         setState(() {
