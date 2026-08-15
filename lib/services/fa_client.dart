@@ -758,6 +758,37 @@ class FAClient {
     return result.comments;
   }
 
+  /// Post a comment on a submission or journal.
+  /// Mirrors Swift `OnlineFASession.postComment` — POST with form params.
+  Future<bool> postComment(
+    String url,
+    String contents, {
+    int? replyToCid,
+  }) async {
+    try {
+      await _ensureInitialized();
+      final params = <String, String>{
+        'action': replyToCid != null ? 'replyto' : 'reply',
+        'replyto': replyToCid?.toString() ?? '',
+        'reply': contents,
+        'submit': 'Post Comment',
+      };
+      final cookieHeader = _buildCookieHeader();
+      final response = await _dio.post(
+        url,
+        data: params,
+        options: cookieHeader != null
+            ? Options(headers: {'Cookie': cookieHeader, 'Referer': url})
+            : Options(headers: {'Referer': url}),
+      );
+      debugPrint('=== postComment: response status ${response.statusCode}');
+      return response.statusCode == 200 || response.statusCode == 302;
+    } catch (e) {
+      debugPrint('=== postComment error: $e');
+      return false;
+    }
+  }
+
   Future<List<Submission>> search(
     String query, {
     int page = 1,
