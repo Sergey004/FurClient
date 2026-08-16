@@ -65,9 +65,15 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
 
     try {
       final result = await widget.client.getWatchSubmissions();
+      final favIds = await widget.client.loadFavoriteIds();
       if (mounted) {
         setState(() {
-          _submissions = result.submissions;
+          _submissions = result.submissions.map((s) {
+            if (favIds.contains(s.id)) {
+              return s.copyWith(isFavorite: true);
+            }
+            return s;
+          }).toList();
           _isInitialLoading = false;
         });
       }

@@ -10,8 +10,8 @@ Future<void> initNotifications() async {
   const WindowsInitializationSettings initializationSettingsWindows =
       WindowsInitializationSettings(
     appName: 'FurClient',
-    appUserModelId: '{A5B8C1D2-4E3F-5678-9012-3456789ABCDE}',
-    guid: '{A5B8C1D2-4E3F-5678-9012-3456789ABCDE}',
+    appUserModelId: 'A5B8C1D2-4E3F-5678-9012-3456789ABCDE',
+    guid: 'd49b0314-ee7a-4626-bf79-97cdb8a991bb',
   );
   const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
