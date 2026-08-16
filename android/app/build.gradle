@@ -6,8 +6,8 @@ plugins {
 
 android {
     namespace = "com.sergey004.furclient"
-    compileSdk = 36
-    ndkVersion = flutter.ndkVersion
+    compileSdk 36
+    ndkVersion = '28.2.13676358'
 
     compileOptions {
         coreLibraryDesugaringEnabled true
@@ -36,7 +36,7 @@ android {
 }
 
 dependencies {
-    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 }
 
 flutter {
