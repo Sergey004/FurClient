@@ -203,11 +203,14 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) {
         return SafeArea(
+          bottom: false,
+          minimum: const EdgeInsets.only(top: 8, bottom: 16),
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -226,11 +229,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                       icon: const Icon(Icons.close, size: 20),
                       onPressed: () => Navigator.of(ctx).pop(),
                     ),
-                    Expanded(
+                    Flexible(
                       child: Text(
                         parentComment != null ? 'Reply' : 'Comment',
                         style: Theme.of(context).textTheme.titleMedium,
                         textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
                       ),
                     ),
                     IconButton(

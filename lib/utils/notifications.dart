@@ -3,7 +3,58 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 final FlutterLocalNotificationsPlugin notificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-/// Initialize with a default channel for download progress/status.
+/// Notification channels for Android system settings. Each FA notification
+/// type gets its own channel so users can disable them selectively.
+const _channels = {
+  'favorite': AndroidNotificationDetails(
+    'favorite_channel',
+    'Favorites',
+    channelDescription: 'When someone favorites your submission',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+  ),
+  'submission_comment': AndroidNotificationDetails(
+    'submission_comment_channel',
+    'Submission Comments',
+    channelDescription: 'Comments on your submissions',
+    importance: Importance.high,
+    priority: Priority.high,
+  ),
+  'journal_comment': AndroidNotificationDetails(
+    'journal_comment_channel',
+    'Journal Comments',
+    channelDescription: 'Comments on your journals',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+  ),
+  'shout': AndroidNotificationDetails(
+    'shout_channel',
+    'Shouts',
+    channelDescription: 'Shouts from users',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+  ),
+  'journal': AndroidNotificationDetails(
+    'journal_channel',
+    'Journals',
+    channelDescription: 'New journal entries from watched users',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+  ),
+  'download': AndroidNotificationDetails(
+    'download_channel',
+    'Downloads',
+    channelDescription: 'Image download progress and results',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+  ),
+};
+
+AndroidNotificationDetails _androidDetails(String channelId) {
+  return _channels[channelId] ?? _channels['download']!;
+}
+
+/// Initialize with all notification channels.
 Future<void> initNotifications() async {
   const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -33,25 +84,46 @@ Future<void> requestNotificationPermissions() async {
   }
 }
 
-Future<void> showFavoriteNotification({required String title}) async {
-  final androidDetails = AndroidNotificationDetails(
-    'download_channel',
-    'Favorites',
-    channelDescription: 'Post favorites',
-    importance: Importance.defaultImportance,
-    priority: Priority.defaultPriority,
+/// Show a notification for a specific FA notification type.
+Future<void> showNotification({
+  required String type,
+  required String title,
+  String body = '',
+  int notificationId = 0,
+  bool showProgress = false,
+  int progress = 0,
+  int maxProgress = 100,
+}) async {
+  final android = AndroidNotificationDetails(
+    '${type}_channel',
+    type.toUpperCase(),
+    channelDescription: 'FA $type notifications',
+    importance: _channels['${type}_channel']?.importance ?? Importance.defaultImportance,
+    priority: _channels['${type}_channel']?.priority ?? Priority.defaultPriority,
     onlyAlertOnce: true,
+    showProgress: showProgress,
+    progress: progress,
+    maxProgress: maxProgress,
   );
   final windowsDetails = WindowsNotificationDetails();
   final details = NotificationDetails(
-    android: androidDetails,
+    android: android,
     windows: windowsDetails,
   );
   await notificationsPlugin.show(
-    1,
-    'Added to favorites',
+    notificationId,
     title,
+    body,
     details,
+  );
+}
+
+Future<void> showFavoriteNotification({required String title}) async {
+  await showNotification(
+    type: 'favorite',
+    title: title,
+    body: 'Added to favorites',
+    notificationId: 1,
   );
 }
 
@@ -62,26 +134,13 @@ Future<void> showDownloadNotification({
   int progress = 0,
   int maxProgress = 100,
 }) async {
-  final androidDetails = AndroidNotificationDetails(
-    'download_channel',
-    'Downloads',
-    channelDescription: 'Image download progress and results',
-    importance: Importance.defaultImportance,
-    priority: Priority.defaultPriority,
+  await showNotification(
+    type: 'download',
+    title: title,
+    body: body,
+    notificationId: 0,
     showProgress: showProgress,
     progress: progress,
     maxProgress: maxProgress,
-    onlyAlertOnce: true,
-  );
-  final windowsDetails = WindowsNotificationDetails();
-  final details = NotificationDetails(
-    android: androidDetails,
-    windows: windowsDetails,
-  );
-  await notificationsPlugin.show(
-    0,
-    title,
-    body,
-    details,
   );
 }

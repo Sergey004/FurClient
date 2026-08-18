@@ -44,6 +44,7 @@ dependencies:
   fwfh_text_style: ^2.0.2+1
   flutter_driver:
     sdk: flutter
+  windows_notification: ^1.3.0
 
 dev_dependencies:
   flutter_test:
