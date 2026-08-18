@@ -758,8 +758,8 @@ class FAClient {
     return result.comments;
   }
 
-  /// Post a comment on a submission or journal.
-  /// Mirrors Swift `OnlineFASession.postComment` — POST with form params.
+  /// Post a comment on a submission or journal via WebView.
+  /// Injects form fields directly into the page to bypass CF blocks.
   Future<bool> postComment(
     String url,
     String contents, {
@@ -767,24 +767,141 @@ class FAClient {
   }) async {
     try {
       await _ensureInitialized();
-      final params = <String, String>{
-        'action': replyToCid != null ? 'replyto' : 'reply',
-        'replyto': replyToCid?.toString() ?? '',
-        'reply': contents,
-        'submit': 'Post Comment',
-      };
+      await _injectSessionCookies(url);
       final cookieHeader = _buildCookieHeader();
-      final response = await _dio.post(
-        url,
-        data: params,
-        options: cookieHeader != null
-            ? Options(headers: {'Cookie': cookieHeader, 'Referer': url})
-            : Options(headers: {'Referer': url}),
+
+      final completer = Completer<bool>();
+      HeadlessInAppWebView? headless;
+      int submitAttempts = 0;
+
+      headless = HeadlessInAppWebView(
+        webViewEnvironment: webViewEnvironment,
+        initialSettings: InAppWebViewSettings(
+          javaScriptEnabled: true,
+        ),
+        onLoadStop: (controller, loadedUrl) async {
+          try {
+            final html = await controller.getHtml() ?? '';
+            if (_isCloudflarePage(html)) {
+              submitAttempts++;
+              debugPrint('=== postComment WebView: CF challenge, attempt $submitAttempts');
+              if (submitAttempts > 5) {
+                if (!completer.isCompleted) completer.complete(false);
+                return;
+              }
+              await _attemptSolveCloudflareChallenge(controller);
+              await Future.delayed(const Duration(seconds: 3));
+              return;
+            }
+
+            if (submitAttempts == 0) {
+              // First load — inject cookies, then inject form fields
+              await _injectSessionCookies(url);
+              final js = '''
+                (function() {
+                  const actionValue = ${replyToCid != null ? '"replyto"' : '"reply"'};
+                  const replyToValue = ${replyToCid != null ? '"${replyToCid}"' : '""'};
+                  const contentsValue = ${jsonEncode(contents)};
+
+                  // Try to find the comment form
+                  let form = null;
+                  const forms = document.querySelectorAll('form');
+                  for (let f of forms) {
+                    const replyField = f.querySelector('textarea[name="reply"], input[name="reply"], input[name="text"]');
+                    if (replyField) {
+                      form = f;
+                      break;
+                    }
+                  }
+
+                  // Also try by checking for action input
+                  if (!form) {
+                    for (let f of forms) {
+                      if (f.querySelector('input[name="action"]') || f.querySelector('textarea[name="reply"]')) {
+                        form = f;
+                        break;
+                      }
+                    }
+                  }
+
+                  if (!form) return 'no_form';
+
+                  // Fill fields
+                  const fInput = form.querySelector('input[name="f"]');
+                  if (fInput) fInput.value = '0';
+
+                  const actionInput = form.querySelector('input[name="action"], select[name="action"]');
+                  if (actionInput) actionInput.value = actionValue;
+
+                  const replyToInput = form.querySelector('input[name="replyto"]');
+                  if (replyToInput) replyToInput.value = replyToValue;
+
+                  const replyInput = form.querySelector('textarea[name="reply"], input[name="reply"], input[name="text"]');
+                  if (replyInput) replyInput.value = contentsValue;
+
+                  // Submit
+                  const submitBtn = form.querySelector('button[type="submit"], input[type="submit"], input[name="submit"], button[name="submit"]');
+                  if (submitBtn) {
+                    setTimeout(function() { submitBtn.click(); }, 200);
+                  } else {
+                    setTimeout(function() { form.submit(); }, 200);
+                  }
+                  return 'injected';
+                })();
+              ''';
+              final result = await controller.evaluateJavascript(source: js);
+              debugPrint('=== postComment WebView: injection result $result');
+              submitAttempts++;
+            } else {
+              // After submit, check response
+              final resultHtml = html;
+              if (!_isCloudflarePage(resultHtml) && resultHtml.isNotEmpty) {
+                if (!completer.isCompleted) completer.complete(true);
+              } else if (submitAttempts > 3) {
+                if (!completer.isCompleted) completer.complete(false);
+              }
+            }
+          } catch (e) {
+            debugPrint('=== postComment WebView onLoadStop error: $e');
+            if (!completer.isCompleted) completer.complete(false);
+          }
+        },
+        onReceivedHttpError: (controller, request, response) async {
+          if (!(request.isForMainFrame ?? false)) return;
+          final status = response.statusCode ?? 0;
+          debugPrint('=== postComment WebView HTTP $status');
+        },
+        onReceivedError: (controller, request, error) async {
+          if (!(request.isForMainFrame ?? false)) return;
+          debugPrint('=== postComment WebView error: $error');
+        },
+        initialUrlRequest: URLRequest(
+          url: WebUri(url),
+          headers: {
+            if (cookieHeader != null) 'Cookie': cookieHeader,
+            'Referer': url,
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          },
+        ),
       );
-      debugPrint('=== postComment: response status ${response.statusCode}');
-      return response.statusCode == 200 || response.statusCode == 302;
+
+      await headless.run();
+
+      final success = await completer.future.timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          debugPrint('=== postComment WebView: timeout');
+          return false;
+        },
+      );
+      await headless.dispose();
+      await _syncCookiesFromWebView();
+      await _restoreCookiesFromSession();
+      debugPrint('=== postComment WebView: result=$success');
+      return success;
     } catch (e) {
-      debugPrint('=== postComment error: $e');
+      debugPrint('=== postComment WebView error: $e');
       return false;
     }
   }

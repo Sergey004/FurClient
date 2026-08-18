@@ -37,6 +37,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   bool _isLoading = true;
   bool _isFaving = false;
   bool _isDownloading = false;
+  bool _isSendingComment = false;
+  final TextEditingController _commentCtrl = TextEditingController();
 
   String? _error;
 
@@ -180,6 +182,200 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       }
     } catch (e) {
       debugPrint('=== _showMessage error: $e');
+    }
+  }
+
+  FAComment? _findCommentById(List<FAComment> comments, String id) {
+    for (final c in comments) {
+      if (c.id == id) return c;
+      final found = _findCommentById(c.replies, id);
+      if (found != null) return found;
+    }
+    return null;
+  }
+
+  Future<void> _showCommentEditor({int? parentCid}) async {
+    _commentCtrl.clear();
+    final parentComment = parentCid != null
+        ? _findCommentById(_comments, parentCid.toString())
+        : null;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                    Expanded(
+                      child: Text(
+                        parentComment != null ? 'Reply' : 'Comment',
+                        style: Theme.of(context).textTheme.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    IconButton(
+                      icon: _isSendingComment
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary,
+                              ),
+                            )
+                          : Icon(Icons.send, size: 20, color: Theme.of(context).colorScheme.onSurface),
+                      onPressed: _isSendingComment || _commentCtrl.text.trim().isEmpty
+                          ? null
+                          : () => _submitComment(ctx, parentCid),
+                    ),
+                  ],
+                ),
+                if (parentComment != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                    child: IgnorePointer(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor:
+                                Theme.of(context).colorScheme.surfaceContainerHighest,
+                            child: parentComment.avatarUrl.isNotEmpty
+                                ? FAImage(
+                                    url: parentComment.avatarUrl,
+                                    width: 28,
+                                    height: 28,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Icon(
+                                    Icons.person,
+                                    size: 14,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  parentComment.author,
+                                  style: TextStyle(
+                                    color: parentComment.author.isNotEmpty &&
+                                            parentComment.author != 'Anonymous'
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.onSurface,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  parentComment.text,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _commentCtrl,
+                    maxLines: null,
+                    minLines: 3,
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
+                    decoration: InputDecoration(
+                      hintText: 'Write a comment...',
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _submitComment(BuildContext ctx, int? parentCid) async {
+    final text = _commentCtrl.text.trim();
+    if (text.isEmpty || _submission == null) return;
+    setState(() => _isSendingComment = true);
+    try {
+      final success = await widget.client.postComment(
+        _submission!.url,
+        text,
+        replyToCid: parentCid,
+      );
+      if (success) {
+        _commentCtrl.clear();
+        Navigator.of(ctx).pop();
+        _showMessage('Comment posted', AppColors.materialGreen);
+        await _loadSubmission();
+      } else {
+        _showMessage('Failed to post comment', AppColors.danger);
+      }
+    } catch (e) {
+      debugPrint('=== postComment error: $e');
+      _showMessage('Error: $e', AppColors.danger);
+    } finally {
+      if (mounted) setState(() => _isSendingComment = false);
     }
   }
 
@@ -661,6 +857,17 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 ),
               ),
               const SizedBox(width: 8),
+              TextButton.icon(
+                icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                label: const Text('Comment'),
+                onPressed: () => _showCommentEditor(parentCid: null),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -797,6 +1004,17 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                         color: AppColors.textMuted,
                         fontSize: 11,
                       ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: Icon(
+                        Icons.reply,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      tooltip: 'Reply',
+                      onPressed: () => _showCommentEditor(
+                          parentCid: int.tryParse(comment.id)),
                     ),
                   ],
                 ),
