@@ -25,6 +25,8 @@ import 'utils/fa_image_proxy.dart';
 import 'package:path_provider/path_provider.dart';
 import 'utils/notifications.dart';
 import 'package:flutter_driver/driver_extension.dart';
+import 'package:app_links/app_links.dart';
+import 'package:fa_kit/fa_kit.dart';
 
 WebViewEnvironment? webViewEnvironment;
 
@@ -116,6 +118,7 @@ class _FurClientAppState extends State<FurClientApp> {
   final FAClient _client = FAClient();
   final UpdateService _updateService = UpdateService();
   final ThemeProvider _themeProvider = ThemeProvider.instance;
+  StreamSubscription<Uri>? _linkSubscription;
   bool _isLoggedIn = false;
   bool _isRestoringSession = true;
 
@@ -124,6 +127,25 @@ class _FurClientAppState extends State<FurClientApp> {
     super.initState();
     _themeProvider.addListener(_onThemeChanged);
     _initApp();
+    _setupDeepLinks();
+  }
+
+  void _setupDeepLinks() {
+    _linkSubscription = AppLinks().uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    });
+  }
+
+  void _handleDeepLink(Uri uri) {
+    debugPrint('Deep link received: $uri');
+    final target = FATarget.parse(uri);
+    if (target == null) {
+      debugPrint('Could not parse deep link');
+      return;
+    }
+
+    // For now, just log the target - navigation will be handled elsewhere
+    debugPrint('Parsed target: $target');
   }
 
   void _onThemeChanged() {
@@ -216,6 +238,7 @@ class _FurClientAppState extends State<FurClientApp> {
     _themeProvider.removeListener(_onThemeChanged);
     _updateService.dispose();
     _themeProvider.dispose();
+    _linkSubscription?.cancel();
     super.dispose();
   }
 
