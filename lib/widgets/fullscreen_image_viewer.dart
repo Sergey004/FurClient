@@ -295,26 +295,12 @@ class _ImageViewerState extends State<_ImageViewer> {
         child: CircularProgressIndicator(strokeWidth: 2),
       );
     }
-    final w = _decoded!.width.toDouble();
-    final h = _decoded!.height.toDouble();
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Compute the on-screen size the image will be rendered at with
-        // BoxFit.contain — gesture math uses this size, not the raw image.
-        final sx = constraints.maxWidth / w;
-        final sy = constraints.maxHeight / h;
-        final scale = sx < sy ? sx : sy;
         return Center(
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white24, width: 1),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.black26,
-            ),
-            child: SizedBox(
-              width: w * scale,
-              height: h * scale,
+          child: Expanded(
+            child: Container(
+              color: Colors.black87,
               child: ExtendedImage.memory(
               widget.bytes,
               fit: BoxFit.fill,

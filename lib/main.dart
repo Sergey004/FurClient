@@ -17,7 +17,9 @@ import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
 import 'utils/cookie_manager.dart';
 import 'screens/login_screen.dart';
+import 'screens/submission_detail_screen.dart';
 import 'navigation/adaptive_shell.dart';
+import 'widgets/adaptive/adaptive_route.dart';
 import 'widgets/fluent_root_chrome.dart';
 import 'utils/platform_utils.dart';
 import 'package:upgrader/upgrader.dart';
@@ -131,8 +133,16 @@ class _FurClientAppState extends State<FurClientApp> {
   }
 
   void _setupDeepLinks() {
+    // Handle initial link when app starts from a deep link
+    // getInitialLink() returns Future<Uri?>, so we handle it here
+    AppLinks().getInitialLink().then((initialLink) {
+      if (initialLink != null && mounted) {
+        _handleDeepLink(initialLink);
+      }
+    });
+
     _linkSubscription = AppLinks().uriLinkStream.listen((uri) {
-      _handleDeepLink(uri);
+      if (mounted) _handleDeepLink(uri);
     });
   }
 
@@ -144,8 +154,79 @@ class _FurClientAppState extends State<FurClientApp> {
       return;
     }
 
-    // For now, just log the target - navigation will be handled elsewhere
     debugPrint('Parsed target: $target');
+    _navigateToTarget(target);
+  }
+
+  void _navigateToTarget(FATarget target) {
+    final targetType = target.type;
+
+    switch (targetType) {
+      case FATargetType.submission:
+        final submissionId = target.submissionId;
+        if (submissionId != null) {
+          final session = _authService.currentSession;
+          if (session != null && session.isLoggedIn) {
+            _client.setSession(session);
+            _client.verifySession().then((valid) {
+              if (valid && mounted) {
+                setState(() {
+                  _isLoggedIn = true;
+                });
+                _client.getSubmission(submissionId.toString()).then((submission) {
+                  if (submission != null && mounted) {
+                    // Navigate to submission detail
+                    Navigator.of(context).push(
+                      adaptiveRoute(
+                        builder: (_) => SubmissionDetailScreen(
+                          client: _client,
+                          submissionId: submissionId.toString(),
+                          sfwMode: false,
+                        ),
+                      ),
+                    );
+                  }
+                });
+              }
+            });
+          }
+        }
+        break;
+      case FATargetType.journal:
+        final journalId = target.journalId;
+        if (journalId != null) {
+          if (mounted) {
+            // Navigate to journal page
+            final route = '/journal/$journalId';
+            Navigator.of(context).pushNamed(route);
+          }
+        }
+        break;
+      case FATargetType.user:
+        final username = target.username;
+        if (username != null && mounted) {
+          final route = '/user/$username';
+          Navigator.of(context).pushNamed(route);
+        }
+        break;
+      case FATargetType.gallery:
+        final username = target.username;
+        if (username != null && mounted) {
+          final route = '/gallery/$username';
+          Navigator.of(context).pushNamed(route);
+        }
+        break;
+      case FATargetType.favorites:
+        if (mounted) {
+          Navigator.of(context).pushNamed('/favorites');
+        }
+        break;
+      case FATargetType.note:
+        // Handle note navigation if needed
+        break;
+      default:
+        debugPrint('Unhandled target type: $targetType');
+    }
   }
 
   void _onThemeChanged() {
