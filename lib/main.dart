@@ -182,7 +182,9 @@ class _FurClientAppState extends State<FurClientApp> {
                 setState(() {
                   _isLoggedIn = true;
                 });
-                _client.getSubmission(submissionId.toString()).then((submission) {
+                _client
+                    .getSubmission(submissionId.toString())
+                    .then((submission) {
                   if (submission != null && mounted) {
                     // Navigate to submission detail
                     Navigator.of(context).push(

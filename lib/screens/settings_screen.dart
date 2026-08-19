@@ -831,7 +831,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                       Padding(
                         padding: const EdgeInsets.only(top: 6),
                         child: PopupMenuButton<String>(
-                          initialValue: svc.selectedVersion ?? svc.latestVersion,
+                          initialValue:
+                              svc.selectedVersion ?? svc.latestVersion,
                           tooltip: 'Select version',
                           onSelected: (v) => svc.selectVersion(v),
                           itemBuilder: (context) {

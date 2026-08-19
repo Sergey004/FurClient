@@ -117,8 +117,7 @@ class UpdateService extends ChangeNotifier {
 
   Future<void> _checkGitHub() async {
     // Fetch all releases to support version selection.
-    final uri =
-        Uri.parse('https://api.github.com/repos/$_repo/releases');
+    final uri = Uri.parse('https://api.github.com/repos/$_repo/releases');
     final response = await http.get(uri, headers: _githubHeaders);
 
     if (response.statusCode == 404) {
@@ -159,9 +158,8 @@ class UpdateService extends ChangeNotifier {
   /// Manual download + `.bat` installer for portable installs.
   Future<void> _downloadAndInstallManual() async {
     // Use selected version, or fall back to latest.
-    final versionTag = _selectedVersion != null
-        ? 'v$_selectedVersion'
-        : 'v$_latestVersion';
+    final versionTag =
+        _selectedVersion != null ? 'v$_selectedVersion' : 'v$_latestVersion';
     final useLatest = _selectedVersion == null;
     final endpoint = useLatest
         ? 'https://api.github.com/repos/$_repo/releases/latest'

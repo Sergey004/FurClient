@@ -784,7 +784,8 @@ class FAClient {
             final html = await controller.getHtml() ?? '';
             if (_isCloudflarePage(html)) {
               submitAttempts++;
-              debugPrint('=== postComment WebView: CF challenge, attempt $submitAttempts');
+              debugPrint(
+                  '=== postComment WebView: CF challenge, attempt $submitAttempts');
               if (submitAttempts > 5) {
                 if (!completer.isCompleted) completer.complete(false);
                 return;

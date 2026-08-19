@@ -60,7 +60,8 @@ class _SubmissionCardState extends State<SubmissionCard> {
     });
     try {
       final updated = _current.favoriteUrl.isNotEmpty
-          ? await widget.client.toggleFavorite(_current.favoriteUrl, _current.id)
+          ? await widget.client
+              .toggleFavorite(_current.favoriteUrl, _current.id)
           : await widget.client.toggleFavoriteById(_current.id);
       if (!mounted) return;
       if (updated != null) {

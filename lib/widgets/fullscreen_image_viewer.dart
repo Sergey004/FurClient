@@ -302,34 +302,34 @@ class _ImageViewerState extends State<_ImageViewer> {
             child: Container(
               color: Colors.black87,
               child: ExtendedImage.memory(
-              widget.bytes,
-              fit: BoxFit.fill,
-              mode: ExtendedImageMode.gesture,
-              enableSlideOutPage: true,
-              initGestureConfigHandler: (state) {
-                return GestureConfig(
-                  minScale: 0.5,
-                  animationMinScale: 0.3,
-                  maxScale: 8.0,
-                  animationMaxScale: 9.0,
-                  speed: 1.0,
-                  inertialSpeed: 100.0,
-                  initialScale: 1.0,
-                  inPageView: false,
-                  cacheGesture: false,
-                );
-              },
-              onDoubleTap: (ExtendedImageGestureState gestureState) {
-                final begin = gestureState.gestureDetails?.totalScale ?? 1.0;
-                gestureState.handleDoubleTap(
-                  scale: begin > 1.5 ? 1.0 : 2.5,
-                  doubleTapPosition: gestureState.pointerDownPosition,
-                );
-              },
+                widget.bytes,
+                fit: BoxFit.fill,
+                mode: ExtendedImageMode.gesture,
+                enableSlideOutPage: true,
+                initGestureConfigHandler: (state) {
+                  return GestureConfig(
+                    minScale: 0.5,
+                    animationMinScale: 0.3,
+                    maxScale: 8.0,
+                    animationMaxScale: 9.0,
+                    speed: 1.0,
+                    inertialSpeed: 100.0,
+                    initialScale: 1.0,
+                    inPageView: false,
+                    cacheGesture: false,
+                  );
+                },
+                onDoubleTap: (ExtendedImageGestureState gestureState) {
+                  final begin = gestureState.gestureDetails?.totalScale ?? 1.0;
+                  gestureState.handleDoubleTap(
+                    scale: begin > 1.5 ? 1.0 : 2.5,
+                    doubleTapPosition: gestureState.pointerDownPosition,
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      );
+        );
       },
     );
   }

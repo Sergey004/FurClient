@@ -245,15 +245,16 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                             )
-                          : Icon(Icons.send, size: 20, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: _isSendingComment || _commentCtrl.text.trim().isEmpty
-                          ? null
-                          : () => _submitComment(ctx, parentCid),
+                          : Icon(Icons.send,
+                              size: 20,
+                              color: Theme.of(context).colorScheme.onSurface),
+                      onPressed:
+                          _isSendingComment || _commentCtrl.text.trim().isEmpty
+                              ? null
+                              : () => _submitComment(ctx, parentCid),
                     ),
                   ],
                 ),
@@ -262,7 +263,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: Theme.of(context).colorScheme.outline,
@@ -274,8 +276,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                         children: [
                           CircleAvatar(
                             radius: 14,
-                            backgroundColor:
-                                Theme.of(context).colorScheme.surfaceContainerHighest,
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
                             child: parentComment.avatarUrl.isNotEmpty
                                 ? FAImage(
                                     url: parentComment.avatarUrl,
@@ -302,7 +305,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                                     color: parentComment.author.isNotEmpty &&
                                             parentComment.author != 'Anonymous'
                                         ? Theme.of(context).colorScheme.primary
-                                        : Theme.of(context).colorScheme.onSurface,
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -311,7 +316,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                                 Text(
                                   parentComment.text,
                                   style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
                                     fontSize: 12,
                                   ),
                                   maxLines: 3,
@@ -336,7 +343,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                     decoration: InputDecoration(
                       hintText: 'Write a comment...',
                       filled: true,
-                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      fillColor:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(28),
                         borderSide: BorderSide.none,
