@@ -132,17 +132,21 @@ class _FurClientAppState extends State<FurClientApp> {
     _setupDeepLinks();
   }
 
+  static bool _initialDeepLinkHandled = false;
+
   void _setupDeepLinks() {
     // Handle initial link when app starts from a deep link
-    // getInitialLink() returns Future<Uri?>, so we handle it here
     AppLinks().getInitialLink().then((initialLink) {
-      if (initialLink != null && mounted) {
+      // Only handle once, and defer until widget is fully built
+      if (initialLink != null && !_initialDeepLinkHandled && mounted) {
+        _initialDeepLinkHandled = true;
         _handleDeepLink(initialLink);
       }
     });
 
     _linkSubscription = AppLinks().uriLinkStream.listen((uri) {
-      if (mounted) _handleDeepLink(uri);
+      // Link stream will be handled when user navigates within app
+      // Deep links from system are handled above
     });
   }
 
