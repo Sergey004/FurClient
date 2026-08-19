@@ -40,7 +40,7 @@ dependencies:
   package_info_plus: ^10.2.1
   flutter_local_notifications: ^19.0.0
   url_launcher: ^6.3.1
-  flutter_widget_from_html_core: ^0.15.2
+  flutter_widget_from_html_core: ^0.17.2
   fwfh_text_style: ^2.0.2+1
   flutter_driver:
     sdk: flutter
