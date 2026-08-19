@@ -50,6 +50,7 @@ const _channels = {
   ),
 };
 
+// ignore: unused_element
 AndroidNotificationDetails _androidDetails(String channelId) {
   return _channels[channelId] ?? _channels['download']!;
 }
@@ -98,8 +99,10 @@ Future<void> showNotification({
     '${type}_channel',
     type.toUpperCase(),
     channelDescription: 'FA $type notifications',
-    importance: _channels['${type}_channel']?.importance ?? Importance.defaultImportance,
-    priority: _channels['${type}_channel']?.priority ?? Priority.defaultPriority,
+    importance: _channels['${type}_channel']?.importance ??
+        Importance.defaultImportance,
+    priority:
+        _channels['${type}_channel']?.priority ?? Priority.defaultPriority,
     onlyAlertOnce: true,
     showProgress: showProgress,
     progress: progress,
