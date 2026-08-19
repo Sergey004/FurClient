@@ -17,7 +17,10 @@ import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
 import 'utils/cookie_manager.dart';
 import 'screens/login_screen.dart';
+import 'screens/journal_detail_screen.dart';
 import 'screens/submission_detail_screen.dart';
+import 'screens/user_content_screen.dart';
+import 'screens/gallery_screen.dart';
 import 'navigation/adaptive_shell.dart';
 import 'widgets/adaptive/adaptive_route.dart';
 import 'widgets/fluent_root_chrome.dart';
@@ -136,17 +139,19 @@ class _FurClientAppState extends State<FurClientApp> {
 
   void _setupDeepLinks() {
     // Handle initial link when app starts from a deep link
-    AppLinks().getInitialLink().then((initialLink) {
-      // Only handle once, and defer until widget is fully built
-      if (initialLink != null && !_initialDeepLinkHandled && mounted) {
-        _initialDeepLinkHandled = true;
-        _handleDeepLink(initialLink);
-      }
+    // Defer navigation until after first frame so Navigator context is available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppLinks().getInitialLink().then((initialLink) {
+        if (initialLink != null && !_initialDeepLinkHandled && mounted) {
+          _initialDeepLinkHandled = true;
+          _handleDeepLink(initialLink);
+        }
+      });
     });
 
     _linkSubscription = AppLinks().uriLinkStream.listen((uri) {
       // Link stream will be handled when user navigates within app
-      // Deep links from system are handled above
+      // Deep links from system are handled above via addPostFrameCallback
     });
   }
 
@@ -200,29 +205,51 @@ class _FurClientAppState extends State<FurClientApp> {
         final journalId = target.journalId;
         if (journalId != null) {
           if (mounted) {
-            // Navigate to journal page
-            final route = '/journal/$journalId';
-            Navigator.of(context).pushNamed(route);
+            // Navigate to journal page using adaptiveRoute like the rest of the app
+            Navigator.of(context).push(
+              adaptiveRoute(
+                builder: (_) => JournalDetailScreen(
+                  client: _client,
+                  journalId: journalId.toString(),
+                ),
+              ),
+            );
           }
         }
         break;
       case FATargetType.user:
         final username = target.username;
         if (username != null && mounted) {
-          final route = '/user/$username';
-          Navigator.of(context).pushNamed(route);
+          // Navigate to user content using adaptiveRoute
+          Navigator.of(context).push(
+            adaptiveRoute(
+              builder: (_) => UserContentScreen(
+                client: _client,
+                username: username,
+                contentType: UserContentType.journals,
+              ),
+            ),
+          );
         }
         break;
       case FATargetType.gallery:
         final username = target.username;
         if (username != null && mounted) {
-          final route = '/gallery/$username';
-          Navigator.of(context).pushNamed(route);
+          // Navigate to gallery using adaptiveRoute
+          Navigator.of(context).push(
+            adaptiveRoute(
+              builder: (_) => GalleryScreen(
+                client: _client,
+                sfwMode: false,
+              ),
+            ),
+          );
         }
         break;
       case FATargetType.favorites:
         if (mounted) {
-          Navigator.of(context).pushNamed('/favorites');
+          // Navigate to favorites - use existing route
+          Navigator.of(context).pushNamed('/');
         }
         break;
       case FATargetType.note:
