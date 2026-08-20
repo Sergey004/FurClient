@@ -29,7 +29,7 @@ class AdaptiveScaffold extends StatelessWidget {
         data: fluentTheme,
         child: fluent.ScaffoldPage(
           content: ColoredBox(
-            color: backgroundColor ?? AppColors.bg,
+            color: backgroundColor ?? colorScheme.surface,
             child: body,
           ),
         ),

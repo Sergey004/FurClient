@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -393,11 +395,16 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   }
 
   Future<void> _downloadImage() async {
+    await _saveImage();
+  }
+
+  Future<String?> _saveImage() async {
     final sub = _submission;
-    if (sub == null || sub.imageUrl.isEmpty || _isDownloading) return;
+    if (sub == null || sub.imageUrl.isEmpty || _isDownloading) return null;
     setState(() => _isDownloading = true);
+    String? path;
     try {
-      final path = await DownloadService.instance.downloadImage(
+      path = await DownloadService.instance.downloadImage(
         imageUrl: sub.imageUrl,
         title: sub.title,
         author: sub.author,
@@ -419,6 +426,97 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     } finally {
       if (mounted) setState(() => _isDownloading = false);
     }
+    return path;
+  }
+
+  Future<void> _shareLink() async {
+    final sub = _submission;
+    if (sub == null || sub.url.isEmpty) return;
+    await SharePlus.instance.share(
+      ShareParams(
+        uri: Uri.tryParse(sub.url),
+        subject: sub.title,
+      ),
+    );
+  }
+
+  Future<void> _shareImage() async {
+    final path = await _saveImage();
+    if (path == null) return;
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(path)],
+        text: _submission?.title,
+      ),
+    );
+  }
+
+  Future<void> _openInBrowser() async {
+    final sub = _submission;
+    if (sub == null || sub.url.isEmpty) return;
+    final uri = Uri.tryParse(sub.url);
+    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _showActionMenu(Submission sub) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: colorScheme.surfaceContainerHigh,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.open_in_browser),
+              title: const Text('Open in browser'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _openInBrowser();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('Share link'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _shareLink();
+              },
+            ),
+            if (sub.imageUrl.isNotEmpty) ...[
+              ListTile(
+                leading: const Icon(Icons.download_outlined),
+                title: const Text('Save image'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _saveImage();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.ios_share_outlined),
+                title: const Text('Share image'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _shareImage();
+                },
+              ),
+            ],
+            ListTile(
+              leading: const Icon(Icons.comment_outlined),
+              title: const Text('Comment'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showCommentEditor(parentCid: null);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -441,7 +539,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     }
 
     return AdaptiveScaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         bottom: false,
         child: _buildBody(isDesktop),
@@ -457,17 +555,19 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   }
 
   Widget _buildError() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
+            Icon(Icons.error_outline, color: colorScheme.error, size: 48),
             const SizedBox(height: 16),
             Text(
               _error!,
-              style: const TextStyle(color: AppColors.textDim, fontSize: 14),
+              style:
+                  TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -487,6 +587,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   // ── Desktop layout ────────────────────────────────────────────────────────
 
   Widget _buildDesktopLayout(Submission sub) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       children: [
         // Кнопка назад — только на desktop где нет AppBar
@@ -496,7 +597,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(flex: 3, child: _buildImageSection(sub)),
-              Container(width: 1, color: AppColors.border),
+              Container(width: 1, color: colorScheme.outlineVariant),
               Expanded(flex: 2, child: _buildDetailsPanel(sub)),
             ],
           ),
@@ -533,7 +634,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
         children: [
           IconButton(
             onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.arrow_back, color: AppColors.text),
+            icon: Icon(Icons.arrow_back,
+                color: Theme.of(context).colorScheme.onSurface),
             tooltip: 'Back',
           ),
         ],
@@ -552,7 +654,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: AppColors.text),
+                icon: Icon(Icons.arrow_back,
+                    color: Theme.of(context).colorScheme.onSurface),
                 onPressed: () => Navigator.of(context).maybePop(),
               ),
             ),
@@ -574,10 +677,11 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   // ── Shared widgets ────────────────────────────────────────────────────────
 
   Widget _buildImageSection(Submission sub) {
+    final colorScheme = Theme.of(context).colorScheme;
     // Flash submission — use Ruffle player instead of image
     if (sub.isFlash && sub.flashUrl.isNotEmpty) {
       return Container(
-        color: AppColors.bgDeep,
+        color: colorScheme.surfaceContainerLowest,
         child: SizedBox(
           height: 400,
           width: double.infinity,
@@ -602,34 +706,34 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             ? SystemMouseCursors.zoomIn
             : SystemMouseCursors.basic,
         child: Container(
-          color: AppColors.bgDeep,
+          color: colorScheme.surfaceContainerLowest,
           child: sub.imageUrl.isNotEmpty
               ? FAImage(
                   url: sub.imageUrl,
                   fit: BoxFit.contain,
                   placeholder: Container(
                     height: 300,
-                    color: AppColors.bgInput,
+                    color: colorScheme.surfaceContainerHighest,
                     child: const Center(
                       child: AdaptiveProgress(strokeWidth: 2),
                     ),
                   ),
                   errorWidget: Container(
                     height: 200,
-                    color: AppColors.bgInput,
-                    child: const Icon(
+                    color: colorScheme.surfaceContainerHighest,
+                    child: Icon(
                       Icons.broken_image,
-                      color: AppColors.textMuted,
+                      color: colorScheme.onSurfaceVariant,
                       size: 48,
                     ),
                   ),
                 )
               : Container(
                   height: 200,
-                  color: AppColors.bgInput,
-                  child: const Center(
-                    child:
-                        Icon(Icons.image, color: AppColors.textMuted, size: 48),
+                  color: colorScheme.surfaceContainerHighest,
+                  child: Center(
+                    child: Icon(Icons.image,
+                        color: colorScheme.onSurfaceVariant, size: 48),
                   ),
                 ),
         ),
@@ -640,6 +744,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   Widget _buildDetailsPanel(Submission sub) {
     final isDesktop =
         MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(isDesktop ? 24 : 16),
@@ -649,7 +754,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           Text(
             sub.title,
             style: TextStyle(
-              color: AppColors.text,
+              color: colorScheme.onSurface,
               fontSize: isDesktop ? 24 : 22,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.3,
@@ -662,23 +767,12 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 : null,
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: AppColors.bgInput,
-                  child: Text(
-                    sub.author.isNotEmpty ? sub.author[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: AppColors.fluentCyan,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+                FAAvatar(username: sub.author, size: 28),
                 const SizedBox(width: 8),
                 Text(
                   sub.author.isNotEmpty ? sub.author : 'Unknown',
-                  style: const TextStyle(
-                    color: AppColors.fluentCyan,
+                  style: TextStyle(
+                    color: colorScheme.primary,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
@@ -695,13 +789,19 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   runSpacing: 8,
                   children: [
                     _statChip(Icons.visibility, '${sub.views}', 'Views',
-                        AppColors.fluentCyan),
+                        colorScheme.primary),
                     _statChip(Icons.comment, '${sub.commentsCount}', 'Comments',
-                        AppColors.materialGreen),
+                        colorScheme.secondary),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'More actions',
+                icon: const Icon(Icons.more_vert),
+                onPressed: () => _showActionMenu(sub),
+              ),
+              const SizedBox(width: 4),
               // Download button
               GestureDetector(
                 onTap: _isDownloading ? null : _downloadImage,
@@ -709,9 +809,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.bgInput,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: colorScheme.outlineVariant),
                   ),
                   child: _isDownloading
                       ? SizedBox(
@@ -719,13 +819,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                           height: 14,
                           child: AdaptiveProgress(
                             strokeWidth: 2,
-                            color: AppColors.fluentCyan,
+                            color: colorScheme.primary,
                           ),
                         )
-                      : const Icon(
+                      : Icon(
                           Icons.download,
                           size: 16,
-                          color: AppColors.textDim,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                 ),
               ),
@@ -738,13 +838,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: sub.isFavorite
-                        ? AppColors.notifFave.withValues(alpha: 0.15)
-                        : AppColors.bgInput,
-                    borderRadius: BorderRadius.circular(10),
+                        ? colorScheme.primaryContainer
+                        : colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: sub.isFavorite
-                          ? AppColors.notifFave
-                          : AppColors.border,
+                          ? colorScheme.primary
+                          : colorScheme.outlineVariant,
                     ),
                   ),
                   child: Row(
@@ -756,7 +856,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                           height: 14,
                           child: AdaptiveProgress(
                             strokeWidth: 2,
-                            color: AppColors.notifFave,
+                            color: colorScheme.primary,
                           ),
                         )
                       else
@@ -766,16 +866,16 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                               : Icons.favorite_border,
                           size: 16,
                           color: sub.isFavorite
-                              ? AppColors.notifFave
-                              : AppColors.textDim,
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
                         ),
                       const SizedBox(width: 6),
                       Text(
                         '${sub.faves}',
                         style: TextStyle(
                           color: sub.isFavorite
-                              ? AppColors.notifFave
-                              : AppColors.text,
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onSurface,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -788,12 +888,12 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           ),
           if (sub.description.isNotEmpty) ...[
             const SizedBox(height: 20),
-            const Divider(color: AppColors.border),
+            Divider(color: colorScheme.outlineVariant),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Description',
               style: TextStyle(
-                color: AppColors.text,
+                color: colorScheme.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -803,25 +903,27 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: colorScheme.outlineVariant),
               ),
               child: FurHtmlWidget(
                 sub.description,
-                style: const TextStyle(
-                    color: AppColors.textDim, fontSize: 14, height: 1.6),
+                style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 14,
+                    height: 1.6),
               ),
             ),
           ],
           if (sub.tags.isNotEmpty) ...[
             const SizedBox(height: 20),
-            const Divider(color: AppColors.border),
+            Divider(color: colorScheme.outlineVariant),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Tags',
               style: TextStyle(
-                color: AppColors.text,
+                color: colorScheme.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -837,16 +939,14 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.materialLavenderBg,
+                      color: colorScheme.secondaryContainer,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: AppColors.materialLavender
-                              .withValues(alpha: 0.3)),
+                      border: Border.all(color: colorScheme.outlineVariant),
                     ),
                     child: Text(
                       tag,
-                      style: const TextStyle(
-                        color: AppColors.materialLavender,
+                      style: TextStyle(
+                        color: colorScheme.onSecondaryContainer,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -857,14 +957,14 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             ),
           ],
           const SizedBox(height: 20),
-          const Divider(color: AppColors.border),
+          Divider(color: colorScheme.outlineVariant),
           const SizedBox(height: 12),
           Row(
             children: [
-              const Text(
+              Text(
                 'Comments',
                 style: TextStyle(
-                  color: AppColors.text,
+                  color: colorScheme.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -884,13 +984,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.materialGreenBg,
+                  color: colorScheme.tertiaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '${_comments.length}',
-                  style: const TextStyle(
-                    color: AppColors.materialGreen,
+                  style: TextStyle(
+                    color: colorScheme.onTertiaryContainer,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -900,13 +1000,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           ),
           const SizedBox(height: 12),
           if (_comments.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
                   'No comments yet',
                   style: TextStyle(
-                    color: AppColors.textMuted,
+                    color: colorScheme.onSurfaceVariant,
                     fontSize: 14,
                   ),
                 ),
@@ -921,6 +1021,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   }
 
   Widget _statChip(IconData icon, String value, String label, Color color) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -935,8 +1036,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           const SizedBox(width: 6),
           Text(
             value,
-            style: const TextStyle(
-              color: AppColors.text,
+            style: TextStyle(
+              color: colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -955,6 +1056,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   }
 
   Widget _buildComment(FAComment comment) {
+    final colorScheme = Theme.of(context).colorScheme;
     // Indent replies visually (max 4 levels, 24px each)
     final indent = (comment.indentLevel.clamp(0, 4)) * 24.0;
     return Padding(
@@ -967,23 +1069,23 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: AppColors.bgInput,
+            backgroundColor: colorScheme.surfaceContainerHighest,
             child: comment.avatarUrl.isNotEmpty
                 ? FAImage(
                     url: comment.avatarUrl,
                     width: 36,
                     height: 36,
                     fit: BoxFit.cover,
-                    errorWidget: const Icon(
+                    errorWidget: Icon(
                       Icons.person,
                       size: 18,
-                      color: AppColors.textMuted,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   )
-                : const Icon(
+                : Icon(
                     Icons.person,
                     size: 18,
-                    color: AppColors.textMuted,
+                    color: colorScheme.onSurfaceVariant,
                   ),
           ),
           const SizedBox(width: 12),
@@ -1004,7 +1106,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                           color: comment.author.isNotEmpty &&
                                   comment.author != 'Anonymous'
                               ? AppColors.fluentCyan
-                              : AppColors.text,
+                              : colorScheme.onSurface,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1013,8 +1115,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                     const SizedBox(width: 8),
                     Text(
                       comment.time,
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
                         fontSize: 11,
                       ),
                     ),
@@ -1035,8 +1137,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 FurHtmlWidget(
                   comment.text,
                   compact: true,
-                  style: const TextStyle(
-                      color: AppColors.textDim, fontSize: 14, height: 1.5),
+                  style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 14,
+                      height: 1.5),
                 ),
               ],
             ),

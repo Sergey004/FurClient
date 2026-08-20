@@ -53,7 +53,7 @@ class FANotification {
       id: header.id.toString(),
       author: header.author,
       displayName: header.displayAuthor,
-      avatarUrl: '',
+      avatarUrl: fa.FAURLs.avatarUrl(header.author) ?? '',
       title: header.title,
       // type: 'submission_comment' | 'journal_comment' | 'shout' | 'journal'
       type: type,

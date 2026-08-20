@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 
 /// Material 3 styled list tile inspired by Google Messages.
 class AppListTile extends StatelessWidget {
@@ -22,11 +23,13 @@ class AppListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final tiles = Theme.of(context).extension<AppTileTheme>() ??
+        AppTileTheme.from(colors);
     return Material(
-      color: colors.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
+      color: tiles.primaryBackground,
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Padding(
           padding: padding,

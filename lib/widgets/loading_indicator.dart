@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 import '../widgets/adaptive/adaptive.dart';
 
 class LoadingIndicator extends StatelessWidget {
@@ -18,8 +17,8 @@ class LoadingIndicator extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               message!,
-              style: const TextStyle(
-                color: AppColors.textDim,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 14,
               ),
               textAlign: TextAlign.center,

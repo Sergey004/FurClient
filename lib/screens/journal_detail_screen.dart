@@ -210,18 +210,7 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
                     onTap: () => _navigateToProfile(j.author),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: AppColors.bgInput,
-                          child: Text(
-                            j.author[0].toUpperCase(),
-                            style: const TextStyle(
-                              color: AppColors.fluentCyan,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+                        FAAvatar(username: j.author, size: 28),
                         const SizedBox(width: 8),
                         Text(
                           j.author,

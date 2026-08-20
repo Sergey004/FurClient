@@ -83,8 +83,21 @@ class FAUrls {
     List<String> ratings = allSearchRatings,
     List<String> contentTypes = allSearchContentTypes,
     String range = '5years',
+    String author = '',
+    List<String> tags = const [],
+    List<String> genders = const [],
   }) {
-    final q = Uri.encodeComponent(query);
+    final operators = <String>[];
+    if (author.trim().isNotEmpty) operators.add('@lower ${author.trim()}');
+    final keywords = [...genders, ...tags]
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .join(' ');
+    if (keywords.isNotEmpty) operators.add('@keywords $keywords');
+    final searchText = [query.trim(), ...operators]
+        .where((value) => value.isNotEmpty)
+        .join(' ');
+    final q = Uri.encodeComponent(searchText);
     final parts = <String>[
       'q=$q',
       'order-by=$sortBy',

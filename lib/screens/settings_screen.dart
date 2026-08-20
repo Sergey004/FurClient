@@ -205,10 +205,10 @@ class _SettingsScreenState extends State<SettingsScreen>
         padding: const EdgeInsets.symmetric(vertical: 8)
             .copyWith(bottom: bottomInset),
         children: [
-          _sectionHeader('APPEARANCE'),
+          _sectionHeader('Appearance'),
           _card([_buildThemeTile()]),
           const SizedBox(height: 24),
-          _sectionHeader('CONTENT'),
+          _sectionHeader('Content'),
           _card([
             _adaptiveSwitchTile(
               icon: Icons.shield_outlined,
@@ -231,7 +231,6 @@ class _SettingsScreenState extends State<SettingsScreen>
               subtitle: 'Save image when favoriting',
             ),
             Divider(height: 1, indent: 16, color: outline),
-            Divider(height: 1, indent: 16, color: outline),
             _adaptiveSwitchTile(
               icon: Icons.close_fullscreen_outlined,
               iconColor: tertiary,
@@ -244,14 +243,13 @@ class _SettingsScreenState extends State<SettingsScreen>
               subtitle: 'Close submission view after favoriting',
             ),
             Divider(height: 1, indent: 16, color: outline),
-            Divider(height: 1, indent: 56, color: outline),
             _buildImageQualityTile(),
           ]),
           const SizedBox(height: 24),
-          _sectionHeader('DOWNLOADS'),
+          _sectionHeader('Downloads'),
           _card([_buildDownloadFolderTile()]),
           const SizedBox(height: 24),
-          _sectionHeader('ACCOUNT'),
+          _sectionHeader('Account'),
           _card([
             _actionTile(
               icon: Icons.logout,
@@ -261,7 +259,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
           ]),
           const SizedBox(height: 24),
-          _sectionHeader('ABOUT'),
+          _sectionHeader('About'),
           _card([
             _infoTile(
               icon: Icons.pets,
@@ -699,10 +697,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       child: Text(
         text,
         style: TextStyle(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
+          color: Theme.of(context).colorScheme.primary,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
@@ -710,14 +707,13 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Widget _card(List<Widget> children) {
     final colorScheme = Theme.of(context).colorScheme;
-    final cardColor = colorScheme.surfaceContainerHighest;
-    final outline = colorScheme.outlineVariant.withValues(alpha: 0.12);
+    final tiles = Theme.of(context).extension<AppTileTheme>() ??
+        AppTileTheme.from(colorScheme);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: outline),
+        color: tiles.primaryBackground,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(children: children),
     );
@@ -737,12 +733,11 @@ class _SettingsScreenState extends State<SettingsScreen>
             Icon(icon, color: accent, size: 20),
             const SizedBox(width: 10),
             Text(
-              title.toUpperCase(),
+              title,
               style: TextStyle(
                 color: accent,
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],

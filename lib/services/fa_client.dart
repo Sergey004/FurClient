@@ -912,9 +912,23 @@ class FAClient {
     int page = 1,
     String sortBy = 'relevancy',
     String sortDirection = 'desc',
+    List<String> ratings = FAUrls.allSearchRatings,
+    List<String> contentTypes = FAUrls.allSearchContentTypes,
+    String range = '5years',
+    String author = '',
+    List<String> tags = const [],
+    List<String> genders = const [],
   }) async {
     final url = FAUrls.search(query,
-        page: page, sortBy: sortBy, sortDirection: sortDirection);
+        page: page,
+        sortBy: sortBy,
+        sortDirection: sortDirection,
+        ratings: ratings,
+        contentTypes: contentTypes,
+        range: range,
+        author: author,
+        tags: tags,
+        genders: genders);
     final html = await _getHtml(url);
     return Submission.parseSearchResults(html);
   }

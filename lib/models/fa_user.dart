@@ -1,5 +1,6 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
+import 'package:fa_kit/fa_kit.dart' as fa;
 
 class FAUserStats {
   final int views;
@@ -95,7 +96,8 @@ class FAUser {
 
     // Avatar — look for img with alt="Avatar" or inside avatar container
     final avatarEl = document.querySelector('img[alt="Avatar"]');
-    final avatarUrl = avatarEl?.attributes['src'] ?? '';
+    final avatarUrl =
+        avatarEl?.attributes['src'] ?? fa.FAURLs.avatarUrl(username) ?? '';
 
     // Banner — user-banner div > img
     final bannerEl = mainWindow?.querySelector('div#header a img') ??

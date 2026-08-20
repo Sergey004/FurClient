@@ -8,6 +8,7 @@ import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/fa_image_loader.dart';
 import '../widgets/m3/app_list_tile.dart';
+import '../widgets/fur_html_widget.dart';
 import '../utils/platform_utils.dart';
 import 'user_content_screen.dart';
 
@@ -458,14 +459,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildBio(FAUser p) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('About',
+          Text('About',
               style: TextStyle(
-                  color: AppColors.text,
+                  color: colors.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
@@ -473,14 +475,13 @@ class _ProfileScreenState extends State<ProfileScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+              color: colors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Text(
+            child: FurHtmlWidget(
               p.description,
-              style: const TextStyle(
-                  color: AppColors.textDim, fontSize: 14, height: 1.6),
+              style: TextStyle(
+                  color: colors.onSurfaceVariant, fontSize: 14, height: 1.6),
             ),
           ),
         ],

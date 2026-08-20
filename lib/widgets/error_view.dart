@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 import '../widgets/adaptive/adaptive.dart';
 
 class ErrorView extends StatelessWidget {
@@ -29,14 +28,16 @@ class ErrorView extends StatelessWidget {
           children: [
             Icon(
               isCf ? Icons.shield_outlined : Icons.error_outline,
-              color: isCf ? AppColors.fluentCyan : AppColors.danger,
+              color: isCf
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.error,
               size: 48,
             ),
             const SizedBox(height: 16),
             Text(
               message,
-              style: const TextStyle(
-                color: AppColors.textDim,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 14,
               ),
               textAlign: TextAlign.center,

@@ -6,11 +6,11 @@ import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:system_theme/system_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Static colour palette (the "Original" dark theme — never changes)
+// Static colours retained for Fluent Windows and legacy service states.
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppColors {
-  // ── Dark / Original palette ────────────────────────────────────────────────
+  // ── Fluent / service colours ───────────────────────────────────────────────
   static const bg = Color(0xFF0f0f11);
   static const bgDeep = Color(0xFF090909);
   static const bgCard = Color(0xFF141414);
@@ -68,6 +68,78 @@ class AppColors {
 class AppBreakpoints {
   static const double desktop = 840;
   static const double tablet = 600;
+}
+
+/// Tonal surfaces used by the expressive Material 3 tile treatment.
+/// Each role keeps its matching foreground readable on light and dark themes.
+class AppTileTheme extends ThemeExtension<AppTileTheme> {
+  final Color primaryBackground;
+  final Color primaryForeground;
+  final Color secondaryBackground;
+  final Color secondaryForeground;
+  final Color tertiaryBackground;
+  final Color tertiaryForeground;
+
+  const AppTileTheme({
+    required this.primaryBackground,
+    required this.primaryForeground,
+    required this.secondaryBackground,
+    required this.secondaryForeground,
+    required this.tertiaryBackground,
+    required this.tertiaryForeground,
+  });
+
+  factory AppTileTheme.from(ColorScheme colors) {
+    return AppTileTheme(
+      primaryBackground: Color.lerp(
+          colors.surfaceContainerHigh, colors.primaryContainer, 0.28)!,
+      primaryForeground: colors.onPrimaryContainer,
+      secondaryBackground: Color.lerp(
+          colors.surfaceContainerHigh, colors.secondaryContainer, 0.24)!,
+      secondaryForeground: colors.onSecondaryContainer,
+      tertiaryBackground: Color.lerp(
+          colors.surfaceContainerHigh, colors.tertiaryContainer, 0.24)!,
+      tertiaryForeground: colors.onTertiaryContainer,
+    );
+  }
+
+  @override
+  AppTileTheme copyWith({
+    Color? primaryBackground,
+    Color? primaryForeground,
+    Color? secondaryBackground,
+    Color? secondaryForeground,
+    Color? tertiaryBackground,
+    Color? tertiaryForeground,
+  }) {
+    return AppTileTheme(
+      primaryBackground: primaryBackground ?? this.primaryBackground,
+      primaryForeground: primaryForeground ?? this.primaryForeground,
+      secondaryBackground: secondaryBackground ?? this.secondaryBackground,
+      secondaryForeground: secondaryForeground ?? this.secondaryForeground,
+      tertiaryBackground: tertiaryBackground ?? this.tertiaryBackground,
+      tertiaryForeground: tertiaryForeground ?? this.tertiaryForeground,
+    );
+  }
+
+  @override
+  AppTileTheme lerp(covariant AppTileTheme? other, double t) {
+    if (other == null) return this;
+    return AppTileTheme(
+      primaryBackground:
+          Color.lerp(primaryBackground, other.primaryBackground, t)!,
+      primaryForeground:
+          Color.lerp(primaryForeground, other.primaryForeground, t)!,
+      secondaryBackground:
+          Color.lerp(secondaryBackground, other.secondaryBackground, t)!,
+      secondaryForeground:
+          Color.lerp(secondaryForeground, other.secondaryForeground, t)!,
+      tertiaryBackground:
+          Color.lerp(tertiaryBackground, other.tertiaryBackground, t)!,
+      tertiaryForeground:
+          Color.lerp(tertiaryForeground, other.tertiaryForeground, t)!,
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -135,59 +207,10 @@ class Palette {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Dark colour parameters (used by buildColorParams for Original theme ONLY)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _DarkParams {
-  final Color bg;
-  final Color bgDeep;
-  final Color bgCard;
-  final Color bgInput;
-  final Color border;
-  final Color text;
-  final Color textDim;
-  final Color textMuted;
-  final Color primary;
-  final Color primaryBg;
-
-  const _DarkParams({
-    required this.bg,
-    required this.bgDeep,
-    required this.bgCard,
-    required this.bgInput,
-    required this.border,
-    required this.text,
-    required this.textDim,
-    required this.textMuted,
-    required this.primary,
-    required this.primaryBg,
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Theme builder
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppTheme {
-  // ═════════════════════════════════════════════════════════════════════════
-  // ORIGINAL DARK THEME (hard-coded, no system colour)
-  // ═════════════════════════════════════════════════════════════════════════
-
-  static ThemeData get darkTheme => _buildMaterialTheme(
-        dark: _DarkParams(
-          bg: AppColors.bg,
-          bgDeep: AppColors.bgDeep,
-          bgCard: AppColors.bgCard,
-          bgInput: AppColors.bgInput,
-          border: AppColors.border,
-          text: AppColors.text,
-          textDim: AppColors.textDim,
-          textMuted: AppColors.textMuted,
-          primary: AppColors.fluentCyanDark,
-          primaryBg: AppColors.fluentCyanBg,
-        ),
-      );
-
   // ═════════════════════════════════════════════════════════════════════════
   // MATERIAL 3 THEMES (system / light / dark modes)
   //
@@ -230,6 +253,7 @@ class AppTheme {
 
   static ThemeData _buildM3Theme(ColorScheme colorScheme) {
     final isDark = colorScheme.brightness == Brightness.dark;
+    final tileTheme = AppTileTheme.from(colorScheme);
 
     // M3 surface hierarchy:
     //   surfaceContainerLowest  → most elevated (cards, dialogs)
@@ -239,30 +263,27 @@ class AppTheme {
     //   surfaceContainerHighest → most recessed (navigation, bottom bar)
     //   surface                 → base scaffold background
     final scaffoldBg = colorScheme.surface;
-    final cardBg = isDark
-        ? colorScheme.surfaceContainerLow
-        : colorScheme.surfaceContainerLowest;
     final inputBg = colorScheme.surfaceContainerHighest;
     final borderCol = colorScheme.outlineVariant;
-    final subtleBorder = colorScheme.outline.withValues(alpha: 0.15);
 
     return ThemeData(
       useMaterial3: true,
       brightness: colorScheme.brightness,
       scaffoldBackgroundColor: scaffoldBg,
       colorScheme: colorScheme,
+      extensions: <ThemeExtension<dynamic>>[tileTheme],
 
       // M3 surface tint: the "elevation glow" tint color
-      // Transparent for original mode, M3 surface tint for M3 modes.
+      // M3 surface tint is applied by the standard Material components.
       // Flutter automatically applies it via surfaceTintColor on Card/Scaffold.
 
       // ── Cards ────────────────────────────────────────────────────────────
       cardTheme: CardThemeData(
-        color: cardBg,
+        color: tileTheme.primaryBackground,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: subtleBorder),
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide.none,
         ),
         margin: EdgeInsets.zero,
         // M3 tonal elevation is handled by surfaceTintColor automatically
@@ -582,216 +603,6 @@ class AppTheme {
       ),
 
       // ── Page transitions (iOS-style on all platforms for smooth feel) ──
-      pageTransitionsTheme: const PageTransitionsTheme(
-        builders: {
-          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
-        },
-      ),
-    );
-  }
-
-  // ═════════════════════════════════════════════════════════════════════════
-  // ORIGINAL THEME BUILDER (uses hard-coded AppColors, NOT M3 ColorScheme)
-  // ═════════════════════════════════════════════════════════════════════════
-
-  static ThemeData _buildMaterialTheme({
-    required _DarkParams dark,
-  }) {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: dark.bg,
-      colorScheme: ColorScheme.dark(primary: dark.primary),
-      cardTheme: CardThemeData(
-        color: dark.bgCard,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.border),
-        ),
-        margin: EdgeInsets.zero,
-      ),
-      appBarTheme: AppBarTheme(
-        backgroundColor: dark.bg,
-        foregroundColor: dark.text,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: false,
-        surfaceTintColor: Colors.transparent,
-        titleTextStyle: TextStyle(
-          color: dark.text,
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.3,
-        ),
-      ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: dark.bgCard,
-        selectedItemColor: dark.primary,
-        unselectedItemColor: dark.textMuted,
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-        selectedLabelStyle:
-            const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: const TextStyle(fontSize: 12),
-      ),
-      navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: dark.bgCard,
-        selectedIconTheme: IconThemeData(color: dark.primary, size: 24),
-        unselectedIconTheme: IconThemeData(color: dark.textMuted, size: 22),
-        selectedLabelTextStyle: TextStyle(
-          color: dark.primary,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
-        unselectedLabelTextStyle: TextStyle(
-          color: dark.textMuted,
-          fontSize: 11,
-        ),
-        indicatorColor: dark.primaryBg,
-        minWidth: 72,
-        minExtendedWidth: 200,
-        groupAlignment: 0,
-      ),
-      chipTheme: ChipThemeData(
-        backgroundColor: dark.bgInput,
-        selectedColor: dark.primaryBg,
-        labelStyle: TextStyle(color: dark.textDim, fontSize: 13),
-        secondaryLabelStyle:
-            TextStyle(color: dark.primary.withValues(alpha: 0.7), fontSize: 13),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide.none,
-        ),
-        side: BorderSide.none,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: dark.bgInput,
-        hintStyle: TextStyle(color: dark.textMuted),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide(color: dark.primary, width: 1.5),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      ),
-      dividerTheme: DividerThemeData(
-        color: dark.border,
-        thickness: 1,
-        space: 1,
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: dark.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.3,
-          ),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: dark.primary,
-        ),
-      ),
-      switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return Colors.white;
-          // OFF: brighter thumb so it's visible against the dark track
-          return const Color(0xFF9ca3af);
-        }),
-        trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return dark.primary;
-          }
-          // OFF: distinct dark track, not too close to bgCard
-          return const Color(0xFF3a3a42);
-        }),
-        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return dark.primary;
-          }
-          return const Color(0xFF555560);
-        }),
-      ),
-      iconTheme: IconThemeData(
-        color: dark.textDim,
-        size: 24,
-      ),
-      textTheme: TextTheme(
-        headlineLarge: TextStyle(
-          color: dark.text,
-          fontSize: 28,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.5,
-        ),
-        headlineMedium: TextStyle(
-          color: dark.text,
-          fontSize: 24,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.3,
-        ),
-        headlineSmall: TextStyle(
-          color: dark.text,
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.2,
-        ),
-        titleLarge: TextStyle(
-          color: dark.text,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.1,
-        ),
-        titleMedium: TextStyle(
-          color: dark.text,
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-        titleSmall: TextStyle(
-          color: dark.text,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
-        bodyLarge: TextStyle(color: dark.text, fontSize: 16),
-        bodyMedium: TextStyle(color: dark.textDim, fontSize: 14),
-        bodySmall: TextStyle(color: dark.textMuted, fontSize: 12),
-        labelLarge: TextStyle(
-          color: dark.text,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.3,
-        ),
-        labelMedium: TextStyle(
-          color: dark.textDim,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-        labelSmall: TextStyle(
-          color: dark.textMuted,
-          fontSize: 11,
-        ),
-      ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),

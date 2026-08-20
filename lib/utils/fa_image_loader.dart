@@ -236,6 +236,7 @@ class FAAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final avatarUrl = 'https://a.furaffinity.net/$username.gif';
     return ClipOval(
       child: FAImage(
@@ -245,11 +246,11 @@ class FAAvatar extends StatelessWidget {
         fit: BoxFit.cover,
         errorWidget: CircleAvatar(
           radius: size / 2,
-          backgroundColor: const Color(0xFF2A2A2A),
+          backgroundColor: colors.primaryContainer,
           child: Text(
             username.isNotEmpty ? username[0].toUpperCase() : '?',
             style: TextStyle(
-              color: const Color(0xFF4FC3F7),
+              color: colors.onPrimaryContainer,
               fontSize: size * 0.4,
               fontWeight: FontWeight.w600,
             ),

@@ -1,6 +1,5 @@
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
 import '../../utils/platform_utils.dart';
 
 /// Adaptive switch — Fluent ToggleSwitch on Windows, Material Switch on others.
@@ -22,12 +21,7 @@ class AdaptiveSwitch extends StatelessWidget {
         onChanged: onChanged,
       );
     }
-    return Switch(
-      value: value,
-      onChanged: onChanged,
-      activeTrackColor: const Color(0xFF00B7C3),
-      activeThumbColor: const Color(0xFF008B97),
-    );
+    return Switch(value: value, onChanged: onChanged);
   }
 }
 
@@ -65,12 +59,14 @@ class AdaptiveSwitchTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style:
-                        const TextStyle(color: AppColors.text, fontSize: 15)),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 15)),
                 const SizedBox(height: 2),
                 Text(subtitle,
-                    style: const TextStyle(
-                        color: AppColors.textMuted, fontSize: 13)),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 13)),
               ],
             ),
           ),

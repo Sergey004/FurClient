@@ -124,6 +124,7 @@ class _FurClientAppState extends State<FurClientApp> {
   final UpdateService _updateService = UpdateService();
   final ThemeProvider _themeProvider = ThemeProvider.instance;
   StreamSubscription<Uri>? _linkSubscription;
+  StreamSubscription<SystemAccentColor>? _systemThemeSubscription;
   bool _isLoggedIn = false;
   bool _isRestoringSession = true;
 
@@ -133,8 +134,22 @@ class _FurClientAppState extends State<FurClientApp> {
   void initState() {
     super.initState();
     _themeProvider.addListener(_onThemeChanged);
+    _setupSystemThemeListener();
     _initApp();
     _setupDeepLinks();
+  }
+
+  void _setupSystemThemeListener() {
+    if (isDesktop) {
+      _systemThemeSubscription = SystemTheme.onChange.listen((_) {
+        if (mounted) {
+          // Reload accent color and rebuild theme
+          SystemTheme.accentColor.load().then((_) {
+            if (mounted) setState(() {});
+          });
+        }
+      });
+    }
   }
 
   static bool _initialDeepLinkHandled = false;
@@ -271,8 +286,7 @@ class _FurClientAppState extends State<FurClientApp> {
   }
 
   void _onThemeChanged() {
-    final isDark = _themeProvider.mode == AppThemeMode.dark ||
-        _themeProvider.mode == AppThemeMode.original;
+    final isDark = _themeProvider.mode == AppThemeMode.dark;
     if (_themeProvider.mode == AppThemeMode.system) {
       AppTheme.setSystemOverlay();
     } else {
@@ -361,6 +375,7 @@ class _FurClientAppState extends State<FurClientApp> {
     _updateService.dispose();
     _themeProvider.dispose();
     _linkSubscription?.cancel();
+    _systemThemeSubscription?.cancel();
     super.dispose();
   }
 
@@ -400,10 +415,6 @@ class _FurClientAppState extends State<FurClientApp> {
             theme = AppTheme.fluentDarkTheme;
             darkTheme = AppTheme.fluentFromSystemAccent(accent);
             break;
-          case AppThemeMode.original:
-            theme = AppTheme.fluentDarkTheme;
-            darkTheme = AppTheme.fluentDarkTheme;
-            break;
         }
 
         return fluent.FluentApp(
@@ -425,17 +436,6 @@ class _FurClientAppState extends State<FurClientApp> {
       listenable: _themeProvider,
       builder: (context, _) {
         final mode = _themeProvider.mode;
-
-        // Original: always dark, no system colour injection
-        if (mode == AppThemeMode.original) {
-          return MaterialApp(
-            title: 'FurClient',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.darkTheme,
-            navigatorKey: _FurClientAppState._navigatorKey,
-            home: UpgradeAlert(child: _buildHome()),
-          );
-        }
 
         return DynamicColorBuilder(
           builder: (lightDynamic, darkDynamic) {
@@ -468,10 +468,6 @@ class _FurClientAppState extends State<FurClientApp> {
                   darkTheme = AppTheme.buildFromSystemAccent(accent);
                 }
                 theme = darkTheme;
-                break;
-              case AppThemeMode.original:
-                theme = AppTheme.darkTheme;
-                darkTheme = null;
                 break;
             }
 

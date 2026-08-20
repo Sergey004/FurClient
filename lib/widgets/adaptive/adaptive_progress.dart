@@ -1,7 +1,7 @@
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 import '../../utils/platform_utils.dart';
-import '../../theme/app_theme.dart';
+//import '../../theme/app_theme.dart';
 
 class AdaptiveProgress extends StatelessWidget {
   final Color? color;
@@ -13,11 +13,11 @@ class AdaptiveProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isWindows) {
       return fluent.ProgressRing(
-        activeColor: color ?? AppColors.fluentCyan,
+        activeColor: color ?? Theme.of(context).colorScheme.primary,
       );
     }
     return CircularProgressIndicator(
-      color: color ?? AppColors.fluentCyan,
+      color: color ?? Theme.of(context).colorScheme.primary,
       strokeWidth: strokeWidth ?? 4,
     );
   }

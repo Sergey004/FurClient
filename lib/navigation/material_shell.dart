@@ -39,37 +39,31 @@ class _MaterialShellState extends State<MaterialShell> {
       icon: Icons.photo_library_outlined,
       selectedIcon: Icons.photo_library,
       label: 'Gallery',
-      accent: AppColors.fluentCyan,
     ),
     _NavItem(
       icon: Icons.subscriptions_outlined,
       selectedIcon: Icons.subscriptions,
       label: 'Watch',
-      accent: AppColors.cupertinoPurple,
     ),
     _NavItem(
       icon: Icons.search_outlined,
       selectedIcon: Icons.search,
       label: 'Search',
-      accent: AppColors.materialGreen,
     ),
     _NavItem(
       icon: Icons.notifications_outlined,
       selectedIcon: Icons.notifications,
       label: 'Notifications',
-      accent: AppColors.fluentCyan,
     ),
     _NavItem(
       icon: Icons.person_outline,
       selectedIcon: Icons.person,
       label: 'Profile',
-      accent: AppColors.materialLavender,
     ),
     _NavItem(
       icon: Icons.settings_outlined,
       selectedIcon: Icons.settings,
       label: 'Settings',
-      accent: AppColors.textMuted,
     ),
   ];
 
@@ -151,8 +145,8 @@ class _MaterialShellState extends State<MaterialShell> {
   }
 
   Widget _buildRailLayout(List<Widget> screens, {required bool isExtended}) {
-    final currentAccent = _navItems[_currentIndex].accent;
     final colorScheme = Theme.of(context).colorScheme;
+    final currentAccent = colorScheme.primary;
 
     return Scaffold(
       body: Row(
@@ -171,7 +165,7 @@ class _MaterialShellState extends State<MaterialShell> {
               extended: isExtended,
               minExtendedWidth: 220,
               backgroundColor: colorScheme.surfaceContainerLow,
-              indicatorColor: currentAccent.withValues(alpha: 0.16),
+              indicatorColor: colorScheme.secondaryContainer,
               useIndicator: true,
               labelType: isExtended ? null : NavigationRailLabelType.selected,
               leading: Padding(
@@ -250,8 +244,7 @@ class _MaterialShellState extends State<MaterialShell> {
                     setState(() => _currentIndex = index),
                 backgroundColor: Colors.transparent,
                 surfaceTintColor: colorScheme.surfaceTint,
-                indicatorColor:
-                    _navItems[_currentIndex].accent.withValues(alpha: 0.14),
+                indicatorColor: colorScheme.secondaryContainer,
                 height: 72,
                 labelBehavior:
                     NavigationDestinationLabelBehavior.onlyShowSelected,
@@ -275,12 +268,10 @@ class _NavItem {
   final IconData icon;
   final IconData selectedIcon;
   final String label;
-  final Color accent;
 
   const _NavItem({
     required this.icon,
     required this.selectedIcon,
     required this.label,
-    required this.accent,
   });
 }

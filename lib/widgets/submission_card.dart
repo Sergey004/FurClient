@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fa_kit/fa_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../services/fa_client.dart';
@@ -112,13 +111,14 @@ class _SubmissionCardState extends State<SubmissionCard> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: widget.onTap,
       child: Card(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           side: _current.isFavorite
-              ? BorderSide(color: AppColors.notifFave, width: 2)
+              ? BorderSide(color: colors.primary, width: 2)
               : BorderSide.none,
         ),
         clipBehavior: Clip.antiAlias,
@@ -134,11 +134,12 @@ class _SubmissionCardState extends State<SubmissionCard> {
   }
 
   Widget _buildImage() {
+    final colors = Theme.of(context).colorScheme;
     return Stack(
       fit: StackFit.expand,
       children: [
         ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
           child: _current.imageUrl.isNotEmpty
               ? FAImage(
                   url: _current.imageUrl,
@@ -147,50 +148,50 @@ class _SubmissionCardState extends State<SubmissionCard> {
                   ),
                   fit: BoxFit.cover,
                   placeholder: Container(
-                    color: AppColors.bgInput,
+                    color: colors.surfaceContainerHighest,
                     child: const Center(
                       child: AdaptiveProgress(strokeWidth: 2),
                     ),
                   ),
                   errorWidget: Container(
-                    color: AppColors.bgInput,
-                    child: const Icon(
+                    color: colors.surfaceContainerHighest,
+                    child: Icon(
                       Icons.broken_image,
-                      color: AppColors.textMuted,
+                      color: colors.onSurfaceVariant,
                       size: 32,
                     ),
                   ),
                 )
               : Container(
-                  color: AppColors.bgInput,
-                  child: const Icon(
+                  color: colors.surfaceContainerHighest,
+                  child: Icon(
                     Icons.image,
-                    color: AppColors.textMuted,
+                    color: colors.onSurfaceVariant,
                     size: 32,
                   ),
                 ),
         ),
         if (_current.isNsfw && widget.sfwMode)
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
-                color: AppColors.bgCard.withValues(alpha: 0.7),
-                child: const Center(
+                color: colors.surfaceContainerHighest.withValues(alpha: 0.88),
+                child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.visibility_off,
-                        color: AppColors.textMuted,
+                        color: colors.onSurfaceVariant,
                         size: 28,
                       ),
                       SizedBox(height: 4),
                       Text(
                         'NSFW',
                         style: TextStyle(
-                          color: AppColors.textMuted,
+                          color: colors.onSurfaceVariant,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -212,16 +213,16 @@ class _SubmissionCardState extends State<SubmissionCard> {
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: AppColors.bgCard.withValues(alpha: 0.6),
+                  color: colors.surfaceContainerHighest.withValues(alpha: 0.72),
                   shape: BoxShape.circle,
                 ),
                 child: _isFaving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: AdaptiveProgress(
                           strokeWidth: 2,
-                          color: AppColors.notifFave,
+                          color: colors.primary,
                         ),
                       )
                     : Icon(
@@ -229,8 +230,8 @@ class _SubmissionCardState extends State<SubmissionCard> {
                             ? Icons.favorite
                             : Icons.favorite_border,
                         color: _current.isFavorite
-                            ? AppColors.notifFave
-                            : AppColors.textDim,
+                            ? colors.primary
+                            : colors.onSurfaceVariant,
                         size: 18,
                       ),
               ),
@@ -242,6 +243,7 @@ class _SubmissionCardState extends State<SubmissionCard> {
   }
 
   Widget _buildCaption() {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
       child: Column(
@@ -251,8 +253,8 @@ class _SubmissionCardState extends State<SubmissionCard> {
             _current.title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.text,
+            style: TextStyle(
+              color: colors.onSurface,
               fontSize: 13,
               fontWeight: FontWeight.w500,
               height: 1.3,
@@ -260,14 +262,22 @@ class _SubmissionCardState extends State<SubmissionCard> {
           ),
           if (_current.author.isNotEmpty) ...[
             const SizedBox(height: 3),
-            Text(
-              _current.author,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 11,
-              ),
+            Row(
+              children: [
+                FAAvatar(username: _current.author, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _current.author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ],

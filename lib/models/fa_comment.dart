@@ -72,18 +72,20 @@ class FAComment {
   factory FAComment.fromFAComment(fa.FAComment faKomment,
       {String avatarUrl = ''}) {
     if (faKomment is fa.FAVisibleComment) {
+      final resolvedAvatar = avatarUrl.isNotEmpty
+          ? avatarUrl
+          : fa.FAURLs.avatarUrl(faKomment.author) ?? '';
       return FAComment(
         id: faKomment.cid.toString(),
         author: faKomment.author,
         displayName: faKomment.displayAuthor,
-        avatarUrl: avatarUrl,
+        avatarUrl: resolvedAvatar,
         htmlText: faKomment.htmlMessage,
         datetime: faKomment.datetime,
         naturalDatetime: faKomment.naturalDatetime,
         indentLevel: faKomment.indentation,
-        replies: faKomment.answers
-            .map((r) => FAComment.fromFAComment(r, avatarUrl: avatarUrl))
-            .toList(),
+        replies:
+            faKomment.answers.map((r) => FAComment.fromFAComment(r)).toList(),
         isHidden: false,
       );
     } else if (faKomment is fa.FAHiddenComment) {

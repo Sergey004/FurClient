@@ -7,13 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///   Windows DWM accent on desktop).
 /// [light] — forced light theme, accent from system.
 /// [dark]  — forced dark theme, accent from system.
-/// [original] — the hard-coded dark theme FurClient shipped with (always dark,
-///   cyan accent, no system colour injection).
 enum AppThemeMode {
   system('System'),
   light('Light'),
-  dark('Dark'),
-  original('Original');
+  dark('Dark');
 
   const AppThemeMode(this.label);
   final String label;
@@ -33,14 +30,18 @@ class ThemeProvider extends ChangeNotifier {
   /// Load theme mode from prefs — call before runApp.
   Future<void> loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    final idx = prefs.getInt(_modeKey) ?? AppThemeMode.original.index;
-    _mode = AppThemeMode.values[idx];
+    final savedIndex = prefs.getInt(_modeKey);
+    // Index 3 belonged to the removed Original theme.
+    final index = savedIndex == null || savedIndex >= AppThemeMode.values.length
+        ? AppThemeMode.system.index
+        : savedIndex;
+    _mode = AppThemeMode.values[index];
   }
 
   /// Legacy constructor for backwards compatibility — delegates to [instance].
   ThemeProvider() : this._();
 
-  AppThemeMode _mode = AppThemeMode.original;
+  AppThemeMode _mode = AppThemeMode.system;
   AppThemeMode get mode => _mode;
 
   Future<void> setMode(AppThemeMode newMode) async {
@@ -60,13 +61,9 @@ class ThemeProvider extends ChangeNotifier {
         return ThemeMode.light;
       case AppThemeMode.dark:
         return ThemeMode.dark;
-      case AppThemeMode.original:
-        // original is always dark
-        return ThemeMode.dark;
     }
   }
 
-  /// Whether we should inject the system accent colour.
-  /// For [original] we keep the hand-picked cyan palette.
-  bool get useSystemAccent => _mode != AppThemeMode.original;
+  /// Material You always uses the active system or dynamic accent.
+  bool get useSystemAccent => true;
 }
