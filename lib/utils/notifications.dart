@@ -71,7 +71,7 @@ Future<void> initNotifications() async {
   );
 
   await notificationsPlugin.initialize(
-    settings: initializationSettings,
+    initializationSettings,
     onDidReceiveNotificationResponse: (NotificationResponse response) {},
   );
 }
@@ -114,10 +114,10 @@ Future<void> showNotification({
     windows: windowsDetails,
   );
   await notificationsPlugin.show(
-    id: notificationId,
-    title: title,
-    body: body,
-    notificationDetails: details,
+    notificationId,
+    title,
+    body,
+    details,
   );
 }
 

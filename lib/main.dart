@@ -22,7 +22,7 @@ import 'screens/submission_detail_screen.dart';
 import 'screens/user_content_screen.dart';
 import 'screens/gallery_screen.dart';
 import 'navigation/adaptive_shell.dart';
-import 'widgets/adaptive/adaptive_route.dart';
+
 import 'widgets/fluent_root_chrome.dart';
 import 'utils/platform_utils.dart';
 import 'package:upgrader/upgrader.dart';
@@ -127,6 +127,8 @@ class _FurClientAppState extends State<FurClientApp> {
   bool _isLoggedIn = false;
   bool _isRestoringSession = true;
 
+  static final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   void initState() {
     super.initState();
@@ -138,8 +140,6 @@ class _FurClientAppState extends State<FurClientApp> {
   static bool _initialDeepLinkHandled = false;
 
   void _setupDeepLinks() {
-    // Handle initial link when app starts from a deep link
-    // Defer navigation until after first frame so Navigator context is available
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppLinks().getInitialLink().then((initialLink) {
         if (initialLink != null && !_initialDeepLinkHandled && mounted) {
@@ -150,8 +150,7 @@ class _FurClientAppState extends State<FurClientApp> {
     });
 
     _linkSubscription = AppLinks().uriLinkStream.listen((uri) {
-      // Link stream will be handled when user navigates within app
-      // Deep links from system are handled above via addPostFrameCallback
+      _handleDeepLink(uri);
     });
   }
 
@@ -170,6 +169,8 @@ class _FurClientAppState extends State<FurClientApp> {
   void _navigateToTarget(FATarget target) {
     final targetType = target.type;
 
+    if (!mounted) return;
+
     switch (targetType) {
       case FATargetType.submission:
         final submissionId = target.submissionId;
@@ -182,22 +183,22 @@ class _FurClientAppState extends State<FurClientApp> {
                 setState(() {
                   _isLoggedIn = true;
                 });
-                _client
-                    .getSubmission(submissionId.toString())
-                    .then((submission) {
-                  if (submission != null && mounted) {
-                    // Navigate to submission detail
-                    Navigator.of(context).push(
-                      adaptiveRoute(
-                        builder: (_) => SubmissionDetailScreen(
-                          client: _client,
-                          submissionId: submissionId.toString(),
-                          sfwMode: false,
-                        ),
+                // Try to get current context from navigator key if needed
+                final navState = _navigatorKey.currentState;
+                if (navState != null) {
+                  navState.push(
+                    MaterialPageRoute(
+                      builder: (_) => SubmissionDetailScreen(
+                        client: _client,
+                        submissionId: submissionId.toString(),
+                        sfwMode: false,
                       ),
-                    );
-                  }
-                });
+                    ),
+                  );
+                } else {
+                  // Navigator not ready yet, will need fallback handling
+                  debugPrint('Navigator not ready for submission deep link: $submissionId');
+                }
               }
             });
           }
@@ -205,26 +206,22 @@ class _FurClientAppState extends State<FurClientApp> {
         break;
       case FATargetType.journal:
         final journalId = target.journalId;
-        if (journalId != null) {
-          if (mounted) {
-            // Navigate to journal page using adaptiveRoute like the rest of the app
-            Navigator.of(context).push(
-              adaptiveRoute(
-                builder: (_) => JournalDetailScreen(
-                  client: _client,
-                  journalId: journalId.toString(),
-                ),
+        if (journalId != null && mounted) {
+          _navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (_) => JournalDetailScreen(
+                client: _client,
+                journalId: journalId.toString(),
               ),
-            );
-          }
+            ),
+          );
         }
         break;
       case FATargetType.user:
         final username = target.username;
         if (username != null && mounted) {
-          // Navigate to user content using adaptiveRoute
-          Navigator.of(context).push(
-            adaptiveRoute(
+          _navigatorKey.currentState?.push(
+            MaterialPageRoute(
               builder: (_) => UserContentScreen(
                 client: _client,
                 username: username,
@@ -237,9 +234,8 @@ class _FurClientAppState extends State<FurClientApp> {
       case FATargetType.gallery:
         final username = target.username;
         if (username != null && mounted) {
-          // Navigate to gallery using adaptiveRoute
-          Navigator.of(context).push(
-            adaptiveRoute(
+          _navigatorKey.currentState?.push(
+            MaterialPageRoute(
               builder: (_) => GalleryScreen(
                 client: _client,
                 sfwMode: false,
@@ -249,17 +245,29 @@ class _FurClientAppState extends State<FurClientApp> {
         }
         break;
       case FATargetType.favorites:
-        if (mounted) {
-          // Navigate to favorites - use existing route
-          Navigator.of(context).pushNamed('/');
-        }
+        // Navigate to gallery tab by default
+        // Note: This requires app-level coordination with AdaptiveShell
+        debugPrint('Favorites deep link - needs shell-level navigation');
         break;
       case FATargetType.note:
-        // Handle note navigation if needed
+        debugPrint('Deep link note - not implemented yet');
+        break;
+      case FATargetType.journals:
+        _navToTabByUrl(target);
+        break;
+      case FATargetType.watchlist:
+        _navToTabByUrl(target);
         break;
       default:
         debugPrint('Unhandled target type: $targetType');
     }
+  }
+
+  Future<void> _navToTabByUrl(FATarget target) async {
+    if (!mounted) return;
+    setState(() {
+      // Will be handled via shell notification or similar
+    });
   }
 
   void _onThemeChanged() {
@@ -424,6 +432,7 @@ class _FurClientAppState extends State<FurClientApp> {
             title: 'FurClient',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,
+            navigatorKey: _FurClientAppState._navigatorKey,
             home: UpgradeAlert(child: _buildHome()),
           );
         }
@@ -472,6 +481,7 @@ class _FurClientAppState extends State<FurClientApp> {
               themeMode: _themeProvider.themeMode,
               theme: theme,
               darkTheme: darkTheme,
+              navigatorKey: _FurClientAppState._navigatorKey,
               home: UpgradeAlert(child: _buildHome()),
             );
           },
