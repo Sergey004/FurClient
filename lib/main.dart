@@ -153,6 +153,8 @@ class _FurClientAppState extends State<FurClientApp> {
   }
 
   static bool _initialDeepLinkHandled = false;
+  String? _lastDeepLink;
+  DateTime? _lastDeepLinkAt;
 
   void _setupDeepLinks() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -171,6 +173,14 @@ class _FurClientAppState extends State<FurClientApp> {
 
   void _handleDeepLink(Uri uri) {
     debugPrint('Deep link received: $uri');
+    final now = DateTime.now();
+    if (_lastDeepLink == uri.toString() &&
+        _lastDeepLinkAt != null &&
+        now.difference(_lastDeepLinkAt!) < const Duration(seconds: 1)) {
+      return;
+    }
+    _lastDeepLink = uri.toString();
+    _lastDeepLinkAt = now;
     final target = FATarget.parse(uri);
     if (target == null) {
       debugPrint('Could not parse deep link');
@@ -478,12 +488,54 @@ class _FurClientAppState extends State<FurClientApp> {
               theme: theme,
               darkTheme: darkTheme,
               navigatorKey: _FurClientAppState._navigatorKey,
+              onGenerateRoute: _onGenerateRoute,
               home: UpgradeAlert(child: _buildHome()),
             );
           },
         );
       },
     );
+  }
+
+  Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
+    final name = settings.name;
+    if (name == null || name.isEmpty) return null;
+    final target = FATarget.parse(Uri.parse(name));
+    if (target == null) return null;
+
+    switch (target.type) {
+      case FATargetType.user:
+        final username = target.username;
+        if (username == null) return null;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => UserContentScreen(
+            client: _client,
+            username: username,
+            contentType: UserContentType.journals,
+          ),
+        );
+      case FATargetType.gallery:
+      case FATargetType.favorites:
+      case FATargetType.journals:
+        final username = target.username;
+        if (username == null) return null;
+        final contentType = switch (target.type) {
+          FATargetType.gallery => UserContentType.gallery,
+          FATargetType.favorites => UserContentType.favorites,
+          _ => UserContentType.journals,
+        };
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => UserContentScreen(
+            client: _client,
+            username: username,
+            contentType: contentType,
+          ),
+        );
+      default:
+        return null;
+    }
   }
 
   Widget _buildHome() {

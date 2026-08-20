@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fa_kit/fa_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -67,7 +68,9 @@ class _SubmissionCardState extends State<SubmissionCard> {
         // Reconcile with the server's parsed state.
         setState(() => _current = updated);
         widget.onFavoriteChanged?.call(updated);
-        await _maybeAutoDownload();
+        // Saving a favorite is complete once the server confirms it. An
+        // optional image download must not hold the card's interaction open.
+        unawaited(_maybeAutoDownload());
       } else {
         // Site toggle failed — revert the optimistic change.
         setState(() {

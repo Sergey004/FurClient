@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io' show Platform;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -455,7 +457,22 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     final sub = _submission;
     if (sub == null || sub.url.isEmpty) return;
     final uri = Uri.tryParse(sub.url);
-    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (uri == null) return;
+
+    if (Platform.isAndroid) {
+      try {
+        await AndroidIntent(
+          action: 'android.intent.action.VIEW',
+          data: uri.toString(),
+          package: 'com.android.chrome',
+        ).launch();
+        return;
+      } catch (e) {
+        debugPrint('=== Chrome launch unavailable, using default browser: $e');
+      }
+    }
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _showActionMenu(Submission sub) async {
@@ -489,14 +506,6 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             ),
             if (sub.imageUrl.isNotEmpty) ...[
               ListTile(
-                leading: const Icon(Icons.download_outlined),
-                title: const Text('Save image'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _saveImage();
-                },
-              ),
-              ListTile(
                 leading: const Icon(Icons.ios_share_outlined),
                 title: const Text('Share image'),
                 onTap: () {
@@ -505,14 +514,6 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                 },
               ),
             ],
-            ListTile(
-              leading: const Icon(Icons.comment_outlined),
-              title: const Text('Comment'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showCommentEditor(parentCid: null);
-              },
-            ),
           ],
         ),
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:extended_image/extended_image.dart';
+import 'package:fa_kit/fa_kit.dart';
 import '../utils/fa_image_proxy.dart';
 
 /// FA-HTML widget — renders FA description/comment HTML via
@@ -44,17 +45,26 @@ class FurHtmlWidget extends StatelessWidget {
       html,
       baseUrl: _baseUrl,
       textStyle: baseStyle,
-      buildAsync: false,
+      // Build large bios/descriptions asynchronously so HTML parsing and
+      // widget-tree construction do not block the first frame.
+      buildAsync: true,
       enableCaching: true,
-      onTapUrl: _onLinkTap,
+      onTapUrl: (url) => _handleLinkTap(context, url),
       factoryBuilder: () => _FAHtmlFactory(imageSize ?? (compact ? 20 : 50)),
     );
   }
 
-  Future<bool> _onLinkTap(String url) async {
+  Future<bool> _handleLinkTap(BuildContext context, String url) async {
     debugPrint('FurHtmlWidget: link tapped: $url');
     try {
       final uri = Uri.parse(url);
+      if (uri.host == 'www.furaffinity.net' || uri.host == 'furaffinity.net') {
+        final target = FATarget.parse(uri);
+        if (target != null) {
+          Navigator.of(context).pushNamed(target.url.path);
+          return true;
+        }
+      }
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }

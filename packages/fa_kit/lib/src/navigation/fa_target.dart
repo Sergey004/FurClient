@@ -93,17 +93,22 @@ class FATarget {
   /// Normalize a deep link URL to a standard HTTPS FurAffinity URL.
   static Uri _normalizeUrl(Uri url) {
     if (url.scheme == 'https' || url.scheme == 'http') {
-      return url;
+      return _withTrailingSlash(url);
     }
 
     // Handle custom schemes like furaffinity://view/12345/
     final path = url.path.startsWith('/') ? url.path : '/${url.path}';
-    return Uri(
+    return _withTrailingSlash(Uri(
       scheme: 'https',
       host: 'www.furaffinity.net',
       path: path,
       fragment: url.fragment,
-    );
+    ));
+  }
+
+  static Uri _withTrailingSlash(Uri url) {
+    if (url.path.isEmpty || url.path.endsWith('/')) return url;
+    return url.replace(path: '${url.path}/');
   }
 
   /// Extract the submission ID if this is a submission target.

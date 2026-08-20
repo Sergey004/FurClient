@@ -307,6 +307,13 @@ class _GalleryScreenState extends State<GalleryScreen>
                 submission: sub,
                 client: widget.client,
                 sfwMode: widget.sfwMode,
+                onFavoriteChanged: (updated) {
+                  final itemIndex = _submissions.indexWhere(
+                    (item) => item.id == updated.id,
+                  );
+                  if (itemIndex == -1 || !mounted) return;
+                  setState(() => _submissions[itemIndex] = updated);
+                },
                 onTap: () => _navigateToDetail(sub),
               );
             },
