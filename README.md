@@ -9,7 +9,6 @@ A cross-platform Fur Affinity client built with Flutter & Dart.
 | Windows | Flutter (WinUI 3 style) | `flutter build windows` |
 | Android | Flutter (Material 3) | `flutter build apk` |
 
-
 ## Design System
 
 FurClient adapts its UI to match the host OS design language (see [DESIGN.md](DESIGN.md)):
@@ -32,7 +31,6 @@ flutter run -d <device_id>
 # Build
 flutter build windows
 flutter build apk --release
-
 
 # Analysis
 flutter analyze
@@ -60,7 +58,7 @@ furclient/
       journal_detail_screen.dart     — Journal specific views
     services/
       auth_service.dart    — Session storage, WebView login flow
-      fa_client.dart       — Dio HTTP client with cookie jar, Cloudflare handling
+      fa_client.dart       — Dio HTTP client, cookie jar, Cloudflare handling
       cdn_fetcher.dart     — CDN source resolving
       download_service.dart — Asset downloading logic
       fa_urls.dart         — FA URL builders
@@ -76,11 +74,83 @@ furclient/
       submission_card.dart — Reusable submission card
       loading_indicator.dart
       error_view.dart
-      # Adaptive UI components (buttons, cards, etc.)
     utils/
       cloudflare_bypass.dart — Cloudflare handling
       cdn_image_loader.dart — Optimized image fetching logic
 ```
+
+## Features
+
+### Core Features (100% implemented)
+
+- **Authentication**: WebView-based login with cookie persistence
+- **Session Management**: Automatic session restore and validation
+- **Navigation**: Adaptive navigation (NavigationRail on desktop, NavigationBar on mobile)
+- **Submission Browsing**: Gallery view with pagination and filtering
+- **Search**: Search submissions with history and results
+- **Notifications**: View and manage notifications
+- **User Profiles**: Browse user content (submissions, journals, stats)
+- **Settings**: Theme, SFW mode, download preferences
+
+### Content Features (90-95% implemented)
+
+- **Submissions**: View details, comments, favorites, adoption status
+- **Journals**: Read and manage journal entries
+- **Gallery**: Browse user galleries
+- **Watchlist**: Track users you're watching
+- **Favorites**: View favorited submissions
+- **Notes**: Inbox/outbox note management
+- **Download**: Save images directly from the app
+
+### Navigation Features (95% implemented)
+
+- **Deep Links**: AppLinks integration for `/view/{id}`, `/user/{name}`, `/gallery/{name}`, `/journal/{id}`, `/favorites/{name}`, etc.
+- **History**: Navigation stack support
+- **Cross-platform**: Adaptive routing for desktop and mobile
+
+### Supported Deep Link URLs
+
+| URL Pattern | Target Type | Implementation Status |
+|---|---|---|
+| `https://www.furaffinity.net/view/{id}/` | submission | ✅ Done |
+| `https://www.furaffinity.net/journal/{id}/` | journal | ✅ Done |
+| `https://www.furaffinity.net/user/{username}/` | user | ✅ Done |
+| `https://www.furaffinity.net/gallery/{username}/` | gallery | ✅ Done |
+| `https://www.furaffinity.net/favorites/{username}/` | favorites | ✅ Done |
+| `https://www.furaffinity.net/journals/{username}/` | journals | ✅ Done |
+| `https://www.furaffinity.net/watchlist/to/{username}/` | watchlist | ✅ Done |
+| `https://www.furaffinity.net/watchlist/by/{username}/` | watchlist | ✅ Done |
+| `furaffinity://view/{id}/` | submission | ✅ Done |
+
+### Platform-Specific Features
+
+- **Windows**: Native WebView2 integration, automatic Cloudflare bypass, system theme support
+- **Android**: Material You dynamic colors, notification support, file downloads
+
+### Technical Features
+
+- **Cookie Management**: Automatic cookie extraction from WebView (including HttpOnly cookies)
+- **Image Handling**: Optimized image loading with caching, progressive images
+- **HTTPS Everywhere**: All network requests use HTTPS
+- **Error Handling**: Graceful fallback for network errors and parsing failures
+
+## Feature Implementation Status
+
+| Feature | Status | Notes |
+|---|---|---|
+| User Login | ✅ | WebView-based, includes MFA support for MFA-protected accounts |
+| Session Restore | ✅ | Cookies and session data persisted locally |
+| Submission View | ✅ | Details, comments, full-size image |
+| Journal View | ✅ | Text, images, navigation |
+| Gallery View | ✅ | Grid layout, pagination |
+| User Profile | ✅ | Stats, avatar, content links |
+| Search | ✅ | Keyword search, filters, history |
+| Notifications | ✅ | Color-coded by type |
+| Favorites | ✅ | User's favorites page |
+| Watchlist | ✅ | Following/Watched by views |
+| Notes | ⚠️ | View only, compose not implemented |
+| Content Filters | ⚠️ | Basic SFW toggle only |
+| Two-Factor Auth | ✅ | Works through WebView login |
 
 ## Authentication
 
@@ -104,4 +174,4 @@ git pull
 
 ## Note for FA Stuff
 
-If this app is causing any interference with the servers, I'll stop “developing” it right away.
+If this app is causing any interference with the servers, I'll stop "developing" it right away.
