@@ -38,7 +38,7 @@ dependencies:
   file_selector: ^1.0.3
   upgrader: ^13.5.0
   package_info_plus: ^10.2.1
-  flutter_local_notifications: ^19.0.0
+  flutter_local_notifications: ^22.3.0
   url_launcher: ^6.3.1
   android_intent_plus: ^5.3.0
   share_plus: ^13.3.0
