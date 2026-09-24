@@ -1,3 +1,5 @@
+**This app never leaks data and does not use telemetry or trackers.**
+
 # FurClient — Fur Affinity Client
 
 A cross-platform Fur Affinity client built with Flutter & Dart.
