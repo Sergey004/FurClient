@@ -32,13 +32,19 @@ import 'utils/notifications.dart';
 import 'package:flutter_driver/driver_extension.dart';
 import 'package:app_links/app_links.dart';
 import 'package:fa_kit/fa_kit.dart';
+import 'package:marionette_flutter/marionette_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 WebViewEnvironment? webViewEnvironment;
 
 void main() {
   runZonedGuarded(() async {
     await http.runWithClient(() async {
-      WidgetsFlutterBinding.ensureInitialized();
+      if (kDebugMode) {
+        MarionetteBinding.ensureInitialized();
+      } else {
+        WidgetsFlutterBinding.ensureInitialized();
+      }
 
       if (Platform.isAndroid) {
         await InAppWebViewController.setWebContentsDebuggingEnabled(true);
@@ -128,7 +134,8 @@ class _FurClientAppState extends State<FurClientApp> {
   bool _isLoggedIn = false;
   bool _isRestoringSession = true;
 
-  static final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> _navigatorKey =
+      GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -222,7 +229,8 @@ class _FurClientAppState extends State<FurClientApp> {
                   );
                 } else {
                   // Navigator not ready yet, will need fallback handling
-                  debugPrint('Navigator not ready for submission deep link: $submissionId');
+                  debugPrint(
+                      'Navigator not ready for submission deep link: $submissionId');
                 }
               }
             });
