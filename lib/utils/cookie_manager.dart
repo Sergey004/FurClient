@@ -287,7 +287,34 @@ class FAICookieManager {
 
   /// Получить все cookies для URL с учётом платформы.
   static Future<List<Cookie>> getCookies(String url) async {
-    return instance.getCookies(url: WebUri(url));
+    final cookies = await instance.getCookies(url: WebUri(url));
+    return cookies.map((c) {
+      final normalized = normalizeExpiryMs(c.expiresDate);
+      if (normalized == c.expiresDate) return c;
+      return Cookie(
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+        path: c.path,
+        expiresDate: normalized,
+        isSecure: c.isSecure,
+        isHttpOnly: c.isHttpOnly,
+        sameSite: c.sameSite,
+      );
+    }).toList();
+  }
+
+  /// Нормализует expiresDate из flutter_inappwebview к миллисекундам.
+  ///
+  /// На Windows плагин пробрасывает CDP `expires` в СЕКУНДАХ, тогда как
+  /// остальные платформы отдают миллисекунды. Реальные даты сейчас
+  /// ~1.7e12 мс против ~1.7e9 секунд, поэтому порог 1e11 (≈1973 год в мс)
+  /// различает их однозначно. `<= 0` (сессионные cookie, CDP даёт -1)
+  /// означает «без срока» — возвращаем null.
+  static int? normalizeExpiryMs(int? raw) {
+    if (raw == null || raw <= 0) return null;
+    if (raw < 100000000000) return raw * 1000;
+    return raw;
   }
 
   /// Получить все cookies из WebView для известных FA URL.

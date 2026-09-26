@@ -275,4 +275,5 @@ app.*.map.json
 /android/.kotlin
 FurClient_new.zip
 .cache/cache1
-.zcode
+.zcode/
+.zcode/config.json

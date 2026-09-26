@@ -45,6 +45,13 @@ class FAClient {
   final Completer<void> _feedReady = Completer<void>();
   int _feedCfAttempts = 0;
 
+  /// «Покажи видимый WebView, пользователь пройдёт CF-челлендж» —
+  /// вызывается на Windows, когда headless-запрос упёрся в Turnstile,
+  /// который сам не решается. Реализация живёт в main.dart; вернёт true,
+  /// если челлендж пройден (cf_clearance в общем сторе) и стоит повторить
+  /// запрос. На Android не используется: там headless проходит CF сам.
+  Future<bool> Function(String url)? cfChallengeResolver;
+
   // Enhanced client for CDN and multi-strategy support
   final FAEnhancedClient _enhancedClient = FAEnhancedClient.instance;
 
@@ -121,6 +128,27 @@ class FAClient {
   Future<void> setSession(UserSession? session,
       {bool freshLogin = false}) async {
     _session = session;
+    if (freshLogin && io.Platform.isWindows) {
+      // Чистим только сессионные куки FA — CF-куки (cf_clearance, cf_chl_*)
+      // трогать нельзя: без них Cloudflare заново челленджит каждый запрос.
+      try {
+        final cm = FAICookieManager.instance;
+        for (final url in _cfCookieUrls) {
+          final existing = await cm.getCookies(url: WebUri(url));
+          for (final c in existing) {
+            if (c.name.startsWith('cf_')) continue;
+            await cm.deleteCookie(
+              url: WebUri(url),
+              name: c.name,
+              domain: c.domain,
+              path: c.path ?? '/',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('=== setSession: cookie purge failed: $e');
+      }
+    }
     await _restoreCookiesFromSession();
     await _enhancedClient.syncCookies();
     if (freshLogin) {
@@ -218,12 +246,23 @@ class FAClient {
     }
 
     try {
-      final html = await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
+      var html = await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
+      // Windows: headless WebView2 не проходит Turnstile сам — отдаём
+      // челлендж видимому резолверу (его cf_clearance попадёт в общий
+      // профиль) и повторяем запрос один раз.
+      if (io.Platform.isWindows &&
+          cfChallengeResolver != null &&
+          (html.isEmpty || isCloudflarePageHtml(html))) {
+        debugPrint('=== Headless CF solve failed for $url, visible resolver…');
+        if (await cfChallengeResolver!(url)) {
+          html = await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
+        }
+      }
       if (html.isEmpty) {
         debugPrint('=== WebView fetch returned empty HTML for $url');
         throw CloudflareError();
       }
-      if (_isCloudflarePage(html)) {
+      if (isCloudflarePageHtml(html)) {
         debugPrint('=== WebView fetched a Cloudflare challenge page for $url');
         throw CloudflareError();
       }
@@ -246,6 +285,11 @@ class FAClient {
       final cookieManager = FAICookieManager.instance;
       final uri = Uri.parse(url);
       final origin = '${uri.scheme}://${uri.host}';
+      // Живой cookie-store — источник истины: FA ротирует сессионные
+      // куки через Set-Cookie, и затирать свежие значения сохранёнными
+      // нельзя. Инжектим только те, которых в сторе нет совсем.
+      final existing = await FAICookieManager.getCookies(origin);
+      final existingNames = existing.map((c) => c.name).toSet();
       for (final item in raw) {
         String? name;
         String? value;
@@ -270,15 +314,20 @@ class FAClient {
         if (name == null || value == null || name.isEmpty || value.isEmpty) {
           continue;
         }
+        // Быстрый фильтр мусора, оставшегося от отладочных сессий.
+        if (name.startsWith('probe_')) continue;
+        if (existingNames.contains(name)) continue;
 
         final cookieDomain = domain ?? '.furaffinity.net';
         final cookiePath = path ?? '/';
         final isSecure = secure ?? true;
 
-        // Expiry far in the future so the cookie doesn't expire during
-        // the session.  FA's 'a' cookie has a very long TTL anyway.
-        final expiry = expiresMs != null && expiresMs > 0
-            ? DateTime.fromMillisecondsSinceEpoch(expiresMs)
+        // В уже сохранённых сессиях могут лежать «секундные» expiresDate
+        // (старый Windows-баг чтения) — дата уходит в прошлое и SetCookie
+        // вместо записи удаляет cookie. Нормализуем перед использованием.
+        final expiryMs = FAICookieManager.normalizeExpiryMs(expiresMs);
+        final expiry = expiryMs != null
+            ? DateTime.fromMillisecondsSinceEpoch(expiryMs)
             : DateTime.now().add(const Duration(days: 365));
 
         // NOTE: WebView2's SetCookie silently drops cookies flagged as
@@ -331,6 +380,19 @@ class FAClient {
     }
   }
 
+  /// Headers for WebView URLRequests. On Windows the User-Agent override is
+  /// omitted on purpose: cf_clearance is issued for the login WebView's
+  /// native WebView2 UA, and spoofing a different UA makes Cloudflare
+  /// reject every request with HTTP 403.
+  Map<String, String> _webviewHeaders({String? cookieHeader, String? referer}) =>
+      {
+        if (cookieHeader != null) 'Cookie': cookieHeader,
+        if (referer != null) 'Referer': referer,
+        if (!io.Platform.isWindows)
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      };
+
   /// Create a persistent headless WebView for authenticated feed pages.
   /// This WebView stays alive so it maintains CF clearance and auth cookies
   /// across requests, avoiding the per-request CF challenge on Windows.
@@ -346,7 +408,7 @@ class FAClient {
       onLoadStop: (controller, loadedUrl) async {
         final html = await controller.getHtml() ?? '';
 
-        if (_isCloudflarePage(html)) {
+        if (isCloudflarePageHtml(html)) {
           _feedCfAttempts++;
           debugPrint('=== FeedWebView: CF challenge #$_feedCfAttempts');
           if (_feedCfAttempts > 5) {
@@ -371,11 +433,7 @@ class FAClient {
       },
       initialUrlRequest: URLRequest(
         url: WebUri('https://www.furaffinity.net/'),
-        headers: {
-          if (cookieHeader != null) 'Cookie': cookieHeader,
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        },
+        headers: _webviewHeaders(cookieHeader: cookieHeader),
       ),
     );
 
@@ -412,12 +470,12 @@ class FAClient {
 
     // Set a one-shot load listener by polling
     debugPrint('=== FeedWebView: navigating to $url');
+
+    // Session cookies must also live in the WebView store, not only in the
+    // request header: redirects and subresources are authorized from there.
+    await _injectSessionCookies('https://www.furaffinity.net/');
     final navCookieHeader = _buildCookieHeader();
-    final navHeaders = <String, String>{
-      'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    };
-    if (navCookieHeader != null) navHeaders['Cookie'] = navCookieHeader;
+    final navHeaders = _webviewHeaders(cookieHeader: navCookieHeader);
     await controller.loadUrl(
       urlRequest: URLRequest(
         url: WebUri(url),
@@ -430,7 +488,7 @@ class FAClient {
     var html = await controller.getHtml() ?? '';
     int waitRounds = 0;
 
-    while (_isCloudflarePage(html) && waitRounds < 5) {
+    while (isCloudflarePageHtml(html) && waitRounds < 5) {
       _feedCfAttempts++;
       debugPrint('=== FeedWebView: CF challenge on navigate #$_feedCfAttempts');
       await _attemptSolveCloudflareChallenge(controller);
@@ -443,6 +501,7 @@ class FAClient {
     await Future.delayed(const Duration(seconds: 3));
     final finalHtml = await controller.getHtml() ?? '';
     final result = finalHtml.length > html.length ? finalHtml : html;
+    debugPrint('=== FeedWebView: landed on ${await controller.getUrl()}');
 
     await _syncCookiesFromWebView();
     await _restoreCookiesFromSession();
@@ -481,7 +540,7 @@ class FAClient {
           debugPrint('=== WebView fetch: ${html.length}B from $loadedUrl');
 
           // If this is a CF challenge page, wait for it to be solved
-          if (_isCloudflarePage(html)) {
+          if (isCloudflarePageHtml(html)) {
             solveAttempts++;
             debugPrint(
                 '=== WebView fetch: CF challenge, attempt $solveAttempts');
@@ -495,7 +554,7 @@ class FAClient {
             await _attemptSolveCloudflareChallenge(controller);
             await Future.delayed(const Duration(seconds: 5));
             final retryHtml = await controller.getHtml() ?? '';
-            if (!_isCloudflarePage(retryHtml)) {
+            if (!isCloudflarePageHtml(retryHtml)) {
               if (!completer.isCompleted) {
                 completer.complete(retryHtml);
               }
@@ -538,11 +597,7 @@ class FAClient {
       },
       initialUrlRequest: URLRequest(
         url: WebUri(url),
-        headers: {
-          if (cookieHeader != null) 'Cookie': cookieHeader,
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        },
+        headers: _webviewHeaders(cookieHeader: cookieHeader),
       ),
     );
 
@@ -586,10 +641,17 @@ class FAClient {
       final html = await _fetchHtmlWithWebView(FAUrls.home);
       if (html.isEmpty) {
         debugPrint('=== verifySession: WebView returned empty HTML');
+        // Windows: CF-заслон на headless ≠ мёртвая сессия. Не разлогиниваем
+        // — разрулится по месту через видимый резолвер.
+        if (io.Platform.isWindows) return true;
         return false;
       }
+      if (io.Platform.isWindows && isCloudflarePageHtml(html)) {
+        debugPrint('=== verifySession: CF challenge on Windows, keep session');
+        return true;
+      }
 
-      final isValid = !_isCloudflarePage(html);
+      final isValid = !isCloudflarePageHtml(html);
       debugPrint(
           '=== verifySession: WebView result is ${isValid ? 'valid' : 'blocked by CF'}');
       return isValid;
@@ -672,9 +734,17 @@ class FAClient {
 
     // On Windows, use the persistent feed WebView so CF clearance cookies
     // are preserved across calls. On other platforms, use standard fetch.
-    final html = io.Platform.isWindows
+    var html = io.Platform.isWindows
         ? await _navigateFeedWebView(url)
         : await _getHtml(url, waitForAjax: true);
+    if (io.Platform.isWindows &&
+        cfChallengeResolver != null &&
+        (html.isEmpty || isCloudflarePageHtml(html))) {
+      debugPrint('=== WatchFeed: CF stuck, asking visible resolver…');
+      if (await cfChallengeResolver!(url)) {
+        html = await _navigateFeedWebView(url);
+      }
+    }
 
     debugPrint('=== WatchFeed: fetched ${html.length} chars from $url');
     // Print the page <title> so we can see if we got a redirect
@@ -691,8 +761,13 @@ class FAClient {
       debugPrint(html.substring(start, (start + 1500).clamp(0, html.length)));
     } else {
       debugPrint('=== WatchFeed: NO messagecenter-submissions found');
-      // Skip the <head> and dump the <body> content so we can see
-      // what structure FA actually returns.
+      // Compact state markers instead of full dumps.
+      debugPrint('=== WatchFeed: markers: '
+          'loggedOut=${html.contains('href="/login"')} '
+          'myUsername=${html.contains('id="my-username"')} '
+          'figures=${RegExp(r'<figure id="sid-').allMatches(html).length} '
+          'isRedirectPage=${html.contains('pageid-redirect')} '
+          'controlPanel=${html.contains('id="pageid-controls"') || html.contains('User control panel')}');
       final bodyIdx = html.indexOf('<body');
       final dumpFrom = bodyIdx >= 0 ? bodyIdx : 0;
       debugPrint('=== WatchFeed: body HTML (from $dumpFrom):');
@@ -782,7 +857,7 @@ class FAClient {
         onLoadStop: (controller, loadedUrl) async {
           try {
             final html = await controller.getHtml() ?? '';
-            if (_isCloudflarePage(html)) {
+            if (isCloudflarePageHtml(html)) {
               submitAttempts++;
               debugPrint(
                   '=== postComment WebView: CF challenge, attempt $submitAttempts');
@@ -856,7 +931,7 @@ class FAClient {
             } else {
               // After submit, check response
               final resultHtml = html;
-              if (!_isCloudflarePage(resultHtml) && resultHtml.isNotEmpty) {
+              if (!isCloudflarePageHtml(resultHtml) && resultHtml.isNotEmpty) {
                 if (!completer.isCompleted) completer.complete(true);
               } else if (submitAttempts > 3) {
                 if (!completer.isCompleted) completer.complete(false);
@@ -878,12 +953,7 @@ class FAClient {
         },
         initialUrlRequest: URLRequest(
           url: WebUri(url),
-          headers: {
-            if (cookieHeader != null) 'Cookie': cookieHeader,
-            'Referer': url,
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-          },
+          headers: _webviewHeaders(cookieHeader: cookieHeader, referer: url),
         ),
       );
 
@@ -968,11 +1038,11 @@ class FAClient {
           debugPrint(
               '=== toggleFavorite WebView: ${html.length}B from $loadedUrl');
 
-          if (_isCloudflarePage(html)) {
+          if (isCloudflarePageHtml(html)) {
             debugPrint('=== toggleFavorite: CF challenge, waiting...');
             await Future.delayed(const Duration(seconds: 3));
             final retryHtml = await controller.getHtml() ?? '';
-            if (!_isCloudflarePage(retryHtml)) {
+            if (!isCloudflarePageHtml(retryHtml)) {
               if (!completer.isCompleted) completer.complete(retryHtml);
             }
             return;
@@ -1067,11 +1137,11 @@ class FAClient {
       onLoadStop: (controller, loadedUrl) async {
         try {
           final html = await controller.getHtml() ?? '';
-          if (_isCloudflarePage(html)) {
+          if (isCloudflarePageHtml(html)) {
             debugPrint('=== toggleFavoriteById: CF challenge, waiting...');
             await Future.delayed(const Duration(seconds: 3));
             final retryHtml = await controller.getHtml() ?? '';
-            if (_isCloudflarePage(retryHtml)) return;
+            if (isCloudflarePageHtml(retryHtml)) return;
           }
 
           if (favoriteUrl == null) {
@@ -1172,11 +1242,11 @@ class FAClient {
           debugPrint(
               '=== toggleSiteSfwMode WebView: ${html.length}B from $loadedUrl');
 
-          if (_isCloudflarePage(html)) {
+          if (isCloudflarePageHtml(html)) {
             debugPrint('=== toggleSiteSfwMode: CF challenge, waiting...');
             await Future.delayed(const Duration(seconds: 3));
             final retryHtml = await controller.getHtml() ?? '';
-            if (!_isCloudflarePage(retryHtml)) {
+            if (!isCloudflarePageHtml(retryHtml)) {
               if (!completer.isCompleted) completer.complete(true);
             }
             return;
@@ -1331,7 +1401,7 @@ class FAClient {
             final html = await controller.getHtml() ?? '';
             debugPrint('=== CF pass: HTML length: ${html.length}');
 
-            if (_isCloudflarePage(html)) {
+            if (isCloudflarePageHtml(html)) {
               solveAttempts++;
               debugPrint(
                   '=== CF pass: challenge detected, attempt $solveAttempts');
@@ -1340,7 +1410,7 @@ class FAClient {
               final retryHtml = await controller.getHtml() ?? '';
               debugPrint('=== CF pass: retry HTML length: ${retryHtml.length}');
 
-              if (_isCloudflarePage(retryHtml)) {
+              if (isCloudflarePageHtml(retryHtml)) {
                 debugPrint(
                     '=== CF pass: challenge still present after attempt $solveAttempts');
                 if (solveAttempts >= 4) {
@@ -1443,24 +1513,21 @@ class FAClient {
   }
 
   /// Check if the HTML is a CF challenge INTERSTITIAL page.
-  /// Key insight: CF challenge pages are tiny (< 30 KB).
-  /// Real FA pages are 80 KB+ and may contain Turnstile/Cloudflare
-  /// references in <script> tags — those are NOT challenge pages.
-  bool _isCloudflarePage(String html) {
-    // Real FA pages are always > 30 KB. CF interstitials are small.
-    if (html.length > 30000) return false;
-
+  ///
+  /// The old heuristic relied on the English title ("Just a moment…"),
+  /// but CF localizes the challenge UI (напр. «Один момент…») — на
+  /// русскоязычной системе детекция молча не срабатывала. Проверяем по
+  /// локаль-независимым маркерам, которые встречаются только на
+  /// челлендж-странице: конфиг `_cf_chl_opt`, виджет `cf-chl-widget`,
+  /// скрипт challenge-platform.
+  static bool isCloudflarePageHtml(String html) {
     final lower = html.toLowerCase();
-    // Title-based check — CF interstitial always has this exact title
-    if (!lower.contains('just a moment') &&
-        !lower.contains('checking your browser')) {
-      return false;
-    }
-    // Confirm with additional challenge-only markers
-    return lower.contains('cf_chl_page') ||
+    return lower.contains('_cf_chl_opt') ||
+        lower.contains('cf-chl-widget') ||
+        lower.contains('cf_chl_page') ||
         lower.contains('challenges.cloudflare.com') ||
-        lower.contains('cf-turnstile') ||
-        lower.contains('verify you are human');
+        lower.contains('checking your browser') ||
+        (lower.contains('just a moment') && lower.contains('cf-turnstile'));
   }
 
   Future<void> _syncCookiesFromWebView() async {
@@ -1535,9 +1602,12 @@ class FAClient {
     if (_session?.cookies == null) return;
     try {
       final List<dynamic> raw = jsonDecode(_session!.cookies!);
-      final sessionCookieMaps = raw.whereType<Map<String, dynamic>>().toList();
+      final sessionCookieMaps = raw
+          .whereType<Map<String, dynamic>>()
+          .where((m) => !(m['name']?.toString().startsWith('probe_') ?? false))
+          .toList();
       final webViewCookieMaps = webViewCookies
-          .where((c) => c.value.isNotEmpty)
+          .where((c) => c.value.isNotEmpty && !c.name.startsWith('probe_'))
           .map((c) => {
                 'name': c.name,
                 'value': c.value,

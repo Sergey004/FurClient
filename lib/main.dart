@@ -8,7 +8,7 @@ import 'package:system_theme/system_theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:cronet_http/cronet_http.dart';
-import 'package:cupertino_http/cupertino_http.dart';
+import 'package:cupertino_http/cupertino_http.dart' hide URLRequest;
 import 'package:window_manager/window_manager.dart';
 import 'services/auth_service.dart';
 import 'services/fa_client.dart';
@@ -66,7 +66,8 @@ void main() {
         webViewEnvironment = await WebViewEnvironment.create(
           settings: WebViewEnvironmentSettings(
             userDataFolder: '${dir.path}\\webview2_data',
-            additionalBrowserArguments: '--disable-gpu --use-gl=swiftshader',
+            // Без --disable-gpu: в headless-режиме со swiftshader Cloudflare
+            // Turnstile палит окружение, и managed-челлендж не проходит.
           ),
         );
         debugPrint(
@@ -142,8 +143,34 @@ class _FurClientAppState extends State<FurClientApp> {
     super.initState();
     _themeProvider.addListener(_onThemeChanged);
     _setupSystemThemeListener();
+    // Windows: CF-челленджи, которые headless WebView2 пройти не может,
+    // показываем пользователю в видимом диалоге (см. _CfChallengeDialog).
+    _client.cfChallengeResolver = _resolveCloudflareChallenge;
     _initApp();
     _setupDeepLinks();
+  }
+
+  bool _cfDialogOpen = false;
+
+  /// Показывает Turnstile/CF-челлендж в видимом InAppWebView на общем
+  /// [webViewEnvironment]; cf_clearance после прохождения остаётся в том же
+  /// профиле и подхватывается headless-запросами. Возвращает true, если
+  /// челлендж пройден (запрос стоит повторить).
+  Future<bool> _resolveCloudflareChallenge(String url) async {
+    if (!isWindows || webViewEnvironment == null) return false;
+    if (_cfDialogOpen) return false;
+    _cfDialogOpen = true;
+    try {
+      final ctx = _navigatorKey.currentContext;
+      if (ctx == null || !ctx.mounted) return false;
+      final solved = await fluent.showDialog<bool>(
+        context: ctx,
+        builder: (context) => _CfChallengeDialog(url: url),
+      );
+      return solved ?? false;
+    } finally {
+      _cfDialogOpen = false;
+    }
   }
 
   void _setupSystemThemeListener() {
@@ -438,6 +465,7 @@ class _FurClientAppState extends State<FurClientApp> {
         return fluent.FluentApp(
           title: 'FurClient',
           debugShowCheckedModeBanner: false,
+          navigatorKey: _navigatorKey,
           themeMode: _themeProvider.themeMode,
           theme: theme,
           darkTheme: darkTheme,
@@ -616,5 +644,73 @@ class _FurClientAppState extends State<FurClientApp> {
       );
     }
     return LoginScreen(authService: _authService, onLogin: _onLogin);
+  }
+}
+
+/// Видимый резолвер Cloudflare-челленджа (Windows).
+///
+/// Headless WebView2 не проходит Turnstile сам (бот-детекция по сигналам
+/// окружения), поэтому челлендж показывается пользователю в этом диалоге.
+/// Как только целевая страница реально загрузилась (не челлендж-экран),
+/// диалог сам закрывается с результатом true.
+class _CfChallengeDialog extends StatefulWidget {
+  final String url;
+  const _CfChallengeDialog({required this.url});
+
+  @override
+  State<_CfChallengeDialog> createState() => _CfChallengeDialogState();
+}
+
+class _CfChallengeDialogState extends State<_CfChallengeDialog> {
+  bool _completed = false;
+
+  Future<void> _onLoadStop(InAppWebViewController controller, Uri? url) async {
+    if (_completed) return;
+    final html = await controller.getHtml() ?? '';
+    // Челлендж-страница крошечная и размечена _cf_chl_opt/cf-chl-widget;
+    // настоящая страница FA всегда крупнее и размечена по-другому.
+    if (!FAClient.isCloudflarePageHtml(html) && html.length > 5000) {
+      _completed = true;
+      if (mounted) Navigator.of(context).pop(true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return fluent.ContentDialog(
+      title: const fluent.Text('Проверка Cloudflare'),
+      content: SizedBox(
+        width: 720,
+        height: 560,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const fluent.Text(
+              'FurAffinity просит подтвердить, что вы не бот. '
+              'Пройдите проверку — страница закроется сама.',
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: InAppWebView(
+                webViewEnvironment: webViewEnvironment,
+                initialSettings: InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                  domStorageEnabled: true,
+                ),
+                initialUrlRequest:
+                    URLRequest(url: WebUri(widget.url)),
+                onLoadStop: _onLoadStop,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        fluent.Button(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const fluent.Text('Отмена'),
+        ),
+      ],
+    );
   }
 }
