@@ -237,8 +237,9 @@ class _LoginScreenState extends State<LoginScreen>
         path = c.path ?? '/';
         isHttpOnly = c.isHttpOnly ?? false;
         isSecure = c.isSecure ?? true;
-        // expiresDate from flutter_inappwebview is int? (millisecondsSinceEpoch)
-        expiresDate = c.expiresDate ?? 0;
+        // expiresDate из flutter_inappwebview: на Windows в секундах (CDP),
+        // на остальных платформах в миллисекундах — нормализуем к мс.
+        expiresDate = FAICookieManager.normalizeExpiryMs(c.expiresDate) ?? 0;
         debugPrint(
             '=== _addCookiesToMap: Cookie: $name | httpOnly=$isHttpOnly | secure=$isSecure | expires=$expiresDate');
       } else if (c is Map<String, dynamic>) {
@@ -249,7 +250,8 @@ class _LoginScreenState extends State<LoginScreen>
         path = c['path'] as String? ?? '/';
         isHttpOnly = c['isHttpOnly'] as bool? ?? false;
         isSecure = c['isSecure'] as bool? ?? true;
-        expiresDate = c['expiresDate'] as int? ?? 0;
+        expiresDate =
+            FAICookieManager.normalizeExpiryMs(c['expiresDate'] as int?) ?? 0;
         debugPrint(
             '=== _addCookiesToMap: Map cookie: $name | httpOnly=$isHttpOnly | secure=$isSecure | expires=$expiresDate');
       } else {
