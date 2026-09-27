@@ -10,8 +10,6 @@ import '../utils/notifications.dart';
 import 'fa_client.dart';
 import 'fa_urls.dart';
 
-/// Порт фоновой нотификации эталона (FurAffinityApp BackgroundRefreshManager).
-///
 /// Цикл: 3 GET (лента → инбокс → /msg/others/) → diff по 6 int-watermark'ам
 /// (строго >) → фильтр по тумблерам → постинг старых-раньше. Watermarks
 /// двигаются из ПОЛНЫХ списков даже для выключенных категорий (помечаем
@@ -54,12 +52,16 @@ class NotificationPoller {
 
     try {
       debugPrint('=== Poller: polling submissions, notes, notifications');
-      // 1. Лента (новые сабмишены).
-      final feed = await client.getWatchSubmissions();
-      // 2. Инбокс нотесов.
-      final notes = await _fetchNotes();
-      // 3. /msg/others/.
-      final others = await _fetchOthers();
+      // Три источника — ПАРАЛЛЕЛЬНО: цикл занимает время самого медленного
+      // запроса, а не сумму трёх.
+      final results = await Future.wait<Object?>([
+        client.getWatchSubmissions(),
+        _fetchNotes(),
+        _fetchOthers(),
+      ]);
+      final feed = results[0] as ({List<Submission> submissions, int? nextSid});
+      final notes = results[1] as List<fa.FANotePreview>;
+      final others = results[2] as fa.FANotificationPreviews;
 
       // Первый запуск: сеем watermarks и выходим, ничего не постим.
       final firstRun = !_hasAnyWatermark(prefs);
@@ -82,15 +84,17 @@ class NotificationPoller {
                 .where((s) => (int.tryParse(s.id) ?? 0) > watermark);
             if (enabled) {
               for (final s in fresh) {
-                records.add(_record('submission-${s.id}', 'submission',
-                    s.displayName.isNotEmpty ? s.displayName : s.author, s.title,
+                records.add(_record(
+                    'submission-${s.id}',
+                    'submission',
+                    s.displayName.isNotEmpty ? s.displayName : s.author,
+                    s.title,
                     'https://www.furaffinity.net/view/${s.id}/'));
               }
             }
             break;
           case 'note':
-            final fresh = notes
-                .where((n) => n.id > watermark && n.unread);
+            final fresh = notes.where((n) => n.id > watermark && n.unread);
             if (enabled) {
               for (final n in fresh) {
                 records.add(_record(
@@ -182,11 +186,9 @@ class NotificationPoller {
       fa.FANotificationPreviews others) async {
     int maxOf(Iterable<int> ids) =>
         ids.isEmpty ? 0 : ids.reduce((a, b) => a > b ? a : b);
-    await prefs.setInt(
-        _wmKeys['submission']!,
+    await prefs.setInt(_wmKeys['submission']!,
         maxOf(feed.submissions.map((s) => int.tryParse(s.id) ?? 0)));
-    await prefs.setInt(_wmKeys['note']!,
-        maxOf(notes.map((n) => n.id)));
+    await prefs.setInt(_wmKeys['note']!, maxOf(notes.map((n) => n.id)));
     await prefs.setInt(_wmKeys['submission_comment']!,
         maxOf(others.submissionComments.map((n) => n.id)));
     await prefs.setInt(_wmKeys['journal_comment']!,
@@ -226,8 +228,8 @@ class NotificationPoller {
         maxOf(others.shouts.map((n) => n.id), prefs.getInt(wm['shout']!) ?? 0));
     await prefs.setInt(
         wm['journal']!,
-        maxOf(
-            others.journals.map((n) => n.id), prefs.getInt(wm['journal']!) ?? 0));
+        maxOf(others.journals.map((n) => n.id),
+            prefs.getInt(wm['journal']!) ?? 0));
   }
 
   Future<List<fa.FANotePreview>> _fetchNotes() async {
@@ -246,8 +248,8 @@ class NotificationPoller {
   Future<fa.FANotificationPreviews> _fetchOthers() async {
     final html = await client.getHtml(FAUrls.notifications);
     return Isolate.run(() {
-      final page = fa.FANotificationsPage.parse(
-          html, Uri.parse(FAUrls.notifications));
+      final page =
+          fa.FANotificationsPage.parse(html, Uri.parse(FAUrls.notifications));
       return fa.FANotificationPreviews.fromPage(page);
     });
   }

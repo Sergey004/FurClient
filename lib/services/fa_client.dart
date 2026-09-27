@@ -1497,24 +1497,29 @@ class FAClient {
   /// сердечки должны краситься и для работ глубже первой страницы.
   /// Останавливается раньше, если страница пустая, повторяет уже виденные
   /// работы (FA заворачивает страницы по кругу) или [untilSid] уже покрыт.
-  Future<Set<String>> loadFavoriteIds({int maxPages = 5, int? untilSid}) async {
+  Future<Set<String>> loadFavoriteIds({int maxPages = 5}) async {
     final username = _session?.username ?? 'me';
     final ids = <String>{};
     try {
-      for (var page = 1; page <= maxPages; page++) {
-        final url = FAUrls.favorites(username, page: page);
-        final html = await _getHtml(url);
-        final items =
-            await _parseInBackground(() => Submission.parseSubmissionsPage(html));
-        final before = ids.length;
-        ids.addAll(items.map((s) => s.id).where((id) => id.isNotEmpty));
-        if (items.isEmpty || ids.length == before) break;
-        if (untilSid != null) {
-          final oldest = items
-              .map((s) => int.tryParse(s.id) ?? 0)
-              .reduce((a, b) => a < b ? a : b);
-          if (oldest <= untilSid) break; // покрытие ленты достигнуто
+      // Страницы — ПАРАЛЛЕЛЬНО волнами по две (гейт как в эталоне:
+      // больше двух одновременных page-фетчей FA не жалует).
+      for (var start = 1; start <= maxPages; start += 2) {
+        final pageCount = (maxPages - start + 1).clamp(0, 2);
+        final pageNumbers = List.generate(pageCount, (i) => start + i);
+        final pageResults = await Future.wait(pageNumbers.map((page) async {
+          final url = FAUrls.favorites(username, page: page);
+          final html = await _getHtml(url);
+          return _parseInBackground(
+              () => Submission.parseSubmissionsPage(html));
+        }));
+        var anyNew = false;
+        for (final items in pageResults) {
+          final before = ids.length;
+          ids.addAll(items.map((s) => s.id).where((id) => id.isNotEmpty));
+          if (ids.length > before) anyNew = true;
         }
+        // Пустая страница или всё уже видели (FA заворачивает по кругу).
+        if (pageResults.any((items) => items.isEmpty) || !anyNew) break;
       }
       return ids;
     } catch (e) {
