@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FurClient — unofficial Fur Affinity client</title>
 <meta name="description" content="Unofficial cross-platform Fur Affinity client built with Flutter. Windows and Android, no telemetry, no trackers.">
-<link rel="icon" href="gassets/App icon bw.png" type="image/png">
+<link rel="icon" href="assets/App icon bw.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -137,6 +137,12 @@
 
   footer{padding:40px 0 64px; color:var(--muted); font-size:.9rem}
   footer a{color:var(--text); text-decoration:underline; text-decoration-color:var(--line)}
+.shots-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-top:28px}
+.shots-grid.wide{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+#screenshots h3{margin-top:28px}
+.shots-grid figure{margin:0}
+.shots-grid img{width:100%;display:block;border-radius:18px;border:1px solid var(--line)}
+.shots-grid figcaption{margin-top:8px;font-size:13px;color:var(--muted);text-align:center}
 </style>
 </head>
 <body>
@@ -215,6 +221,29 @@
         <h3>The FA basics, covered</h3>
         <p>Gallery, journals, favorites with heart states, posting comments, SFW mode synced with the site's toggle, shouts wall on profiles, image downloads.</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<section id="screenshots">
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <p class="lede">Captured from real devices — nothing mocked up.</p>
+    <h3>Windows · Fluent</h3>
+    <div class="shots-grid wide">
+      <figure><img src="screenshots/windows-gallery.png" alt="Fluent gallery grid" loading="lazy"><figcaption>Gallery</figcaption></figure>
+      <figure><img src="screenshots/windows-watch.png" alt="Fluent watch feed" loading="lazy"><figcaption>Watch feed</figcaption></figure>
+      <figure><img src="screenshots/windows-settings.png" alt="Fluent settings" loading="lazy"><figcaption>Settings</figcaption></figure>
+    </div>
+    <h3>Android · Material 3</h3>
+    <div class="shots-grid">
+      <figure><img src="screenshots/gallery.png" alt="Gallery grid" loading="lazy"><figcaption>Gallery</figcaption></figure>
+      <figure><img src="screenshots/watch.png" alt="Watch feed with favorite hearts" loading="lazy"><figcaption>Watch feed</figcaption></figure>
+      <figure><img src="screenshots/submission.png" alt="Submission page" loading="lazy"><figcaption>Submission</figcaption></figure>
+      <figure><img src="screenshots/notifications.png" alt="Notifications by type" loading="lazy"><figcaption>Notifications</figcaption></figure>
+      <figure><img src="screenshots/profile_shouts.png" alt="Profile with shouts wall" loading="lazy"><figcaption>Profile + shouts</figcaption></figure>
+      <figure><img src="screenshots/search.png" alt="Search with history" loading="lazy"><figcaption>Search</figcaption></figure>
+      <figure><img src="screenshots/settings.png" alt="Settings" loading="lazy"><figcaption>Settings</figcaption></figure>
     </div>
   </div>
 </section>
