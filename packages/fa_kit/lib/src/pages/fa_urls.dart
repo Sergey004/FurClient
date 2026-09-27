@@ -172,8 +172,11 @@ class FAURLs {
   // ── URL Type Checks ──
 
   /// Check if a URL is a user page URL.
+  ///
+  /// Хвостовой слэш опционален: ссылки шаутов из message center приходят
+  /// как `/user/<name>#shout-<id>` (path без завершающего слэша).
   static bool isUserUrl(Uri url) {
-    return RegExp(r'^/user/[^/]+/$').hasMatch(url.path);
+    return RegExp(r'^/user/[^/]+/?$').hasMatch(url.path);
   }
 
   /// Check if a URL is a submission URL.

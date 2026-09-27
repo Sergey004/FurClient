@@ -1424,13 +1424,6 @@ class FAClient {
   Future<FAUser?> getUser(String username) async {
     final url = FAUrls.user(username);
     final html = await _getHtml(url);
-    // TEMP DEBUG: dump profile HTML for parser fixing.
-    try {
-      final dir = await getTemporaryDirectory();
-      io.File('${dir.path}/profile_dump.html').writeAsStringSync(html);
-      debugPrint(
-          '=== PROFILE DUMP: ${dir.path}/profile_dump.html (${html.length}B)');
-    } catch (_) {}
     return parseUserInBackground(html, username);
   }
 
@@ -1998,7 +1991,37 @@ Future<List<FANotification>> parseNotificationsInBackground(String html) =>
     Isolate.run(() => FANotification.parseNotifications(html));
 
 Future<FAUser?> parseUserInBackground(String html, String username) =>
-    Isolate.run(() => FAUser.parseUserPage(html, username));
+    Isolate.run(() {
+      final user = FAUser.parseUserPage(html, username);
+      if (user == null) return null;
+      // Шауты (стена комментариев) парсим kit'ом — они не входят в
+      // собственный парсер приложения.
+      final kitUser =
+          fa.FAUserPage.parse(html, Uri.parse(FAUrls.user(username)));
+      final shouts = kitUser.shouts
+          .whereType<fa.FAVisiblePageComment>()
+          .map((c) => FAProfileShout(
+                cid: c.cid,
+                author: c.author,
+                displayAuthor:
+                    c.displayAuthor.isNotEmpty ? c.displayAuthor : c.author,
+                avatarUrl: fa.FAURLs.avatarUrl(c.author) ?? '',
+                naturalDatetime: c.naturalDatetime,
+                htmlMessage: c.htmlMessage,
+              ))
+          .toList();
+      return FAUser(
+        username: user.username,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        bannerUrl: user.bannerUrl,
+        description: user.description,
+        stats: user.stats,
+        isWatching: user.isWatching,
+        watchUrl: user.watchUrl,
+        shouts: shouts,
+      );
+    });
 
 Future<FAJournal?> parseJournalInBackground(String html, String id) =>
     Isolate.run(() => FAJournal.parseJournalDetail(html, id));

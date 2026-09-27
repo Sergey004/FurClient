@@ -176,8 +176,75 @@ class _ProfileScreenState extends State<ProfileScreen>
         ],
         const SizedBox(height: 20),
         _buildLinks(p),
+        if (p.shouts.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _buildShouts(p),
+        ],
         SizedBox(height: bottomInset),
       ],
+    );
+  }
+
+  /// Стена шаутов (guestbook) — тап по шаут-уведомлению ведёт сюда.
+  Widget _buildShouts(FAUser p) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Shouts (${p.shouts.length})',
+              style: TextStyle(
+                  color: colors.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          for (final shout in p.shouts)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      FAAvatar(
+                        username: shout.author,
+                        size: 32,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          shout.displayAuthor,
+                          style: TextStyle(
+                              color: colors.onSurface,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      Text(shout.naturalDatetime,
+                          style: TextStyle(
+                              color: colors.onSurfaceVariant, fontSize: 12)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  FurHtmlWidget(
+                    shout.htmlMessage,
+                    style: TextStyle(
+                        color: colors.onSurfaceVariant,
+                        fontSize: 13,
+                        height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -274,6 +341,10 @@ class _ProfileScreenState extends State<ProfileScreen>
             const SizedBox(height: 20),
           ],
           _buildLinks(p),
+          if (p.shouts.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _buildShouts(p),
+          ],
         ],
       ),
     );

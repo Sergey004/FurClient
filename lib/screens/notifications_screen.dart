@@ -93,7 +93,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
     // User profile: /user/username/
     final userMatch =
-        RegExp(r'/user/([a-zA-Z][a-zA-Z0-9_]+)/').firstMatch(notification.url);
+        RegExp(r'/user/([a-zA-Z][a-zA-Z0-9_]+)').firstMatch(notification.url);
     if (userMatch != null) {
       Navigator.of(context).push(
         adaptiveRoute(

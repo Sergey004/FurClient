@@ -2,6 +2,24 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:fa_kit/fa_kit.dart' as fa;
 
+class FAProfileShout {
+  final int cid;
+  final String author;
+  final String displayAuthor;
+  final String avatarUrl;
+  final String naturalDatetime;
+  final String htmlMessage;
+
+  FAProfileShout({
+    required this.cid,
+    required this.author,
+    required this.displayAuthor,
+    required this.avatarUrl,
+    required this.naturalDatetime,
+    required this.htmlMessage,
+  });
+}
+
 class FAUserStats {
   final int views;
   final int submissions;
@@ -44,6 +62,9 @@ class FAUser {
   final bool isWatching;
   final String watchUrl;
 
+  /// Шауты (guestbook) со страницы пользователя — стена комментариев.
+  final List<FAProfileShout> shouts;
+
   FAUser({
     required this.username,
     required this.displayName,
@@ -53,6 +74,7 @@ class FAUser {
     required this.stats,
     required this.isWatching,
     required this.watchUrl,
+    this.shouts = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -194,11 +216,21 @@ class FAUser {
   /// Вычищаем теги из текста секции и ищем [label] — хвостовое слово
   /// лейбла с двоеточием — по чистому тексту.
   static int _parseHighlightValue(dom.Document document, String label) {
-    final statsSection = document.querySelector('div.section-body');
-    final source = (statsSection?.outerHtml ?? document.outerHtml)
-        .replaceAll(RegExp(r'<[^>]+>'), ' ');
+    // На странице несколько div.section-body (контакт-инфо, stats, ...)
+    // — ищем в каждом, затем по всему документу.
+    for (final section in document.querySelectorAll('div.section-body')) {
+      final text =
+          section.outerHtml.replaceAll(RegExp(r'<[^>]+>'), ' ');
+      final match =
+          RegExp('${RegExp.escape(label)}\\s*([\\d,]+)').firstMatch(text);
+      if (match != null) {
+        return int.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0;
+      }
+    }
+    final docText =
+        document.outerHtml.replaceAll(RegExp(r'<[^>]+>'), ' ');
     final match =
-        RegExp('${RegExp.escape(label)}\\s*([\\d,]+)').firstMatch(source);
+        RegExp('${RegExp.escape(label)}\\s*([\\d,]+)').firstMatch(docText);
     if (match == null) return 0;
     return int.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0;
   }
