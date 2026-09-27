@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../services/search_history.dart';
@@ -55,17 +54,11 @@ class _FluentShellState extends State<FluentShell> {
   }
 
   Future<void> _loadSfwMode() async {
-    // Always check the site's sfw_toggle cookie first
-    final siteSfw = widget.client.checkSiteSfwMode();
-    debugPrint('=== FluentShell: site SFW mode = $siteSfw');
-
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getBool('sfw_mode') ?? false;
-    // Site cookie is authoritative — overwrite local setting
-    final value = siteSfw;
-    if (value != saved) {
-      await prefs.setBool('sfw_mode', value);
-    }
+    // Истина по приоритету: кука сайта → локальный преф → дефолт ON.
+    // При «ON без куки» кука sfw_toggle=on дописывается — сайт тоже
+    // начинает отдавать SFW-контент (см. resolveStartupSfwMode).
+    final value = await widget.client.resolveStartupSfwMode();
+    debugPrint('=== FluentShell: startup SFW mode = $value');
     if (mounted && value != _sfwMode) {
       setState(() => _sfwMode = value);
     }

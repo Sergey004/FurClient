@@ -64,8 +64,12 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
     });
 
     try {
-      final result = await widget.client.getWatchSubmissions();
-      final favIds = await widget.client.loadFavoriteIds();
+      // Лента и статусы избранного грузятся ПАРАЛЛЕЛЬНО: экран открывается
+      // быстрее, сердечки красятся сразу при готовности обоих запросов.
+      final feedFuture = widget.client.getWatchSubmissions();
+      final favFuture = widget.client.loadFavoriteIds();
+      final result = await feedFuture;
+      final favIds = await favFuture;
       if (mounted) {
         setState(() {
           _submissions = result.submissions.map((s) {
@@ -96,12 +100,20 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
     setState(() => _isRefreshing = true);
 
     try {
-      final result = await widget.client.getWatchSubmissions();
+      // Fav-статусы обновляем вместе с лентой — иначе после refresh
+      // сердечки сбрасываются в пустые.
+      final feedFuture = widget.client.getWatchSubmissions();
+      final favFuture = widget.client.loadFavoriteIds();
+      final result = await feedFuture;
+      final favIds = await favFuture;
       if (!mounted) return;
+
+      Submission applyFav(Submission s) =>
+          favIds.contains(s.id) ? s.copyWith(isFavorite: true) : s;
 
       if (_submissions.isEmpty) {
         setState(() {
-          _submissions = result.submissions;
+          _submissions = result.submissions.map(applyFav).toList();
           _isRefreshing = false;
         });
         return;
@@ -112,7 +124,8 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
       // "newer than the current head" filter is enough.
       final currentTopSid = int.tryParse(_submissions.first.id) ?? 0;
       final fresh = result.submissions
-          .where((s) => (int.tryParse(s.id) ?? 0) > currentTopSid);
+          .where((s) => (int.tryParse(s.id) ?? 0) > currentTopSid)
+          .map(applyFav);
       if (fresh.isEmpty) {
         setState(() => _isRefreshing = false);
         return;
@@ -133,6 +146,20 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
           client: widget.client,
           submissionId: submission.id,
           sfwMode: widget.sfwMode,
+          onSubmissionUpdated: (updated) {
+            if (!mounted) return;
+            setState(() {
+              _submissions = _submissions
+                  .map((s) => s.id == updated.id
+                      ? s.copyWith(
+                          isFavorite: updated.isFavorite,
+                          faves: updated.faves,
+                          favoriteUrl: updated.favoriteUrl,
+                        )
+                      : s)
+                  .toList();
+            });
+          },
         ),
       ),
     );

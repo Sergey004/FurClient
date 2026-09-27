@@ -167,6 +167,20 @@ class _GalleryScreenState extends State<GalleryScreen>
           client: widget.client,
           submissionId: submission.id,
           sfwMode: widget.sfwMode,
+          onSubmissionUpdated: (updated) {
+            if (!mounted) return;
+            setState(() {
+              _submissions = _submissions
+                  .map((s) => s.id == updated.id
+                      ? s.copyWith(
+                          isFavorite: updated.isFavorite,
+                          faves: updated.faves,
+                          favoriteUrl: updated.favoriteUrl,
+                        )
+                      : s)
+                  .toList();
+            });
+          },
         ),
       ),
     );

@@ -24,11 +24,16 @@ class SubmissionDetailScreen extends StatefulWidget {
   final String submissionId;
   final bool sfwMode;
 
+  /// Вызывается после каждого успешного toggle favorite — списки-родители
+  /// обновляют сердечко карточки, не дожидаясь возврата с экрана.
+  final ValueChanged<Submission>? onSubmissionUpdated;
+
   const SubmissionDetailScreen({
     super.key,
     required this.client,
     required this.submissionId,
     this.sfwMode = false,
+    this.onSubmissionUpdated,
   });
 
   @override
@@ -115,28 +120,31 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           await widget.client.toggleFavorite(sub.favoriteUrl, sub.id);
       if (mounted && updated != null) {
         success = true;
+        final updatedSubmission = Submission(
+          id: sub.id,
+          title: sub.title,
+          author: sub.author,
+          category: sub.category,
+          imageUrl: sub.imageUrl,
+          views: sub.views,
+          faves: updated.faves,
+          commentsCount: sub.commentsCount,
+          description: sub.description,
+          tags: sub.tags,
+          date: sub.date,
+          isNsfw: sub.isNsfw,
+          rating: sub.rating,
+          url: sub.url,
+          isFavorite: updated.isFavorite,
+          favoriteUrl: updated.favoriteUrl,
+        );
         setState(() {
           // Use server-parsed state: isFavorite, faves, and the fresh
           // favoriteUrl (with updated ?key=) so a second toggle works.
-          _submission = Submission(
-            id: sub.id,
-            title: sub.title,
-            author: sub.author,
-            category: sub.category,
-            imageUrl: sub.imageUrl,
-            views: sub.views,
-            faves: updated.faves,
-            commentsCount: sub.commentsCount,
-            description: sub.description,
-            tags: sub.tags,
-            date: sub.date,
-            isNsfw: sub.isNsfw,
-            rating: sub.rating,
-            url: sub.url,
-            isFavorite: updated.isFavorite,
-            favoriteUrl: updated.favoriteUrl,
-          );
+          _submission = updatedSubmission;
         });
+        // Список-родитель красит сердечко карточки сразу.
+        widget.onSubmissionUpdated?.call(updatedSubmission);
       }
     } catch (e) {
       debugPrint('=== toggleFavorite error: $e');

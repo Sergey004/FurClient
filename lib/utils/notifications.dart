@@ -48,7 +48,32 @@ const _channels = {
     importance: Importance.defaultImportance,
     priority: Priority.defaultPriority,
   ),
+  'submission': AndroidNotificationDetails(
+    'submission_channel',
+    'New Submissions',
+    channelDescription: 'New submissions from watched users',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+  ),
+  'note': AndroidNotificationDetails(
+    'note_channel',
+    'Notes',
+    channelDescription: 'New private messages (notes)',
+    importance: Importance.high,
+    priority: Priority.high,
+  ),
+  'system': AndroidNotificationDetails(
+    'system_channel',
+    'System',
+    channelDescription: 'Service statuses like Cloudflare checks',
+    importance: Importance.high,
+    priority: Priority.high,
+  ),
 };
+
+/// Обработчик тапа по уведомлению — main.dart подписывает свой deep-link
+/// роутер (FATarget) сюда при старте.
+void Function(String url)? onNotificationTap;
 
 // ignore: unused_element
 AndroidNotificationDetails _androidDetails(String channelId) {
@@ -72,7 +97,12 @@ Future<void> initNotifications() async {
 
   await notificationsPlugin.initialize(
     initializationSettings,
-    onDidReceiveNotificationResponse: (NotificationResponse response) {},
+    onDidReceiveNotificationResponse: (NotificationResponse response) {
+      final payload = response.payload;
+      if (payload != null && payload.isNotEmpty) {
+        onNotificationTap?.call(payload);
+      }
+    },
   );
 }
 
@@ -94,6 +124,7 @@ Future<void> showNotification({
   bool showProgress = false,
   int progress = 0,
   int maxProgress = 100,
+  String? payload,
 }) async {
   final android = AndroidNotificationDetails(
     '${type}_channel',
@@ -118,6 +149,7 @@ Future<void> showNotification({
     title,
     body,
     details,
+    payload: payload,
   );
 }
 

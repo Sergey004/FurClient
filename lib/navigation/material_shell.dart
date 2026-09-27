@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -32,7 +31,8 @@ class MaterialShell extends StatefulWidget {
 
 class _MaterialShellState extends State<MaterialShell> {
   int _currentIndex = 0;
-  bool _sfwMode = false;
+  // SFW включён по умолчанию, пока не отработает resolveStartupSfwMode.
+  bool _sfwMode = true;
 
   static const _navItems = [
     _NavItem(
@@ -87,17 +87,11 @@ class _MaterialShellState extends State<MaterialShell> {
   }
 
   Future<void> _loadSfwMode() async {
-    // Always check the site's sfw_toggle cookie first
-    final siteSfw = widget.client.checkSiteSfwMode();
-    debugPrint('=== MaterialShell: site SFW mode = $siteSfw');
-
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getBool('sfw_mode') ?? false;
-    // Site cookie is authoritative — overwrite local setting
-    final value = siteSfw;
-    if (value != saved) {
-      await prefs.setBool('sfw_mode', value);
-    }
+    // Истина по приоритету: кука сайта → локальный преф → дефолт ON.
+    // При «ON без куки» кука sfw_toggle=on дописывается — сайт тоже
+    // начинает отдавать SFW-контент (см. resolveStartupSfwMode).
+    final value = await widget.client.resolveStartupSfwMode();
+    debugPrint('=== MaterialShell: startup SFW mode = $value');
     if (mounted && value != _sfwMode) {
       setState(() => _sfwMode = value);
     }

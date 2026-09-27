@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform, HttpClient;
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
@@ -10,8 +11,11 @@ import 'package:http/io_client.dart';
 import 'package:cronet_http/cronet_http.dart';
 import 'package:cupertino_http/cupertino_http.dart' hide URLRequest;
 import 'package:window_manager/window_manager.dart';
+import 'package:workmanager/workmanager.dart';
+
 import 'services/auth_service.dart';
 import 'services/fa_client.dart';
+import 'services/notification_poller.dart';
 import 'services/update_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
@@ -37,6 +41,35 @@ import 'package:flutter/foundation.dart';
 
 WebViewEnvironment? webViewEnvironment;
 
+/// Фоновый вход workmanager (Android, без Google Play Services —
+/// androidx.work сам падает на AlarmManager-реализацию).
+/// Свежий изолят: свои FAClient/AuthService/уведомления.
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    try {
+      debugPrint('=== Workmanager: background task $task started');
+      await initNotifications();
+      final client = FAClient();
+      await client.init();
+      final auth = AuthService();
+      await auth.loadSavedSession();
+      final session = auth.currentSession;
+      if (session == null || !session.isLoggedIn) {
+        debugPrint('=== Workmanager: no session, skipping');
+        return true;
+      }
+      await client.setSession(session);
+      await NotificationPoller(client).pollAndNotify();
+      debugPrint('=== Workmanager: background task $task done');
+      return true;
+    } catch (e) {
+      debugPrint('=== Workmanager: background task error: $e');
+      return true;
+    }
+  });
+}
+
 void main() {
   runZonedGuarded(() async {
     await http.runWithClient(() async {
@@ -48,11 +81,32 @@ void main() {
 
       if (Platform.isAndroid) {
         await InAppWebViewController.setWebContentsDebuggingEnabled(true);
+        // Пин максимальной частоты панели: на LTPO-экранах (1–120 Гц) без
+        // этого Flutter прыгает между 60 и 120 Гц при смене поверхностей.
+        try {
+          await FlutterDisplayMode.setHighRefreshRate();
+        } catch (e) {
+          debugPrint('DisplayMode init error: $e');
+        }
         try {
           await initNotifications();
           await requestNotificationPermissions();
         } catch (e) {
           debugPrint('Notification init error: $e');
+        }
+        // Фоновый опрос уведомлений каждые 30 минут (минимум workmanager'а
+        // — 15 минут; без GMS androidx.work использует AlarmManager).
+        try {
+          await Workmanager().initialize(callbackDispatcher);
+          await Workmanager().registerPeriodicTask(
+            'furclient-notification-poll',
+            'notificationPoll',
+            frequency: const Duration(minutes: 30),
+            constraints: Constraints(networkType: NetworkType.connected),
+            existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+          );
+        } catch (e) {
+          debugPrint('Workmanager init error: $e');
         }
       }
 
@@ -146,6 +200,22 @@ class _FurClientAppState extends State<FurClientApp> {
     // Windows: CF-челленджи, которые headless WebView2 пройти не может,
     // показываем пользователю в видимом диалоге (см. _CfChallengeDialog).
     _client.cfChallengeResolver = _resolveCloudflareChallenge;
+    // Тап по уведомлению → deep-link роутер (FATarget).
+    onNotificationTap = (url) {
+      final target = FATarget.parseString(url);
+      if (target != null) _navigateToTarget(target);
+    };
+    // Foreground-опрос уведомлений: раз после старта + таймер на Windows
+    // (на Android в фоне работает workmanager; dedup по watermark'ам
+    // исключает дубли между foreground- и background-прогонами).
+    Future.delayed(const Duration(seconds: 20), () {
+      if (mounted) NotificationPoller(_client).pollAndNotify();
+    });
+    if (isWindows) {
+      Timer.periodic(const Duration(minutes: 30), (_) {
+        NotificationPoller(_client).pollAndNotify();
+      });
+    }
     _initApp();
     _setupDeepLinks();
   }
@@ -697,8 +767,7 @@ class _CfChallengeDialogState extends State<_CfChallengeDialog> {
                   javaScriptEnabled: true,
                   domStorageEnabled: true,
                 ),
-                initialUrlRequest:
-                    URLRequest(url: WebUri(widget.url)),
+                initialUrlRequest: URLRequest(url: WebUri(widget.url)),
                 onLoadStop: _onLoadStop,
               ),
             ),

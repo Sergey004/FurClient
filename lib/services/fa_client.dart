@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
+import 'dart:isolate';
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
@@ -9,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
 import '../utils/cookie_manager.dart';
@@ -228,6 +230,16 @@ class FAClient {
     return merged.values.toList();
   }
 
+  /// Public accessor for the WebView HTML fetch — used by the notification
+  /// poller and other services that need authenticated page HTML.
+  Future<String> getHtml(String url, {bool waitForAjax = false}) =>
+      _getHtml(url, waitForAjax: waitForAjax);
+
+  /// Тяжёлый HTML-парсинг — вне UI-изолятa. На 120 Гц бюджет кадра 8.3 мс,
+  /// а разбор страницы 150–250 КБ занимает десятки миллисекунд; парсеры
+  /// fa_kit чистые (без I/O), поэтому спокойно живут в фоновом изоляте.
+  Future<T> _parseInBackground<T>(T Function() parse) => Isolate.run(parse);
+
   Future<String> _getHtml(String url, {bool waitForAjax = false}) async {
     await _ensureInitialized();
 
@@ -247,14 +259,21 @@ class FAClient {
 
     try {
       var html = await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
+      // Пассивная фаза: чистим счётчики неудач CF и пробуем ещё раз —
+      // managed-челлендж часто решается сам, стоит не дёргать пользователя.
+      if (_cfLooksBlocked(html)) {
+        await clearCloudflareCookies();
+        html = await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
+      }
       // Windows: headless WebView2 не проходит Turnstile сам — отдаём
       // челлендж видимому резолверу (его cf_clearance попадёт в общий
       // профиль) и повторяем запрос один раз.
       if (io.Platform.isWindows &&
           cfChallengeResolver != null &&
-          (html.isEmpty || isCloudflarePageHtml(html))) {
+          _cfLooksBlocked(html)) {
         debugPrint('=== Headless CF solve failed for $url, visible resolver…');
         if (await cfChallengeResolver!(url)) {
+          await _refreshClearanceAfterSolve();
           html = await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
         }
       }
@@ -384,7 +403,8 @@ class FAClient {
   /// omitted on purpose: cf_clearance is issued for the login WebView's
   /// native WebView2 UA, and spoofing a different UA makes Cloudflare
   /// reject every request with HTTP 403.
-  Map<String, String> _webviewHeaders({String? cookieHeader, String? referer}) =>
+  Map<String, String> _webviewHeaders(
+          {String? cookieHeader, String? referer}) =>
       {
         if (cookieHeader != null) 'Cookie': cookieHeader,
         if (referer != null) 'Referer': referer,
@@ -392,6 +412,91 @@ class FAClient {
           'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       };
+
+  /// CF-куки, чьё устаревание провоцирует эскалацию челленджа: протухший
+  /// clearance, __cf_bm и счётчики пассивных неудач cf_chl_rc_* (их рост
+  /// «кричит» Cloudflare о повторных провалах — измеренный факт эталона,
+  /// FurAffinityApp Android/docs/cloudflare-and-login.md).
+  static const _cfCookieNames = [
+    'cf_clearance',
+    '__cf_bm',
+    'cf_chl_rc_ni',
+    'cf_chl_rc_i',
+  ];
+
+  /// Expires the CF cookies whose stale state makes Cloudflare escalate.
+  /// Call only when a challenge is actually detected — purging on healthy
+  /// traffic would provoke a new challenge for no reason.
+  Future<void> clearCloudflareCookies() async {
+    try {
+      final cm = FAICookieManager.instance;
+      for (final url in _cfCookieUrls) {
+        final existing = await cm.getCookies(url: WebUri(url));
+        for (final c in existing) {
+          if (!_cfCookieNames.contains(c.name)) continue;
+          // Deletion must name the exact domain: cf_clearance lives on the
+          // apex, the cf_chl_rc_* counters are host-only.
+          await cm.deleteCookie(
+            url: WebUri(url),
+            name: c.name,
+            domain: c.domain,
+            path: c.path ?? '/',
+          );
+        }
+      }
+      debugPrint('=== CF: cleared cloudflare cookies');
+    } catch (e) {
+      debugPrint('=== CF: cookie cleanup failed: $e');
+    }
+  }
+
+  /// После решения челленджа в сторе могут остаться дубликаты cf_clearance
+  /// (старый + свежий) — сервер может принять не тот, и всё снова 403.
+  /// Перечитываем свежее значение, сносим все дубликаты и кладём его
+  /// обратно единственным экземпляром.
+  Future<void> _refreshClearanceAfterSolve() async {
+    try {
+      final cm = FAICookieManager.instance;
+      Cookie? fresh;
+      for (final url in _cfCookieUrls) {
+        final cookies = await cm.getCookies(url: WebUri(url));
+        for (final c in cookies.where((c) => c.name == 'cf_clearance')) {
+          fresh ??= c;
+          await cm.deleteCookie(
+            url: WebUri(url),
+            name: c.name,
+            domain: c.domain,
+            path: c.path ?? '/',
+          );
+        }
+      }
+      if (fresh == null) {
+        debugPrint('=== CF: no cf_clearance in store after solve');
+        return;
+      }
+      await cm.setCookie(
+        url: WebUri('https://www.furaffinity.net/'),
+        name: fresh.name,
+        value: fresh.value,
+        domain: fresh.domain ?? '.furaffinity.net',
+        path: fresh.path ?? '/',
+        // WebView2 молча теряет httpOnly-куки (см. _injectSessionCookies).
+        isHttpOnly: false,
+        isSecure: fresh.isSecure,
+        expiresDate: DateTime.now()
+            .add(const Duration(days: 365))
+            .millisecondsSinceEpoch,
+      );
+      debugPrint('=== CF: refreshed cf_clearance (${fresh.value.length}B)');
+    } catch (e) {
+      debugPrint('=== CF: clearance refresh failed: $e');
+    }
+  }
+
+  /// Точка «запрос заблокирован CF»: пустой ответ (таймаут челлендж-лупа)
+  /// либо маркеры челлендж-страницы.
+  bool _cfLooksBlocked(String html) =>
+      html.isEmpty || isCloudflarePageHtml(html);
 
   /// Create a persistent headless WebView for authenticated feed pages.
   /// This WebView stays alive so it maintains CF clearance and auth cookies
@@ -411,6 +516,7 @@ class FAClient {
         if (isCloudflarePageHtml(html)) {
           _feedCfAttempts++;
           debugPrint('=== FeedWebView: CF challenge #$_feedCfAttempts');
+          if (_feedCfAttempts >= 2) await clearCloudflareCookies();
           if (_feedCfAttempts > 5) {
             if (!_feedReady.isCompleted) {
               _feedReady.completeError(Exception(
@@ -491,6 +597,8 @@ class FAClient {
     while (isCloudflarePageHtml(html) && waitRounds < 5) {
       _feedCfAttempts++;
       debugPrint('=== FeedWebView: CF challenge on navigate #$_feedCfAttempts');
+      // Со 2-го раунда чистим счётчики неудач CF.
+      if (waitRounds >= 1) await clearCloudflareCookies();
       await _attemptSolveCloudflareChallenge(controller);
       await Future.delayed(const Duration(seconds: 8));
       html = await controller.getHtml() ?? '';
@@ -518,6 +626,9 @@ class FAClient {
     final completer = Completer<String>();
     HeadlessInAppWebView? headless;
     int solveAttempts = 0;
+    // cf-mitigated — локаль-независимый признак челленджа на уровне
+    // заголовков; HTML-маркеры могут не сработать на локализованной странице.
+    bool sawCfMitigated = false;
 
     // Inject session cookies via CookieManager as a best-effort attempt.
     await _injectSessionCookies(url);
@@ -540,10 +651,13 @@ class FAClient {
           debugPrint('=== WebView fetch: ${html.length}B from $loadedUrl');
 
           // If this is a CF challenge page, wait for it to be solved
-          if (isCloudflarePageHtml(html)) {
+          if (isCloudflarePageHtml(html) || sawCfMitigated) {
             solveAttempts++;
             debugPrint(
                 '=== WebView fetch: CF challenge, attempt $solveAttempts');
+            // Со 2-й попытки чистим счётчики неудач — их накопление
+            // заставляет CF эскалировать челлендж.
+            if (solveAttempts >= 2) await clearCloudflareCookies();
             if (solveAttempts > 5) {
               if (!completer.isCompleted) {
                 completer.completeError(Exception(
@@ -589,6 +703,18 @@ class FAClient {
       onReceivedHttpError: (controller, request, response) async {
         if (!(request.isForMainFrame ?? false)) return;
         final status = response.statusCode ?? 0;
+        if (status == 403 || status == 503) {
+          final headers = response.headers;
+          if (headers != null) {
+            for (final e in headers.entries) {
+              if (e.key.toLowerCase() == 'cf-mitigated' &&
+                  e.value.toLowerCase() == 'challenge') {
+                sawCfMitigated = true;
+                debugPrint('=== WebView fetch: cf-mitigated on HTTP $status');
+              }
+            }
+          }
+        }
         debugPrint('=== WebView fetch: HTTP $status');
       },
       onReceivedError: (controller, request, error) async {
@@ -641,13 +767,12 @@ class FAClient {
       final html = await _fetchHtmlWithWebView(FAUrls.home);
       if (html.isEmpty) {
         debugPrint('=== verifySession: WebView returned empty HTML');
-        // Windows: CF-заслон на headless ≠ мёртвая сессия. Не разлогиниваем
-        // — разрулится по месту через видимый резолвер.
-        if (io.Platform.isWindows) return true;
-        return false;
+        // CF-заслон на headless ≠ мёртвая сессия. Не разлогиниваем —
+        // разрулится по месту через резолвер/повторные попытки.
+        return true;
       }
-      if (io.Platform.isWindows && isCloudflarePageHtml(html)) {
-        debugPrint('=== verifySession: CF challenge on Windows, keep session');
+      if (isCloudflarePageHtml(html)) {
+        debugPrint('=== verifySession: CF challenge, keep session');
         return true;
       }
 
@@ -715,7 +840,7 @@ class FAClient {
   Future<List<Submission>> getSubmissions(int page, String category) async {
     final url = FAUrls.browse(filter: category, page: page);
     final html = await _getHtml(url);
-    return Submission.parseSubmissionsPage(html);
+    return _parseInBackground(() => Submission.parseSubmissionsPage(html));
   }
 
   /// Fetch the watch feed (`/msg/submissions/`).
@@ -737,11 +862,18 @@ class FAClient {
     var html = io.Platform.isWindows
         ? await _navigateFeedWebView(url)
         : await _getHtml(url, waitForAjax: true);
+    // Пассивная фаза: чистим счётчики неудач CF и перезагружаем ленту тем
+    // же постоянным WebView, прежде чем звать пользователя.
+    if (io.Platform.isWindows && _cfLooksBlocked(html)) {
+      await clearCloudflareCookies();
+      html = await _navigateFeedWebView(url);
+    }
     if (io.Platform.isWindows &&
         cfChallengeResolver != null &&
-        (html.isEmpty || isCloudflarePageHtml(html))) {
+        _cfLooksBlocked(html)) {
       debugPrint('=== WatchFeed: CF stuck, asking visible resolver…');
       if (await cfChallengeResolver!(url)) {
+        await _refreshClearanceAfterSolve();
         html = await _navigateFeedWebView(url);
       }
     }
@@ -774,8 +906,8 @@ class FAClient {
       debugPrint(
           html.substring(dumpFrom, (dumpFrom + 5000).clamp(0, html.length)));
     }
-    final page = fa.FASubmissionsPage.parse(
-        html, Uri.parse('https://www.furaffinity.net'));
+    final page = await _parseInBackground(() => fa.FASubmissionsPage.parse(
+        html, Uri.parse('https://www.furaffinity.net')));
     debugPrint(
         '=== WatchFeed: parsed ${page.submissions.length} submissions, nextPageUrl=${page.nextPageUrl}');
     final subs = page.submissions
@@ -796,7 +928,7 @@ class FAClient {
   Future<List<Submission>> getGallery(String username, {int page = 1}) async {
     final url = FAUrls.gallery(username, page: page);
     final html = await _getHtml(url);
-    return Submission.parseSubmissionsPage(html);
+    return _parseInBackground(() => Submission.parseSubmissionsPage(html));
   }
 
   /// Fetch submission details + comments in a single HTML fetch.
@@ -807,16 +939,20 @@ class FAClient {
     // waitForAjax: comments load via JavaScript, need extra wait
     final html = await _getHtml(url, waitForAjax: true);
     try {
-      final page = fa.FASubmissionPage.parse(
-          html, Uri.parse('https://www.furaffinity.net/view/$id/'));
-      final submission = Submission.fromFASubmissionPage(page, id);
-      final comments = fa
-          .buildCommentsTree(page.comments)
-          .map((c) => FAComment.fromFAComment(c))
-          .toList();
+      // Парсинг страницы сабмишена + дерева комментариев целиком в фоне.
+      final result = await _parseInBackground(() {
+        final page = fa.FASubmissionPage.parse(
+            html, Uri.parse('https://www.furaffinity.net/view/$id/'));
+        final submission = Submission.fromFASubmissionPage(page, id);
+        final comments = fa
+            .buildCommentsTree(page.comments)
+            .map((c) => FAComment.fromFAComment(c))
+            .toList();
+        return (submission: submission, comments: comments);
+      });
       debugPrint(
-          '=== getSubmissionWithComments: ${comments.length} comments parsed');
-      return (submission: submission, comments: comments);
+          '=== getSubmissionWithComments: ${result.comments.length} comments parsed');
+      return result;
     } catch (e) {
       debugPrint('=== getSubmissionWithComments parse failed: $e');
       return (submission: null, comments: <FAComment>[]);
@@ -861,6 +997,8 @@ class FAClient {
               submitAttempts++;
               debugPrint(
                   '=== postComment WebView: CF challenge, attempt $submitAttempts');
+              // Со 2-й попытки чистим счётчики неудач CF.
+              if (submitAttempts >= 2) await clearCloudflareCookies();
               if (submitAttempts > 5) {
                 if (!completer.isCompleted) completer.complete(false);
                 return;
@@ -1040,6 +1178,7 @@ class FAClient {
 
           if (isCloudflarePageHtml(html)) {
             debugPrint('=== toggleFavorite: CF challenge, waiting...');
+            await clearCloudflareCookies();
             await Future.delayed(const Duration(seconds: 3));
             final retryHtml = await controller.getHtml() ?? '';
             if (!isCloudflarePageHtml(retryHtml)) {
@@ -1092,11 +1231,13 @@ class FAClient {
 
       // Парсим ответ как submission page — получаем актуальный favoriteUrl
       // (с новым key) и isFavorite/faves из ответа сервера, а не из догадки.
-      final page = fa.FASubmissionPage.parse(
-        html,
-        Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
-      );
-      final submission = Submission.fromFASubmissionPage(page, submissionId);
+      final submission = await _parseInBackground(() {
+        final page = fa.FASubmissionPage.parse(
+          html,
+          Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
+        );
+        return Submission.fromFASubmissionPage(page, submissionId);
+      });
       debugPrint(
           '=== toggleFavorite: result isFavorite=${submission.isFavorite}, faves=${submission.faves}');
       return submission;
@@ -1139,6 +1280,7 @@ class FAClient {
           final html = await controller.getHtml() ?? '';
           if (isCloudflarePageHtml(html)) {
             debugPrint('=== toggleFavoriteById: CF challenge, waiting...');
+            await clearCloudflareCookies();
             await Future.delayed(const Duration(seconds: 3));
             final retryHtml = await controller.getHtml() ?? '';
             if (isCloudflarePageHtml(retryHtml)) return;
@@ -1169,12 +1311,13 @@ class FAClient {
             );
           } else {
             // Step 2: fav/unfav action completed — parse the result page.
-            final page = fa.FASubmissionPage.parse(
-              html,
-              Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
-            );
-            final submission =
-                Submission.fromFASubmissionPage(page, submissionId);
+            final submission = await _parseInBackground(() {
+              final page = fa.FASubmissionPage.parse(
+                html,
+                Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
+              );
+              return Submission.fromFASubmissionPage(page, submissionId);
+            });
             debugPrint(
                 '=== toggleFavoriteById: result isFavorite=${submission.isFavorite}, faves=${submission.faves}');
             if (!completer.isCompleted) completer.complete(submission);
@@ -1244,6 +1387,7 @@ class FAClient {
 
           if (isCloudflarePageHtml(html)) {
             debugPrint('=== toggleSiteSfwMode: CF challenge, waiting...');
+            await clearCloudflareCookies();
             await Future.delayed(const Duration(seconds: 3));
             final retryHtml = await controller.getHtml() ?? '';
             if (!isCloudflarePageHtml(retryHtml)) {
@@ -1299,13 +1443,13 @@ class FAClient {
 
   Future<List<FANotification>> getNotifications() async {
     final html = await _getHtml(FAUrls.notifications);
-    return FANotification.parseNotifications(html);
+    return _parseInBackground(() => FANotification.parseNotifications(html));
   }
 
   Future<FAUser?> getUser(String username) async {
     final url = FAUrls.user(username);
     final html = await _getHtml(url);
-    return FAUser.parseUserPage(html, username);
+    return _parseInBackground(() => FAUser.parseUserPage(html, username));
   }
 
   Future<FAUser?> getUserProfile(String username) async {
@@ -1336,30 +1480,46 @@ class FAClient {
   Future<FAJournal?> getJournal(String id) async {
     final url = FAUrls.journal(id);
     final html = await _getHtml(url);
-    return FAJournal.parseJournalDetail(html, id);
+    return _parseInBackground(() => FAJournal.parseJournalDetail(html, id));
   }
 
   /// Fetch a user's journals list.
   Future<List<FAJournalPreview>> getUserJournals(String username) async {
     final url = FAUrls.journals(username);
     final html = await _getHtml(url);
-    return FAJournalPreview.parseJournalList(html);
+    return _parseInBackground(() => FAJournalPreview.parseJournalList(html));
   }
 
   /// Fetch current user's favorites and return set of submission IDs.
   /// Used to restore `isFavorite` on any submission list after restart.
-  Future<Set<String>> loadFavoriteIds() async {
+  ///
+  /// Обходит до [maxPages] страниц избранного (~72 работы на страницу):
+  /// сердечки должны краситься и для работ глубже первой страницы.
+  /// Останавливается раньше, если страница пустая, повторяет уже виденные
+  /// работы (FA заворачивает страницы по кругу) или [untilSid] уже покрыт.
+  Future<Set<String>> loadFavoriteIds({int maxPages = 5, int? untilSid}) async {
     final username = _session?.username ?? 'me';
+    final ids = <String>{};
     try {
-      final url = FAUrls.favorites(username);
-      final html = await _getHtml(url);
-      return Submission.parseSubmissionsPage(html)
-          .map((s) => s.id)
-          .where((id) => id.isNotEmpty)
-          .toSet();
+      for (var page = 1; page <= maxPages; page++) {
+        final url = FAUrls.favorites(username, page: page);
+        final html = await _getHtml(url);
+        final items =
+            await _parseInBackground(() => Submission.parseSubmissionsPage(html));
+        final before = ids.length;
+        ids.addAll(items.map((s) => s.id).where((id) => id.isNotEmpty));
+        if (items.isEmpty || ids.length == before) break;
+        if (untilSid != null) {
+          final oldest = items
+              .map((s) => int.tryParse(s.id) ?? 0)
+              .reduce((a, b) => a < b ? a : b);
+          if (oldest <= untilSid) break; // покрытие ленты достигнуто
+        }
+      }
+      return ids;
     } catch (e) {
       debugPrint('=== loadFavoriteIds error: $e');
-      return <String>{};
+      return ids; // частичный результат лучше пустого
     }
   }
 
@@ -1368,7 +1528,7 @@ class FAClient {
       {int page = 1}) async {
     final url = FAUrls.favorites(username, page: page);
     final html = await _getHtml(url);
-    return Submission.parseSubmissionsPage(html);
+    return _parseInBackground(() => Submission.parseSubmissionsPage(html));
   }
 
   // ── CF Challenge Pass ────────────────────────────────────────────────
@@ -1390,6 +1550,7 @@ class FAClient {
       final completer = Completer<bool>();
       HeadlessInAppWebView? headless;
       int solveAttempts = 0;
+      bool sawCfMitigated = false;
 
       headless = HeadlessInAppWebView(
         webViewEnvironment: webViewEnvironment,
@@ -1401,16 +1562,18 @@ class FAClient {
             final html = await controller.getHtml() ?? '';
             debugPrint('=== CF pass: HTML length: ${html.length}');
 
-            if (isCloudflarePageHtml(html)) {
+            if (isCloudflarePageHtml(html) || sawCfMitigated) {
               solveAttempts++;
               debugPrint(
                   '=== CF pass: challenge detected, attempt $solveAttempts');
+              // Со 2-й попытки чистим счётчики неудач CF.
+              if (solveAttempts >= 2) await clearCloudflareCookies();
               await _attemptSolveCloudflareChallenge(controller);
               await Future.delayed(const Duration(seconds: 5));
               final retryHtml = await controller.getHtml() ?? '';
               debugPrint('=== CF pass: retry HTML length: ${retryHtml.length}');
 
-              if (isCloudflarePageHtml(retryHtml)) {
+              if (isCloudflarePageHtml(retryHtml) && !sawCfMitigated) {
                 debugPrint(
                     '=== CF pass: challenge still present after attempt $solveAttempts');
                 if (solveAttempts >= 4) {
@@ -1419,11 +1582,15 @@ class FAClient {
                 }
                 return;
               }
+              if (!isCloudflarePageHtml(retryHtml)) {
+                sawCfMitigated = false;
+              }
             }
 
             debugPrint(
                 '=== CF pass: page loaded successfully, syncing cookies...');
             await _syncCookiesFromWebView();
+            await _refreshClearanceAfterSolve();
             if (!completer.isCompleted) completer.complete(true);
           } catch (e) {
             debugPrint('=== CF pass onLoadStop error: $e');
@@ -1433,6 +1600,15 @@ class FAClient {
           if (!(request.isForMainFrame ?? false)) return;
           final status = response.statusCode ?? 0;
           if (status == 403 || status == 503) {
+            final headers = response.headers;
+            if (headers != null) {
+              for (final e in headers.entries) {
+                if (e.key.toLowerCase() == 'cf-mitigated' &&
+                    e.value.toLowerCase() == 'challenge') {
+                  sawCfMitigated = true;
+                }
+              }
+            }
             debugPrint('=== CF pass: HTTP $status — challenge in progress');
           }
         },
@@ -1696,24 +1872,99 @@ class FAClient {
     }
   }
 
-  /// Check if SFW mode is enabled on the FA website by reading the sfw_toggle cookie.
-  /// Returns true if SFW is on (sfw_toggle cookie is present and non-empty).
-  bool checkSiteSfwMode() {
-    if (_session?.cookies == null) return false;
+  /// Читает куку sfw_toggle из сессии. null — куки нет вовсе (FA ставит её
+  /// только при переключении тумблера на сайте, при логине её может не быть).
+  bool? _readSfwToggleCookie() {
+    if (_session?.cookies == null) return null;
     try {
       final List<dynamic> raw = jsonDecode(_session!.cookies!);
       for (final item in raw) {
-        if (item is Map<String, dynamic>) {
-          final name = item['name']?.toString() ?? '';
-          if (name == 'sfw_toggle') {
-            final value = item['value']?.toString() ?? '';
-            return value.isNotEmpty && value != '0';
-          }
+        if (item is Map<String, dynamic> &&
+            item['name']?.toString() == 'sfw_toggle') {
+          final value = item['value']?.toString() ?? '';
+          if (value.isEmpty) return null;
+          return value == 'on' || (value != '0' && value != 'off');
         }
       }
     } catch (e) {
       debugPrint('=== Error checking SFW cookie: $e');
     }
-    return false;
+    return null;
+  }
+
+  /// Check if SFW mode is enabled on the FA website by reading the
+  /// sfw_toggle cookie (absent cookie counts as off).
+  bool checkSiteSfwMode() => _readSfwToggleCookie() ?? false;
+
+  /// SFW-режим на старте, по приоритету истины:
+  /// 1) кука sfw_toggle из сессии — фактическое состояние сайта;
+  /// 2) локальный преф sfw_mode — пользователь уже переключал в приложении;
+  /// 3) по умолчанию ВКЛЮЧЁН.
+  /// Если решающими оказались преф/дефолт «ON», а куки нет — дописываем
+  /// sfw_toggle=on в сессию и все куки-хранилища, чтобы и сайт отдавал
+  /// SFW-контент: синхрон с сайтом, а не только с UI.
+  Future<bool> resolveStartupSfwMode() async {
+    final cookieSfw = _readSfwToggleCookie();
+    if (cookieSfw != null) {
+      debugPrint('=== SFW: from site cookie = $cookieSfw');
+      return cookieSfw;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getBool('sfw_mode') ?? true; // по умолчанию ВКЛ
+    debugPrint('=== SFW: site cookie absent, startup mode = $saved');
+    if (saved) {
+      await _forceSfwCookieOn();
+    }
+    await prefs.setBool('sfw_mode', saved);
+    return saved;
+  }
+
+  /// Дописывает sfw_toggle=on в сессию (с персистом в SharedPreferences
+  /// под ключом AuthService) и в живые куки-хранилища.
+  Future<void> _forceSfwCookieOn() async {
+    try {
+      if (_session != null) {
+        final List<dynamic> raw = _session!.cookies != null
+            ? jsonDecode(_session!.cookies!)
+            : <dynamic>[];
+        final cookies = raw.whereType<Map<String, dynamic>>().toList();
+        cookies.removeWhere((m) => m['name'] == 'sfw_toggle');
+        cookies.add({
+          'name': 'sfw_toggle',
+          'value': 'on',
+          'domain': '.furaffinity.net',
+          'path': '/',
+          'isHttpOnly': false,
+          'isSecure': true,
+          'expiresDate': DateTime.now()
+              .add(const Duration(days: 365))
+              .millisecondsSinceEpoch,
+        });
+        _session = UserSession(
+          username: _session!.username,
+          avatarUrl: _session!.avatarUrl,
+          isLoggedIn: _session!.isLoggedIn,
+          cookies: jsonEncode(cookies),
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('fa_session', jsonEncode(_session!.toJson()));
+      }
+      await FAICookieManager.instance.setCookie(
+        url: WebUri('https://www.furaffinity.net/'),
+        name: 'sfw_toggle',
+        value: 'on',
+        domain: '.furaffinity.net',
+        path: '/',
+        isHttpOnly: false,
+        isSecure: true,
+        expiresDate: DateTime.now()
+            .add(const Duration(days: 365))
+            .millisecondsSinceEpoch,
+      );
+      debugPrint('=== SFW: sfw_toggle=on written to session and store');
+    } catch (e) {
+      debugPrint('=== SFW: failed to force cookie on: $e');
+    }
   }
 }
