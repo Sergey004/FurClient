@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../services/fa_urls.dart';
 import '../services/search_history.dart';
+import '../utils/scroll_to_top.dart';
 import '../widgets/submission_card.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
@@ -18,12 +19,16 @@ class SearchScreen extends StatefulWidget {
   final VoidCallback? onLogout;
   final String? initialQuery;
 
+  /// Индекс вкладки в шелле — для сигнала «скролл наверх».
+  final int tabIndex;
+
   const SearchScreen({
     super.key,
     required this.client,
     this.sfwMode = false,
     this.onLogout,
     this.initialQuery,
+    this.tabIndex = 2,
   });
 
   @override
@@ -33,6 +38,7 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen>
     with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
+  late final VoidCallback _scrollToTopCancel;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   final SearchHistory _searchHistory = SearchHistory();
@@ -65,6 +71,13 @@ class _SearchScreenState extends State<SearchScreen>
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _scrollToTopCancel = ScrollToTopBus.subscribe(widget.tabIndex, () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(0,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic);
+      }
+    });
     _initHistory();
     SearchHistory.externalQuery.addListener(_onExternalQuery);
     // If initial query provided, search immediately
@@ -96,6 +109,7 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   void dispose() {
     SearchHistory.externalQuery.removeListener(_onExternalQuery);
+    _scrollToTopCancel();
     _scrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();

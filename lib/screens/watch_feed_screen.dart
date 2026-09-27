@@ -7,6 +7,7 @@ import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import 'submission_detail_screen.dart';
+import '../utils/scroll_to_top.dart';
 
 /// Watch feed — submissions from artists the logged-in user watches.
 ///
@@ -22,8 +23,15 @@ class WatchFeedScreen extends StatefulWidget {
   final bool sfwMode;
   final VoidCallback? onLogout;
 
+  /// Индекс вкладки в шелле — для сигнала «скролл наверх».
+  final int tabIndex;
+
   const WatchFeedScreen(
-      {super.key, required this.client, this.sfwMode = false, this.onLogout});
+      {super.key,
+      required this.client,
+      this.sfwMode = false,
+      this.onLogout,
+      this.tabIndex = 1});
 
   @override
   State<WatchFeedScreen> createState() => _WatchFeedScreenState();
@@ -32,6 +40,7 @@ class WatchFeedScreen extends StatefulWidget {
 class _WatchFeedScreenState extends State<WatchFeedScreen>
     with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
+  late final VoidCallback _scrollToTopCancel;
 
   /// Submissions loaded so far, kept across refreshes. New refresh results
   /// are merged at the top (newest-first via descending sid order, matching
@@ -48,11 +57,19 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
   @override
   void initState() {
     super.initState();
+    _scrollToTopCancel = ScrollToTopBus.subscribe(widget.tabIndex, () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(0,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic);
+      }
+    });
     _initialLoad();
   }
 
   @override
   void dispose() {
+    _scrollToTopCancel();
     _scrollController.dispose();
     super.dispose();
   }

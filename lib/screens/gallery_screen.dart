@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
+import '../utils/scroll_to_top.dart';
 import '../services/fa_client.dart';
 import '../widgets/submission_card.dart';
 import '../widgets/loading_indicator.dart';
@@ -15,8 +16,15 @@ class GalleryScreen extends StatefulWidget {
   final bool sfwMode;
   final VoidCallback? onLogout;
 
+  /// Индекс вкладки в шелле — для сигнала «скролл наверх».
+  final int tabIndex;
+
   const GalleryScreen(
-      {super.key, required this.client, this.sfwMode = false, this.onLogout});
+      {super.key,
+      required this.client,
+      this.sfwMode = false,
+      this.onLogout,
+      this.tabIndex = 0});
 
   @override
   State<GalleryScreen> createState() => _GalleryScreenState();
@@ -25,6 +33,7 @@ class GalleryScreen extends StatefulWidget {
 class _GalleryScreenState extends State<GalleryScreen>
     with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
+  late final VoidCallback _scrollToTopCancel;
 
   List<Submission> _submissions = [];
   int _currentPage = 1;
@@ -50,11 +59,19 @@ class _GalleryScreenState extends State<GalleryScreen>
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _scrollToTopCancel = ScrollToTopBus.subscribe(widget.tabIndex, () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(0,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic);
+      }
+    });
     _loadSubmissions();
   }
 
   @override
   void dispose() {
+    _scrollToTopCancel();
     _scrollController.dispose();
     super.dispose();
   }

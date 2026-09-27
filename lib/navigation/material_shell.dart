@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import '../theme/app_theme.dart';
+import '../utils/scroll_to_top.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
 import '../services/search_history.dart';
@@ -80,6 +82,17 @@ class _MaterialShellState extends State<MaterialShell> {
     }
   }
 
+  /// Тап по вкладке: переключение; повторный тап по АКТИВНОЙ вкладке —
+  /// скролл текущего списка наверх (стандартное поведение Material).
+  void _onNavTap(int index) {
+    HapticFeedback.selectionClick();
+    if (index == _currentIndex) {
+      ScrollToTopBus.fire(index);
+      return;
+    }
+    setState(() => _currentIndex = index);
+  }
+
   @override
   void dispose() {
     SearchHistory.externalQuery.removeListener(_onExternalSearch);
@@ -104,11 +117,20 @@ class _MaterialShellState extends State<MaterialShell> {
   List<Widget> _buildScreens() {
     return [
       GalleryScreen(
-          client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+          client: widget.client,
+          sfwMode: _sfwMode,
+          onLogout: widget.onLogout,
+          tabIndex: 0),
       WatchFeedScreen(
-          client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+          client: widget.client,
+          sfwMode: _sfwMode,
+          onLogout: widget.onLogout,
+          tabIndex: 1),
       SearchScreen(
-          client: widget.client, sfwMode: _sfwMode, onLogout: widget.onLogout),
+          client: widget.client,
+          sfwMode: _sfwMode,
+          onLogout: widget.onLogout,
+          tabIndex: 2),
       NotificationsScreen(client: widget.client, onLogout: widget.onLogout),
       ProfileScreen(
           client: widget.client,
@@ -232,23 +254,37 @@ class _MaterialShellState extends State<MaterialShell> {
                   width: 1,
                 ),
               ),
-              child: NavigationBar(
-                selectedIndex: _currentIndex,
-                onDestinationSelected: (index) =>
-                    setState(() => _currentIndex = index),
-                backgroundColor: Colors.transparent,
-                surfaceTintColor: colorScheme.surfaceTint,
-                indicatorColor: colorScheme.secondaryContainer,
-                height: 72,
-                labelBehavior:
-                    NavigationDestinationLabelBehavior.onlyShowSelected,
-                destinations: _navItems.map((item) {
-                  return NavigationDestination(
-                    icon: Icon(item.icon, size: 22),
-                    selectedIcon: Icon(item.selectedIcon, size: 24),
-                    label: item.label,
-                  );
-                }).toList(),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  navigationBarTheme: NavigationBarThemeData(
+                    // 6 вкладок — «Notifications» не влезает в ширину
+                    // назначения стандартным кеглем и переносится.
+                    labelTextStyle: WidgetStatePropertyAll(
+                      TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+                child: NavigationBar(
+                  selectedIndex: _currentIndex,
+                  onDestinationSelected: _onNavTap,
+                  backgroundColor: Colors.transparent,
+                  surfaceTintColor: colorScheme.surfaceTint,
+                  indicatorColor: colorScheme.secondaryContainer,
+                  height: 72,
+                  labelBehavior:
+                      NavigationDestinationLabelBehavior.onlyShowSelected,
+                  destinations: _navItems.map((item) {
+                    return NavigationDestination(
+                      icon: Icon(item.icon, size: 22),
+                      selectedIcon: Icon(item.selectedIcon, size: 24),
+                      label: item.label,
+                    );
+                  }).toList(),
+                ),
               ),
             ),
           ),
