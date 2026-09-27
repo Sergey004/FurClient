@@ -37,6 +37,7 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
   /// are merged at the top (newest-first via descending sid order, matching
   /// FA's listing order).
   List<Submission> _submissions = [];
+  Set<String> _favIds = {};
   bool _isInitialLoading = false;
   bool _isRefreshing = false;
   String? _error;
@@ -56,6 +57,18 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
     super.dispose();
   }
 
+  /// Красит сердечки у карточек, чьи id есть в [_favIds]. Только добавляет:
+  /// вручную зафавканное в этой сессии не снимаем.
+  void _applyFavs() {
+    setState(() {
+      _submissions = _submissions
+          .map((s) => s.isFavorite || !_favIds.contains(s.id)
+              ? s
+              : s.copyWith(isFavorite: true))
+          .toList();
+    });
+  }
+
   Future<void> _initialLoad() async {
     if (_isInitialLoading) return;
     setState(() {
@@ -64,23 +77,22 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
     });
 
     try {
-      // Лента и статусы избранного грузятся ПАРАЛЛЕЛЬНО: экран открывается
-      // быстрее, сердечки красятся сразу при готовности обоих запросов.
+      // Лента показывается СРАЗУ; fav-фетч живёт в отдельном async-потоке и
+      // докрашивает сердечки по мере поступления страниц избранного.
       final feedFuture = widget.client.getWatchSubmissions();
-      final favFuture = widget.client.loadFavoriteIds();
+      final favFuture = widget.client.loadFavoriteIds(onPartial: (ids) {
+        if (!mounted) return;
+        _favIds.addAll(ids);
+        _applyFavs();
+      });
       final result = await feedFuture;
-      final favIds = await favFuture;
       if (mounted) {
         setState(() {
-          _submissions = result.submissions.map((s) {
-            if (favIds.contains(s.id)) {
-              return s.copyWith(isFavorite: true);
-            }
-            return s;
-          }).toList();
+          _submissions = result.submissions;
           _isInitialLoading = false;
         });
       }
+      await favFuture; // ошибки внутри loadFavoriteIds уже проглочены
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -100,40 +112,46 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
     setState(() => _isRefreshing = true);
 
     try {
-      // Fav-статусы обновляем вместе с лентой — иначе после refresh
-      // сердечки сбрасываются в пустые.
+      // Лента мержится сразу; fav-фетч — отдельный поток, сердечки
+      // докрашиваются прогрессивно через onPartial.
       final feedFuture = widget.client.getWatchSubmissions();
-      final favFuture = widget.client.loadFavoriteIds();
+      final favFuture = widget.client.loadFavoriteIds(onPartial: (ids) {
+        if (!mounted) return;
+        _favIds.addAll(ids);
+        _applyFavs();
+      });
       final result = await feedFuture;
-      final favIds = await favFuture;
       if (!mounted) return;
-
-      Submission applyFav(Submission s) =>
-          favIds.contains(s.id) ? s.copyWith(isFavorite: true) : s;
 
       if (_submissions.isEmpty) {
         setState(() {
-          _submissions = result.submissions.map(applyFav).toList();
+          _submissions = result.submissions;
           _isRefreshing = false;
         });
+        await favFuture;
         return;
       }
 
       // Merge: keep only newly fetched submissions whose sid is *newer* than
       // the current top. FA returns sids in descending order, so a simple
-      // "newer than the current head" filter is enough.
+      // "newer than the current head" filter is enough. Свежие карточки
+      // сразу получают сердечки из уже накопленного множества.
       final currentTopSid = int.tryParse(_submissions.first.id) ?? 0;
       final fresh = result.submissions
           .where((s) => (int.tryParse(s.id) ?? 0) > currentTopSid)
-          .map(applyFav);
+          .map((s) => _favIds.contains(s.id) && !s.isFavorite
+              ? s.copyWith(isFavorite: true)
+              : s);
       if (fresh.isEmpty) {
         setState(() => _isRefreshing = false);
+        await favFuture;
         return;
       }
       setState(() {
         _submissions = [...fresh, ..._submissions];
         _isRefreshing = false;
       });
+      await favFuture;
     } catch (_) {
       if (mounted) setState(() => _isRefreshing = false);
     }

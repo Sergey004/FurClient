@@ -235,11 +235,6 @@ class FAClient {
   Future<String> getHtml(String url, {bool waitForAjax = false}) =>
       _getHtml(url, waitForAjax: waitForAjax);
 
-  /// Тяжёлый HTML-парсинг — вне UI-изолятa. На 120 Гц бюджет кадра 8.3 мс,
-  /// а разбор страницы 150–250 КБ занимает десятки миллисекунд; парсеры
-  /// fa_kit чистые (без I/O), поэтому спокойно живут в фоновом изоляте.
-  Future<T> _parseInBackground<T>(T Function() parse) => Isolate.run(parse);
-
   Future<String> _getHtml(String url, {bool waitForAjax = false}) async {
     await _ensureInitialized();
 
@@ -840,7 +835,7 @@ class FAClient {
   Future<List<Submission>> getSubmissions(int page, String category) async {
     final url = FAUrls.browse(filter: category, page: page);
     final html = await _getHtml(url);
-    return _parseInBackground(() => Submission.parseSubmissionsPage(html));
+    return parseListInBackground(html);
   }
 
   /// Fetch the watch feed (`/msg/submissions/`).
@@ -906,8 +901,7 @@ class FAClient {
       debugPrint(
           html.substring(dumpFrom, (dumpFrom + 5000).clamp(0, html.length)));
     }
-    final page = await _parseInBackground(() => fa.FASubmissionsPage.parse(
-        html, Uri.parse('https://www.furaffinity.net')));
+    final page = await parseWatchPageInBackground(html);
     debugPrint(
         '=== WatchFeed: parsed ${page.submissions.length} submissions, nextPageUrl=${page.nextPageUrl}');
     final subs = page.submissions
@@ -928,7 +922,7 @@ class FAClient {
   Future<List<Submission>> getGallery(String username, {int page = 1}) async {
     final url = FAUrls.gallery(username, page: page);
     final html = await _getHtml(url);
-    return _parseInBackground(() => Submission.parseSubmissionsPage(html));
+    return parseListInBackground(html);
   }
 
   /// Fetch submission details + comments in a single HTML fetch.
@@ -940,16 +934,7 @@ class FAClient {
     final html = await _getHtml(url, waitForAjax: true);
     try {
       // Парсинг страницы сабмишена + дерева комментариев целиком в фоне.
-      final result = await _parseInBackground(() {
-        final page = fa.FASubmissionPage.parse(
-            html, Uri.parse('https://www.furaffinity.net/view/$id/'));
-        final submission = Submission.fromFASubmissionPage(page, id);
-        final comments = fa
-            .buildCommentsTree(page.comments)
-            .map((c) => FAComment.fromFAComment(c))
-            .toList();
-        return (submission: submission, comments: comments);
-      });
+      final result = await parseSubmissionDetailInBackground(html, id);
       debugPrint(
           '=== getSubmissionWithComments: ${result.comments.length} comments parsed');
       return result;
@@ -1231,13 +1216,8 @@ class FAClient {
 
       // Парсим ответ как submission page — получаем актуальный favoriteUrl
       // (с новым key) и isFavorite/faves из ответа сервера, а не из догадки.
-      final submission = await _parseInBackground(() {
-        final page = fa.FASubmissionPage.parse(
-          html,
-          Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
-        );
-        return Submission.fromFASubmissionPage(page, submissionId);
-      });
+      final submission = await parseSubmissionInBackground(
+          html, submissionId, 'https://www.furaffinity.net/view/$submissionId/');
       debugPrint(
           '=== toggleFavorite: result isFavorite=${submission.isFavorite}, faves=${submission.faves}');
       return submission;
@@ -1311,13 +1291,8 @@ class FAClient {
             );
           } else {
             // Step 2: fav/unfav action completed — parse the result page.
-            final submission = await _parseInBackground(() {
-              final page = fa.FASubmissionPage.parse(
-                html,
-                Uri.parse('https://www.furaffinity.net/view/$submissionId/'),
-              );
-              return Submission.fromFASubmissionPage(page, submissionId);
-            });
+            final submission = await parseSubmissionInBackground(
+                html, submissionId, 'https://www.furaffinity.net/view/$submissionId/');
             debugPrint(
                 '=== toggleFavoriteById: result isFavorite=${submission.isFavorite}, faves=${submission.faves}');
             if (!completer.isCompleted) completer.complete(submission);
@@ -1443,13 +1418,20 @@ class FAClient {
 
   Future<List<FANotification>> getNotifications() async {
     final html = await _getHtml(FAUrls.notifications);
-    return _parseInBackground(() => FANotification.parseNotifications(html));
+    return parseNotificationsInBackground(html);
   }
 
   Future<FAUser?> getUser(String username) async {
     final url = FAUrls.user(username);
     final html = await _getHtml(url);
-    return _parseInBackground(() => FAUser.parseUserPage(html, username));
+    // TEMP DEBUG: dump profile HTML for parser fixing.
+    try {
+      final dir = await getTemporaryDirectory();
+      io.File('${dir.path}/profile_dump.html').writeAsStringSync(html);
+      debugPrint(
+          '=== PROFILE DUMP: ${dir.path}/profile_dump.html (${html.length}B)');
+    } catch (_) {}
+    return parseUserInBackground(html, username);
   }
 
   Future<FAUser?> getUserProfile(String username) async {
@@ -1480,14 +1462,14 @@ class FAClient {
   Future<FAJournal?> getJournal(String id) async {
     final url = FAUrls.journal(id);
     final html = await _getHtml(url);
-    return _parseInBackground(() => FAJournal.parseJournalDetail(html, id));
+    return parseJournalInBackground(html, id);
   }
 
   /// Fetch a user's journals list.
   Future<List<FAJournalPreview>> getUserJournals(String username) async {
     final url = FAUrls.journals(username);
     final html = await _getHtml(url);
-    return _parseInBackground(() => FAJournalPreview.parseJournalList(html));
+    return parseJournalListInBackground(html);
   }
 
   /// Fetch current user's favorites and return set of submission IDs.
@@ -1497,7 +1479,8 @@ class FAClient {
   /// сердечки должны краситься и для работ глубже первой страницы.
   /// Останавливается раньше, если страница пустая, повторяет уже виденные
   /// работы (FA заворачивает страницы по кругу) или [untilSid] уже покрыт.
-  Future<Set<String>> loadFavoriteIds({int maxPages = 5}) async {
+  Future<Set<String>> loadFavoriteIds(
+      {int maxPages = 5, void Function(Set<String> ids)? onPartial}) async {
     final username = _session?.username ?? 'me';
     final ids = <String>{};
     try {
@@ -1509,8 +1492,7 @@ class FAClient {
         final pageResults = await Future.wait(pageNumbers.map((page) async {
           final url = FAUrls.favorites(username, page: page);
           final html = await _getHtml(url);
-          return _parseInBackground(
-              () => Submission.parseSubmissionsPage(html));
+          return parseListInBackground(html);
         }));
         var anyNew = false;
         for (final items in pageResults) {
@@ -1518,6 +1500,9 @@ class FAClient {
           ids.addAll(items.map((s) => s.id).where((id) => id.isNotEmpty));
           if (ids.length > before) anyNew = true;
         }
+        // Прогрессивный колбек: экран красит сердечки, не дожидаясь остальных
+        // волн.
+        onPartial?.call(Set.of(ids));
         // Пустая страница или всё уже видели (FA заворачивает по кругу).
         if (pageResults.any((items) => items.isEmpty) || !anyNew) break;
       }
@@ -1533,7 +1518,7 @@ class FAClient {
       {int page = 1}) async {
     final url = FAUrls.favorites(username, page: page);
     final html = await _getHtml(url);
-    return _parseInBackground(() => Submission.parseSubmissionsPage(html));
+    return parseListInBackground(html);
   }
 
   // ── CF Challenge Pass ────────────────────────────────────────────────
@@ -1973,3 +1958,50 @@ class FAClient {
     }
   }
 }
+
+
+// ── Фоновый HTML-парсинг ─────────────────────────────────────────────
+// Top-level функции, чтобы замыкания Isolate.run не захватывали `this`
+// FAClient'а через контекст-чейн async-методов: изолят отвергает
+// unsendable-объекты (Completer'ы и пр.), и парсинг падал целиком.
+
+/// Тяжёлый HTML-парсинг — вне UI-изолятa. На 120 Гц бюджет кадра 8.3 мс,
+/// а разбор страницы 150–250 КБ занимает десятки миллисекунд; парсеры
+/// fa_kit чистые (без I/O), поэтому спокойно живут в фоновом изоляте.
+Future<List<Submission>> parseListInBackground(String html) =>
+    Isolate.run(() => Submission.parseSubmissionsPage(html));
+
+Future<fa.FASubmissionsPage> parseWatchPageInBackground(String html) =>
+    Isolate.run(() => fa.FASubmissionsPage.parse(
+        html, Uri.parse('https://www.furaffinity.net')));
+
+Future<Submission> parseSubmissionInBackground(
+        String html, String submissionId, String url) =>
+    Isolate.run(() {
+      final page = fa.FASubmissionPage.parse(html, Uri.parse(url));
+      return Submission.fromFASubmissionPage(page, submissionId);
+    });
+
+Future<({Submission? submission, List<FAComment> comments})>
+    parseSubmissionDetailInBackground(String html, String id) => Isolate.run(() {
+          final page = fa.FASubmissionPage.parse(
+              html, Uri.parse('https://www.furaffinity.net/view/$id/'));
+          final submission = Submission.fromFASubmissionPage(page, id);
+          final comments = fa
+              .buildCommentsTree(page.comments)
+              .map((c) => FAComment.fromFAComment(c))
+              .toList();
+          return (submission: submission, comments: comments);
+        });
+
+Future<List<FANotification>> parseNotificationsInBackground(String html) =>
+    Isolate.run(() => FANotification.parseNotifications(html));
+
+Future<FAUser?> parseUserInBackground(String html, String username) =>
+    Isolate.run(() => FAUser.parseUserPage(html, username));
+
+Future<FAJournal?> parseJournalInBackground(String html, String id) =>
+    Isolate.run(() => FAJournal.parseJournalDetail(html, id));
+
+Future<List<FAJournalPreview>> parseJournalListInBackground(String html) =>
+    Isolate.run(() => FAJournalPreview.parseJournalList(html));

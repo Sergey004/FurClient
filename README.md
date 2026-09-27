@@ -1,6 +1,11 @@
-**This app never leaks data and does not use telemetry or trackers.**
+> [!NOTE]
+> 🔒 Privacy
+>
+> This app does not use telemetry, analytics, trackers, >Firebase, or other third-party data collection services.
+>
+> Your Fur Affinity credentials and account data are not >collected or sold.
 
-# FurClient — Fur Affinity Client
+# FurClient — unofficial Fur Affinity client for Android and Windows
 
 A cross-platform Fur Affinity client built with Flutter & Dart.
 

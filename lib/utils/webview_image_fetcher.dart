@@ -109,7 +109,8 @@ class WebViewImageFetcher {
       await worker.dispose();
     }
     _workers.clear();
-    debugPrint('=== WebViewImageFetcher: Reset (pool re-created on next fetch)');
+    debugPrint(
+        '=== WebViewImageFetcher: Reset (pool re-created on next fetch)');
   }
 
   /// Full dispose пула.

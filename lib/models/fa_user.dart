@@ -113,12 +113,14 @@ class FAUser {
     final description = descEl?.text.trim() ?? '';
 
     // Stats — FA uses: <span class="highlight">Views:</span> 3515
-    // inside div.section-body > div.table > div.cell
+    // inside div.section-body > div.table > div.cell. В бета-теме лейблы
+    // рвутся адаптивными спанами (Comments/Cmts), поэтому ищем по хвостовому
+    // слову лейбла в тексте без тегов — см. [_parseHighlightValue].
     final views = _parseHighlightValue(document, 'Views:');
     final submissions = _parseHighlightValue(document, 'Submissions:');
     final favorites = _parseHighlightValue(document, 'Favs:');
     // FA has "Comments Earned" and "Comments Made" — use Earned as the main count
-    final comments = _parseHighlightValue(document, 'Comments Earned:');
+    final comments = _parseHighlightValue(document, 'Earned:');
     final journals = _parseHighlightValue(document, 'Journals:');
 
     // Watch button
@@ -184,32 +186,20 @@ class FAUser {
     return username;
   }
 
-  /// Parse a stat value from the FA profile format using regex on raw HTML.
-  /// FA uses: <span class="highlight">Views:</span> 3515
+  /// Parse a stat value from the FA profile stats block.
+  ///
+  /// Бета-тема рвёт лейблы адаптивными спанами
+  /// (`<span class="hideonmobile">Comments</span> <span>Cmts</span> Earned:`),
+  /// поэтому регулярка по сырой HTML с фиксированным лейблом не матчится.
+  /// Вычищаем теги из текста секции и ищем [label] — хвостовое слово
+  /// лейбла с двоеточием — по чистому тексту.
   static int _parseHighlightValue(dom.Document document, String label) {
-    // Build regex that accounts for </span> between label and number
-    // e.g. "Views:</span> 3515" or "Comments Earned:</span> 105"
-    final pattern = '${RegExp.escape(label)}</span>\\s*([\\d,]+)';
-
-    // Search in the stats section first
     final statsSection = document.querySelector('div.section-body');
-    if (statsSection != null) {
-      final regex = RegExp(pattern);
-      final match = regex.firstMatch(statsSection.outerHtml);
-      if (match != null) {
-        final cleaned = match.group(1)!.replaceAll(',', '');
-        return int.tryParse(cleaned) ?? 0;
-      }
-    }
-
-    // Fallback: search entire document
-    final fullHtml = document.outerHtml;
-    final regex = RegExp(pattern);
-    final match = regex.firstMatch(fullHtml);
-    if (match != null) {
-      final cleaned = match.group(1)!.replaceAll(',', '');
-      return int.tryParse(cleaned) ?? 0;
-    }
-    return 0;
+    final source = (statsSection?.outerHtml ?? document.outerHtml)
+        .replaceAll(RegExp(r'<[^>]+>'), ' ');
+    final match =
+        RegExp('${RegExp.escape(label)}\\s*([\\d,]+)').firstMatch(source);
+    if (match == null) return 0;
+    return int.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0;
   }
 }
