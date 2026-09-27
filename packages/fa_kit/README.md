@@ -1,1 +1,0 @@
-Port of the Dart library from  [FurAffinityApp FAKit](https://github.com/Ceylo/FurAffinityApp/tree/main/FAKit) (kinda broken)
