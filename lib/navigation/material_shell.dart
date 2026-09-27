@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show HapticFeedback;
+import '../utils/haptics.dart';
 import '../theme/app_theme.dart';
 import '../utils/scroll_to_top.dart';
 import '../models/models.dart';
@@ -85,7 +85,7 @@ class _MaterialShellState extends State<MaterialShell> {
   /// Тап по вкладке: переключение; повторный тап по АКТИВНОЙ вкладке —
   /// скролл текущего списка наверх (стандартное поведение Material).
   void _onNavTap(int index) {
-    HapticFeedback.selectionClick();
+    FHaptics.selection();
     if (index == _currentIndex) {
       ScrollToTopBus.fire(index);
       return;

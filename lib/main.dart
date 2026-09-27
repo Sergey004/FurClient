@@ -14,6 +14,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'services/auth_service.dart';
+import 'utils/haptics.dart';
 import 'services/fa_client.dart';
 import 'services/notification_poller.dart';
 import 'services/update_service.dart';
@@ -78,6 +79,9 @@ void main() {
       } else {
         WidgetsFlutterBinding.ensureInitialized();
       }
+
+      // Настройка хаптик (haptics_enabled) — до любых UI-взаимодействий.
+      await FHaptics.load();
 
       if (Platform.isAndroid) {
         await InAppWebViewController.setWebContentsDebuggingEnabled(true);

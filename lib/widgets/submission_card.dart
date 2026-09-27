@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../utils/haptics.dart';
 import 'package:fa_kit/fa_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
@@ -66,6 +67,7 @@ class _SubmissionCardState extends State<SubmissionCard> {
       if (!mounted) return;
       if (updated != null) {
         // Reconcile with the server's parsed state.
+        FHaptics.success();
         setState(() => _current = updated);
         widget.onFavoriteChanged?.call(updated);
         // Saving a favorite is complete once the server confirms it. An

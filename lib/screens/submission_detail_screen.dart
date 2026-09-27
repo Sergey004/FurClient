@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/haptics.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:share_plus/share_plus.dart';
@@ -120,6 +121,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           await widget.client.toggleFavorite(sub.favoriteUrl, sub.id);
       if (mounted && updated != null) {
         success = true;
+        FHaptics.success();
         final updatedSubmission = Submission(
           id: sub.id,
           title: sub.title,

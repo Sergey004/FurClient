@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/haptics.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -126,6 +127,7 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
   /// order and any new sid must land before the current top.
   Future<void> _onRefresh() async {
     if (_isRefreshing) return;
+    FHaptics.light();
     setState(() => _isRefreshing = true);
 
     try {

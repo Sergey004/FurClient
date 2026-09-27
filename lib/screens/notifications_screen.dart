@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/haptics.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -178,6 +179,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       );
     }
 
+    FHaptics.light();
     return RefreshIndicator(
       color: AppColors.cupertinoPurple,
       backgroundColor: Theme.of(context).cardColor,

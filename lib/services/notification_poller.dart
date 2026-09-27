@@ -141,20 +141,37 @@ class NotificationPoller {
 
       // 4. Watermarks двигаем из полных списков (включая выключенные).
       await _saveWatermarks(prefs, feed, notes, others);
+      // CF прошёл — сбрасываем метку, чтобы СЛЕДУЮЩИЙ заслон снова
+      // уведомил (смысл — сигнал об изменении состояния, не спам).
+      await prefs.setInt('last_cf_toast_at', 0);
       debugPrint('=== Poller: posted ${records.length} notifications');
     } on CloudflareError {
       // CF-заслон в фоне: тост и выход, watermarks не трогаем.
-      debugPrint('=== Poller: CF challenge in background, posting CF toast');
-      await showNotification(
-        type: 'system',
-        title: 'Cloudflare check required',
-        body:
-            'FurAffinity needs human verification. Open the app to resume notifications.',
-        notificationId: _cfToastNotificationId,
-      );
+      await _postCfToast();
     } catch (e) {
       debugPrint('=== Poller: error: $e');
     }
+  }
+
+  /// Тост «нужен человек» — но не чаще раза в 6 часов: Cloudflare может
+  /// молотить челленджами несколько циклов подряд, и уведомление про каждый
+  /// превращается в спам.
+  Future<void> _postCfToast() async {
+    final prefs = await SharedPreferences.getInstance();
+    final last = prefs.getInt('last_cf_toast_at') ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - last < const Duration(hours: 6).inMilliseconds) {
+      debugPrint('=== Poller: CF challenge continues, toast suppressed');
+      return;
+    }
+    await prefs.setInt('last_cf_toast_at', now);
+    await showNotification(
+      type: 'system',
+      title: 'Cloudflare check required',
+      body:
+          'FurAffinity needs human verification. Open the app to resume notifications.',
+      notificationId: _cfToastNotificationId,
+    );
   }
 
   Map<String, String> _record(

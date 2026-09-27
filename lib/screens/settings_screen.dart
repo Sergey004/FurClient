@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/haptics.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_selector/file_selector.dart';
@@ -35,6 +36,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen>
     with AutomaticKeepAliveClientMixin {
   bool _sfwMode = false;
+  bool _hapticsEnabled = true;
   bool _autoDownloadOnFave = false;
   bool _autoCloseOnFave = true;
   String _imageQuality = 'high';
@@ -76,12 +78,20 @@ class _SettingsScreenState extends State<SettingsScreen>
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
+        _hapticsEnabled = prefs.getBool('haptics_enabled') ?? true;
         _autoDownloadOnFave = prefs.getBool('auto_download_on_fave') ?? false;
         _autoCloseOnFave = prefs.getBool('auto_close_on_fave') ?? true;
         _imageQuality = prefs.getString('image_quality') ?? 'high';
         _customDownloadPath = prefs.getString('custom_download_path') ?? '';
       });
     }
+    FHaptics.enabled = _hapticsEnabled;
+  }
+
+  /// Тумблер «Haptic feedback» — мигом влияет на все FHaptics-вызовы.
+  Future<void> _onHapticsToggle(bool value) async {
+    setState(() => _hapticsEnabled = value);
+    await FHaptics.setEnabled(value);
   }
 
   Future<void> _saveSetting(String key, dynamic value) async {
@@ -244,6 +254,18 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
             Divider(height: 1, indent: 16, color: outline),
             _buildImageQualityTile(),
+          ]),
+          const SizedBox(height: 24),
+          _sectionHeader('Feedback'),
+          _card([
+            _adaptiveSwitchTile(
+              icon: Icons.vibration_outlined,
+              iconColor: secondary,
+              value: _hapticsEnabled,
+              onChanged: _onHapticsToggle,
+              title: 'Haptic feedback',
+              subtitle: 'Vibration on tabs, pulls and favorites',
+            ),
           ]),
           const SizedBox(height: 24),
           _sectionHeader('Downloads'),

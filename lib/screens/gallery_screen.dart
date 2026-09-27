@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/haptics.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
@@ -118,6 +119,7 @@ class _GalleryScreenState extends State<GalleryScreen>
   /// Mirrors the watch-feed refresh behaviour.
   Future<void> _onRefresh() async {
     if (_isRefreshing || _isLoading) return;
+    FHaptics.light();
     setState(() => _isRefreshing = true);
 
     try {
