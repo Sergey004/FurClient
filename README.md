@@ -1,9 +1,9 @@
 > [!NOTE]
-> 🔒 Privacy
+> Privacy
 >
-> This app does not use telemetry, analytics, trackers, >Firebase, or other third-party data collection services.
+> This app does not use telemetry, analytics, trackers, Firebase, or other third-party data collection services.
 >
-> Your Fur Affinity credentials and account data are not >collected or sold.
+> Your Fur Affinity credentials and account data are not collected or sold.
 
 # FurClient — unofficial Fur Affinity client for Android and Windows
 
