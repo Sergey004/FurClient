@@ -10,6 +10,7 @@ import '../screens/search_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
+import '../utils/scroll_to_top.dart';
 
 class FluentShell extends StatefulWidget {
   final FAClient client;
@@ -101,7 +102,12 @@ class _FluentShellState extends State<FluentShell> {
     return fluent.NavigationView(
       pane: fluent.NavigationPane(
         selected: _currentIndex,
-        onChanged: (index) => setState(() => _currentIndex = index),
+        onChanged: (index) {
+          // Повторный тап по активному пункту — скролл текущего списка
+          // наверх (та же шина, что и в Material-шелле).
+          if (index == _currentIndex) ScrollToTopBus.fire(index);
+          setState(() => _currentIndex = index);
+        },
         displayMode: fluent.PaneDisplayMode.auto,
         size: const fluent.NavigationPaneSize(openWidth: 280),
         header: Padding(

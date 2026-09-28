@@ -11,6 +11,7 @@ import '../widgets/m3/app_list_tile.dart';
 import 'submission_detail_screen.dart';
 import 'journal_detail_screen.dart';
 import 'profile_screen.dart';
+import 'notes_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   final FAClient client;
@@ -145,6 +146,17 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     return AdaptiveScaffold(
       appBar: AppBar(
         title: const Text('Notifications'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.mail_outline),
+            tooltip: 'Notes',
+            onPressed: () => Navigator.of(context).push(
+              adaptiveRoute(
+                builder: (_) => NotesScreen(client: widget.client),
+              ),
+            ),
+          ),
+        ],
       ),
       body: _buildBody(),
     );

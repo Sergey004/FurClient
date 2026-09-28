@@ -11,13 +11,17 @@ import '../widgets/adaptive/adaptive.dart';
 import '../widgets/caption_buttons.dart';
 import '../utils/platform_utils.dart';
 import 'submission_detail_screen.dart';
+import '../utils/fa_image_loader.dart';
 import 'journal_detail_screen.dart';
+import 'profile_screen.dart';
+import 'package:fa_kit/fa_kit.dart' as fa;
 
 /// What kind of user content to display.
 enum UserContentType {
   gallery,
   favorites,
   journals,
+  watchlist,
 }
 
 /// Native screen for viewing a user's gallery, favorites, or journals.
@@ -42,6 +46,7 @@ class UserContentScreen extends StatefulWidget {
 class _UserContentScreenState extends State<UserContentScreen> {
   List<Submission> _submissions = [];
   List<FAJournalPreview> _journals = [];
+  List<fa.FAWatchlistUser> _watchlistUsers = [];
   int _currentPage = 1;
   bool _isLoading = true;
   bool _isLoadingMore = false;
@@ -80,6 +85,8 @@ class _UserContentScreenState extends State<UserContentScreen> {
         return '$user\'s Favorites';
       case UserContentType.journals:
         return '$user\'s Journals';
+      case UserContentType.watchlist:
+        return '$user\'s Watchlist';
     }
   }
 
@@ -89,6 +96,7 @@ class _UserContentScreenState extends State<UserContentScreen> {
       _error = null;
       _submissions = [];
       _journals = [];
+      _watchlistUsers = [];
       _currentPage = 1;
       _hasMore = true;
     });
@@ -104,11 +112,15 @@ class _UserContentScreenState extends State<UserContentScreen> {
         case UserContentType.journals:
           _journals = await widget.client.getUserJournals(widget.username);
           break;
+        case UserContentType.watchlist:
+          _watchlistUsers = await widget.client.getWatchlist(widget.username);
+          break;
       }
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _hasMore = widget.contentType == UserContentType.journals
+          _hasMore = widget.contentType == UserContentType.journals ||
+                  widget.contentType == UserContentType.watchlist
               ? false
               : _submissions.isNotEmpty;
         });
@@ -125,7 +137,8 @@ class _UserContentScreenState extends State<UserContentScreen> {
 
   Future<void> _loadMore() async {
     if (_isLoadingMore || _isLoading || !_hasMore) return;
-    if (widget.contentType == UserContentType.journals) return;
+    if (widget.contentType == UserContentType.journals ||
+        widget.contentType == UserContentType.watchlist) return;
 
     setState(() => _isLoadingMore = true);
     _currentPage++;
@@ -285,6 +298,8 @@ class _UserContentScreenState extends State<UserContentScreen> {
         return _buildSubmissionGrid();
       case UserContentType.journals:
         return _buildJournalList();
+      case UserContentType.watchlist:
+        return _buildWatchlist();
     }
   }
 
@@ -412,6 +427,57 @@ class _UserContentScreenState extends State<UserContentScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // ── Watchlist (users) ────────────────────────────────────────────────
+
+  Widget _buildWatchlist() {
+    if (_watchlistUsers.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.people_outline,
+                  color: AppColors.textMuted, size: 48),
+              const SizedBox(height: 16),
+              Text('Nobody here',
+                  style: TextStyle(color: AppColors.textDim, fontSize: 16)),
+              const SizedBox(height: 8),
+              AdaptiveButton(label: 'Refresh', onPressed: _loadContent),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      itemCount: _watchlistUsers.length,
+      itemBuilder: (context, index) {
+        final u = _watchlistUsers[index];
+        return ListTile(
+          leading: FAAvatar(username: u.name, size: 40),
+          title: Text(u.displayName.isNotEmpty ? u.displayName : u.name,
+              style: const TextStyle(color: AppColors.text, fontSize: 15)),
+          subtitle: Text(u.name,
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+          trailing: const Icon(Icons.chevron_right,
+              size: 20, color: AppColors.textMuted),
+          onTap: () => Navigator.of(context).push(
+            adaptiveRoute(
+              builder: (_) => ProfileScreen(
+                client: widget.client,
+                session: widget.client.session!,
+                targetUsername: u.name,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

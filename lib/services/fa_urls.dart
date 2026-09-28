@@ -150,6 +150,7 @@ class FAUrls {
   static String get notesInbox => '$baseUrl/controls/switchbox/inbox/';
   static String get notesSent => '$baseUrl/controls/switchbox/sent/';
   static String newNote(String username) => '$baseUrl/newpm/$username/';
+  static String get sendNote => '$baseUrl/msg/send/';
 
   static const Map<String, String> filterMap = {
     'all': '',

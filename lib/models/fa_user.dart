@@ -77,6 +77,18 @@ class FAUser {
     this.shouts = const [],
   });
 
+  FAUser copyWith({bool? isWatching, String? watchUrl}) => FAUser(
+        username: username,
+        displayName: displayName,
+        avatarUrl: avatarUrl,
+        bannerUrl: bannerUrl,
+        description: description,
+        stats: stats,
+        isWatching: isWatching ?? this.isWatching,
+        watchUrl: watchUrl ?? this.watchUrl,
+        shouts: shouts,
+      );
+
   Map<String, dynamic> toJson() => {
         'username': username,
         'displayName': displayName,

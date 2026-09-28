@@ -1506,6 +1506,59 @@ class FAClient {
     }
   }
 
+  // ── Notes ────────────────────────────────────────────────────────────
+
+  /// Инбокс нотесов (у каждой записи unread-флаг).
+  Future<List<fa.FANotePreview>> getNotes() async {
+    final url = FAUrls.notesInbox;
+    final html = await _getHtml(url);
+    return parseNotesInBackground(html, url);
+  }
+
+  /// Страница нотеса: контент + answerKey для ответа.
+  Future<fa.FANotePage> getNote(String url) async {
+    final html = await _getHtml(url);
+    return parseNoteInBackground(html, url);
+  }
+
+  /// Отправить нотес. [replyKey] — из FANotePage при ответе; для нового
+  /// нотеса ключ берётся со страницы /newpm/<to>.
+  Future<void> sendNote(
+      {required String to,
+      required String subject,
+      required String message,
+      String? replyKey}) async {
+    await _ensureInitialized();
+    String key = replyKey ?? '';
+    if (key.isEmpty) {
+      final newUrl = FAUrls.newNote(to);
+      final html = await _getHtml(newUrl);
+      key = await parseNewNoteKeyInBackground(html);
+      if (key.isEmpty) {
+        throw Exception('Could not extract note form key');
+      }
+    }
+    final cookieHeader = _buildCookieHeader();
+    await _dio.post<String>(
+      FAUrls.sendNote,
+      data: {'key': key, 'to': to, 'subject': subject, 'message': message},
+      options: Options(
+        headers: {if (cookieHeader != null) 'Cookie': cookieHeader},
+        contentType: 'application/x-www-form-urlencoded',
+      ),
+    );
+    debugPrint('=== sendNote: delivered to $to');
+  }
+
+  /// Fetch a user's watchlist. direction: 'by' = кто кого СМОТРИТ
+  /// (watching), 'to' = кто смотрит НА НЕГО (watchers).
+  Future<List<fa.FAWatchlistUser>> getWatchlist(String username,
+      {String direction = 'by', int page = 1}) async {
+    final url = FAUrls.watchlist(username, direction, page: page);
+    final html = await _getHtml(url);
+    return parseWatchlistInBackground(html, url);
+  }
+
   /// Fetch a user's favorites page.
   Future<List<Submission>> getUserFavorites(String username,
       {int page = 1}) async {
@@ -2028,3 +2081,26 @@ Future<FAJournal?> parseJournalInBackground(String html, String id) =>
 
 Future<List<FAJournalPreview>> parseJournalListInBackground(String html) =>
     Isolate.run(() => FAJournalPreview.parseJournalList(html));
+
+
+Future<List<fa.FAWatchlistUser>> parseWatchlistInBackground(
+        String html, String url) =>
+    Isolate.run(() => fa.FAWatchlistPage.parse(html, Uri.parse(url)).users);
+
+
+Future<List<fa.FANotePreview>> parseNotesInBackground(String html, String url) =>
+    Isolate.run(() {
+      final page = fa.FANotesPage.parse(html, Uri.parse(url));
+      return page.noteHeaders
+          .whereType<fa.FANoteHeader>()
+          .map(fa.FANotePreview.fromHeader)
+          .toList();
+    });
+
+Future<fa.FANotePage> parseNoteInBackground(String html, String url) =>
+    Isolate.run(() => fa.FANotePage.parse(html, Uri.parse(url)));
+
+Future<String> parseNewNoteKeyInBackground(String html) =>
+    Isolate.run(() => fa.FANewNotePage.parse(
+            html, Uri.parse('https://www.furaffinity.net'))
+        .apiKey);

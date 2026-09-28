@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../utils/haptics.dart';
+import 'notes_screen.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
@@ -442,35 +444,70 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  bool _isWatchBusy = false;
+
+  /// Кнопка Watch: дергает toggleWatch и обновляет состояние профиля.
+  /// На своём профиле кнопка не показывается (см. вызовы).
+  Future<void> _onWatchToggle(FAUser p) async {
+    if (_isWatchBusy) return;
+    setState(() => _isWatchBusy = true);
+    FHaptics.light();
+    try {
+      final nowWatching =
+          await widget.client.toggleWatch(p.username, p.isWatching);
+      if (mounted && nowWatching != p.isWatching) {
+        FHaptics.success();
+        setState(() {
+          _profile = p.copyWith(isWatching: nowWatching);
+        });
+      }
+    } catch (e) {
+      debugPrint('=== toggleWatch error: $e');
+    } finally {
+      if (mounted) setState(() => _isWatchBusy = false);
+    }
+  }
+
   Widget _buildWatchButton(FAUser p) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color:
-            p.isWatching ? AppColors.bgInput : AppColors.materialLavenderDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color:
-                p.isWatching ? AppColors.border : AppColors.materialLavender),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            p.isWatching ? Icons.visibility : Icons.visibility_off,
-            size: 16,
-            color: p.isWatching ? AppColors.textDim : Colors.white,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            p.isWatching ? 'Watching' : 'Watch',
-            style: TextStyle(
-              fontSize: 14,
-              color: p.isWatching ? AppColors.textDim : Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+    final watching = p.isWatching;
+    return InkWell(
+      onTap: _profile?.username == p.username || _isWatchBusy
+          ? null
+          : () => _onWatchToggle(p),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: watching ? AppColors.bgInput : AppColors.materialLavenderDark,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: watching ? AppColors.border : AppColors.materialLavender),
+        ),
+        child: _isWatchBusy
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    watching ? Icons.visibility : Icons.visibility_off,
+                    size: 16,
+                    color: watching ? AppColors.textDim : Colors.white,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    watching ? 'Watching' : 'Watch',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: watching ? AppColors.textDim : Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -596,6 +633,26 @@ class _ProfileScreenState extends State<ProfileScreen>
             trailing: const Icon(Icons.chevron_right,
                 size: 20, color: AppColors.textMuted),
             onTap: () => _openUserContent(p.username, UserContentType.journals),
+          ),
+          const SizedBox(height: 8),
+          AppListTile(
+            leading: Icon(Icons.mail_outline, color: AppColors.notifComment),
+            title: 'Notes',
+            trailing: const Icon(Icons.chevron_right,
+                size: 20, color: AppColors.textMuted),
+            onTap: () => Navigator.of(context).push(
+              adaptiveRoute(
+                builder: (_) => NotesScreen(client: widget.client),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          AppListTile(
+            leading: Icon(Icons.people_outline, color: AppColors.fluentCyan),
+            title: 'Watchlist',
+            trailing: const Icon(Icons.chevron_right,
+                size: 20, color: AppColors.textMuted),
+            onTap: () => _openUserContent(p.username, UserContentType.watchlist),
           ),
         ],
       ),

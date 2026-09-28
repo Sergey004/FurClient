@@ -278,14 +278,6 @@ String encodeQueue(List<Map<String, String>> records) => jsonEncode(records);
 
 
 // Топ-левел парсеры: замыкания без `this` (unsendable-ловушка изолятов).
-Future<List<fa.FANotePreview>> parseNotesInBackground(String html, String url) =>
-    Isolate.run(() {
-      final page = fa.FANotesPage.parse(html, Uri.parse(url));
-      return page.noteHeaders
-          .whereType<fa.FANoteHeader>()
-          .map(fa.FANotePreview.fromHeader)
-          .toList();
-    });
 
 Future<fa.FANotificationPreviews> parseOthersInBackground(String html) =>
     Isolate.run(() {

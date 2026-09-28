@@ -23,6 +23,7 @@ import 'theme/theme_provider.dart';
 import 'utils/cookie_manager.dart';
 import 'screens/login_screen.dart';
 import 'screens/journal_detail_screen.dart';
+import 'screens/note_detail_screen.dart';
 import 'screens/submission_detail_screen.dart';
 import 'screens/user_content_screen.dart';
 import 'screens/gallery_screen.dart';
@@ -384,7 +385,17 @@ class _FurClientAppState extends State<FurClientApp> {
         debugPrint('Favorites deep link - needs shell-level navigation');
         break;
       case FATargetType.note:
-        debugPrint('Deep link note - not implemented yet');
+        final navState = _navigatorKey.currentState;
+        if (navState != null) {
+          navState.push(
+            MaterialPageRoute(
+              builder: (_) => NoteDetailScreen(
+                client: _client,
+                url: target.url.toString(),
+              ),
+            ),
+          );
+        }
         break;
       case FATargetType.journals:
         _navToTabByUrl(target);
@@ -433,20 +444,24 @@ class _FurClientAppState extends State<FurClientApp> {
         debugPrint(
             '=== _initApp: Restoring session for user: ${session.username}');
         await _client.setSession(session);
-        final valid = await _client.verifySession();
-        debugPrint('=== _initApp: Session verification result: $valid');
-        if (valid) {
-          if (mounted) {
-            setState(() {
-              _isLoggedIn = true;
-              _isRestoringSession = false;
-            });
-          }
-          return;
-        } else {
-          debugPrint('=== _initApp: Session invalid, logging out');
-          await _authService.logout();
+        // Оптимистичный рестарт: шелл показываем сразу — сплэш не должен
+        // ждать сетевую проверку (WebView-фетч 2–5 с, при CF до 60 с).
+        if (mounted) {
+          setState(() {
+            _isLoggedIn = true;
+            _isRestoringSession = false;
+          });
         }
+        // Верификация в фоне: false = сессия реально мертва (CF-заслон
+        // возвращает true) — тихо разлогиниваем.
+        unawaited(_client.verifySession().then((valid) async {
+          debugPrint('=== _initApp: background verification: $valid');
+          if (!valid) {
+            await _authService.logout();
+            if (mounted) setState(() => _isLoggedIn = false);
+          }
+        }));
+        return;
       } else {
         debugPrint('=== _initApp: No valid session to restore');
       }

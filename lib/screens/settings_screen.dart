@@ -37,6 +37,13 @@ class _SettingsScreenState extends State<SettingsScreen>
     with AutomaticKeepAliveClientMixin {
   bool _sfwMode = false;
   bool _hapticsEnabled = true;
+  // Категории фоновых уведомлений (poller читает те же ключи).
+  bool _notifySubmissions = true;
+  bool _notifyNotes = true;
+  bool _notifySubmissionComments = true;
+  bool _notifyJournalComments = true;
+  bool _notifyShouts = true;
+  bool _notifyJournals = true;
   bool _autoDownloadOnFave = false;
   bool _autoCloseOnFave = true;
   String _imageQuality = 'high';
@@ -79,6 +86,14 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (mounted) {
       setState(() {
         _hapticsEnabled = prefs.getBool('haptics_enabled') ?? true;
+        _notifySubmissions = prefs.getBool('notify_submissions') ?? true;
+        _notifyNotes = prefs.getBool('notify_notes') ?? true;
+        _notifySubmissionComments =
+            prefs.getBool('notify_submission_comments') ?? true;
+        _notifyJournalComments =
+            prefs.getBool('notify_journal_comments') ?? true;
+        _notifyShouts = prefs.getBool('notify_shouts') ?? true;
+        _notifyJournals = prefs.getBool('notify_journals') ?? true;
         _autoDownloadOnFave = prefs.getBool('auto_download_on_fave') ?? false;
         _autoCloseOnFave = prefs.getBool('auto_close_on_fave') ?? true;
         _imageQuality = prefs.getString('image_quality') ?? 'high';
@@ -92,6 +107,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _onHapticsToggle(bool value) async {
     setState(() => _hapticsEnabled = value);
     await FHaptics.setEnabled(value);
+  }
+
+  /// Тумблер категории фоновых уведомлений — poller читает ключ
+  /// на каждом цикле, перезапуск не нужен.
+  Future<void> _saveNotify(String key, bool value) async {
+    setState(() {});
+    await _saveSetting(key, value);
   }
 
   Future<void> _saveSetting(String key, dynamic value) async {
@@ -265,6 +287,63 @@ class _SettingsScreenState extends State<SettingsScreen>
               onChanged: _onHapticsToggle,
               title: 'Haptic feedback',
               subtitle: 'Vibration on tabs, pulls and favorites',
+            ),
+          ]),
+          const SizedBox(height: 24),
+          _sectionHeader('Notifications'),
+          _card([
+            _adaptiveSwitchTile(
+              icon: Icons.photo_library_outlined,
+              iconColor: primary,
+              value: _notifySubmissions,
+              onChanged: (v) => _saveNotify('notify_submissions', v),
+              title: 'New submissions',
+              subtitle: 'From artists you watch',
+            ),
+            Divider(height: 1, indent: 16, color: outline),
+            _adaptiveSwitchTile(
+              icon: Icons.mail_outline,
+              iconColor: secondary,
+              value: _notifyNotes,
+              onChanged: (v) => _saveNotify('notify_notes', v),
+              title: 'Notes',
+              subtitle: 'Private messages',
+            ),
+            Divider(height: 1, indent: 16, color: outline),
+            _adaptiveSwitchTile(
+              icon: Icons.comment_outlined,
+              iconColor: tertiary,
+              value: _notifySubmissionComments,
+              onChanged: (v) => _saveNotify('notify_submission_comments', v),
+              title: 'Submission comments',
+              subtitle: 'Comments on your submissions',
+            ),
+            Divider(height: 1, indent: 16, color: outline),
+            _adaptiveSwitchTile(
+              icon: Icons.article_outlined,
+              iconColor: primary,
+              value: _notifyJournalComments,
+              onChanged: (v) => _saveNotify('notify_journal_comments', v),
+              title: 'Journal comments',
+              subtitle: 'Comments on your journals',
+            ),
+            Divider(height: 1, indent: 16, color: outline),
+            _adaptiveSwitchTile(
+              icon: Icons.campaign_outlined,
+              iconColor: secondary,
+              value: _notifyShouts,
+              onChanged: (v) => _saveNotify('notify_shouts', v),
+              title: 'Shouts',
+              subtitle: 'Messages on your page',
+            ),
+            Divider(height: 1, indent: 16, color: outline),
+            _adaptiveSwitchTile(
+              icon: Icons.rss_feed_outlined,
+              iconColor: tertiary,
+              value: _notifyJournals,
+              onChanged: (v) => _saveNotify('notify_journals', v),
+              title: 'Journals',
+              subtitle: 'From watched users',
             ),
           ]),
           const SizedBox(height: 24),
