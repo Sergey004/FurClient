@@ -106,7 +106,13 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
       final result = await feedFuture;
       if (mounted) {
         setState(() {
-          _submissions = result.submissions;
+          // fav-волны могли прийти РАНЬШЕ ленты — применяем накопленные
+          // _favIds, иначе сердечки терялись из-за гонки.
+          _submissions = result.submissions
+              .map((s) => _favIds.contains(s.id) && !s.isFavorite
+                  ? s.copyWith(isFavorite: true)
+                  : s)
+              .toList();
           _isInitialLoading = false;
         });
       }

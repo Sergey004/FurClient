@@ -44,6 +44,7 @@ class _SearchScreenState extends State<SearchScreen>
   final SearchHistory _searchHistory = SearchHistory();
 
   List<Submission> _results = [];
+  Set<String> _favIds = {};
   int _currentPage = 1;
   bool _isLoading = false;
   bool _isLoadingMore = false;
@@ -71,6 +72,11 @@ class _SearchScreenState extends State<SearchScreen>
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    widget.client.loadFavoriteIds(onPartial: (ids) {
+      if (!mounted) return;
+      _favIds = ids;
+      if (_results.isNotEmpty) _applyFavs();
+    });
     _scrollToTopCancel = ScrollToTopBus.subscribe(widget.tabIndex, () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(0,
@@ -118,6 +124,17 @@ class _SearchScreenState extends State<SearchScreen>
     super.dispose();
   }
 
+  void _applyFavs() {
+    setState(() {
+      _results = _results
+          .map((s) =>
+              s.isFavorite || !_favIds.contains(s.id)
+                  ? s
+                  : s.copyWith(isFavorite: true))
+          .toList();
+    });
+  }
+
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
@@ -157,7 +174,11 @@ class _SearchScreenState extends State<SearchScreen>
       );
       if (mounted) {
         setState(() {
-          _results = results;
+          _results = results
+              .map((s) => _favIds.contains(s.id) && !s.isFavorite
+                  ? s.copyWith(isFavorite: true)
+                  : s)
+              .toList();
           _isLoading = false;
           _hasMore = results.isNotEmpty;
         });
@@ -192,7 +213,10 @@ class _SearchScreenState extends State<SearchScreen>
       );
       if (mounted) {
         setState(() {
-          _results.addAll(results);
+          _results.addAll(results
+              .map((s) => _favIds.contains(s.id) && !s.isFavorite
+                  ? s.copyWith(isFavorite: true)
+                  : s));
           _isLoadingMore = false;
           _hasMore = results.isNotEmpty;
         });

@@ -1,21 +1,36 @@
 import 'package:flutter/material.dart';
 import '../services/fa_client.dart';
 import '../utils/haptics.dart';
-import '../widgets/adaptive/adaptive.dart';
 
-/// Композ нового нотеса: to + subject + message → sendNote
-/// (ключ формы клиент добирает сам со страницы /newpm/<to>).
-class NewNoteScreen extends StatefulWidget {
+/// Композ нового нотеса — модальный bottom sheet в стиле панели
+/// параметров поиска: to + subject + message → sendNote (ключ формы
+/// клиент добирает сам со страницы /newpm/<to>).
+class NewNoteSheet extends StatefulWidget {
   final FAClient client;
   final String? initialTo;
 
-  const NewNoteScreen({super.key, required this.client, this.initialTo});
+  const NewNoteSheet({super.key, required this.client, this.initialTo});
+
+  /// Открыть композ шитом (клавиатура учитывается через viewInsets).
+  static Future<void> show(BuildContext context, FAClient client,
+      {String? initialTo}) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => NewNoteSheet(client: client, initialTo: initialTo),
+    );
+  }
 
   @override
-  State<NewNoteScreen> createState() => _NewNoteScreenState();
+  State<NewNoteSheet> createState() => _NewNoteSheetState();
 }
 
-class _NewNoteScreenState extends State<NewNoteScreen> {
+class _NewNoteSheetState extends State<NewNoteSheet> {
   late final TextEditingController _toCtrl =
       TextEditingController(text: widget.initialTo ?? '');
   final TextEditingController _subjectCtrl = TextEditingController();
@@ -49,10 +64,8 @@ class _NewNoteScreenState extends State<NewNoteScreen> {
           to: to, subject: subject, message: message);
       FHaptics.success();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Note sent to $to'),
-            duration: const Duration(seconds: 2)));
-        Navigator.of(context).pop();
+        FHaptics.success();
+        Navigator.pop(context);
       }
     } catch (e) {
       debugPrint('=== NewNote send error: $e');
@@ -65,13 +78,26 @@ class _NewNoteScreenState extends State<NewNoteScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return AdaptiveScaffold(
-      appBar: AppBar(title: const Text('New note')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
+      child: SingleChildScrollView(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text('New note',
+                      style: Theme.of(context).textTheme.titleLarge),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
             TextField(
               controller: _toCtrl,
               style: TextStyle(color: colors.onSurface, fontSize: 14),

@@ -37,6 +37,7 @@ class _GalleryScreenState extends State<GalleryScreen>
   late final VoidCallback _scrollToTopCancel;
 
   List<Submission> _submissions = [];
+  Set<String> _favIds = {};
   int _currentPage = 1;
   bool _isLoading = false;
   bool _isLoadingMore = false;
@@ -67,7 +68,24 @@ class _GalleryScreenState extends State<GalleryScreen>
             curve: Curves.easeOutCubic);
       }
     });
+    // Сердечки: кэшированный fav-фетч + прогрессивная покраска карточек.
+    widget.client.loadFavoriteIds(onPartial: (ids) {
+      if (!mounted) return;
+      _favIds = ids;
+      _applyFavs();
+    });
     _loadSubmissions();
+  }
+
+  void _applyFavs() {
+    setState(() {
+      _submissions = _submissions
+          .map((s) =>
+              s.isFavorite || !_favIds.contains(s.id)
+                  ? s
+                  : s.copyWith(isFavorite: true))
+          .toList();
+    });
   }
 
   @override
@@ -98,7 +116,11 @@ class _GalleryScreenState extends State<GalleryScreen>
       final results = await widget.client.getSubmissions(1, _selectedCategory);
       if (mounted) {
         setState(() {
-          _submissions = results;
+          _submissions = results
+              .map((s) => _favIds.contains(s.id) && !s.isFavorite
+                  ? s.copyWith(isFavorite: true)
+                  : s)
+              .toList();
           _isLoading = false;
           _hasMore = results.isNotEmpty;
         });

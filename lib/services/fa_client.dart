@@ -1472,8 +1472,44 @@ class FAClient {
   /// сердечки должны краситься и для работ глубже первой страницы.
   /// Останавливается раньше, если страница пустая, повторяет уже виденные
   /// работы (FA заворачивает страницы по кругу) или [untilSid] уже покрыт.
+  Set<String>? _favIdsCache;
+  DateTime? _favIdsAt;
+  Future<Set<String>>? _favIdsInFlight;
+
   Future<Set<String>> loadFavoriteIds(
-      {int maxPages = 5, void Function(Set<String> ids)? onPartial}) async {
+      {int maxPages = 5,
+      void Function(Set<String> ids)? onPartial,
+      bool force = false}) async {
+    // Кэш на 10 минут: несколько экранов (Watch/Gallery/Search/UserContent)
+    // не должны каждый дергать 5 страниц favorites.
+    if (!force &&
+        _favIdsCache != null &&
+        _favIdsAt != null &&
+        DateTime.now().difference(_favIdsAt!) < const Duration(minutes: 10)) {
+      onPartial?.call(_favIdsCache!);
+      return _favIdsCache!;
+    }
+    // Конкурентные вызовы (Watch+Gallery поднимаются вместе) ждут ОДИН
+    // прогон, а не стартуют по три дублирующих волны.
+    final inFlight = _favIdsInFlight;
+    if (inFlight != null) {
+      final ids = await inFlight;
+      onPartial?.call(ids);
+      return ids;
+    }
+    final future = _loadFavoriteIdsInner(
+        maxPages: maxPages, onPartial: onPartial);
+    _favIdsInFlight = future;
+    try {
+      return await future;
+    } finally {
+      _favIdsInFlight = null;
+    }
+  }
+
+  Future<Set<String>> _loadFavoriteIdsInner(
+      {required int maxPages,
+      void Function(Set<String> ids)? onPartial}) async {
     final username = _session?.username ?? 'me';
     final ids = <String>{};
     try {
@@ -1499,6 +1535,8 @@ class FAClient {
         // Пустая страница или всё уже видели (FA заворачивает по кругу).
         if (pageResults.any((items) => items.isEmpty) || !anyNew) break;
       }
+      _favIdsCache = Set.of(ids);
+      _favIdsAt = DateTime.now();
       return ids;
     } catch (e) {
       debugPrint('=== loadFavoriteIds error: $e');

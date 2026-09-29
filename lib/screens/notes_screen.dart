@@ -78,11 +78,7 @@ class _NotesScreenState extends State<NotesScreen> {
     return AdaptiveScaffold(
       appBar: AppBar(title: const Text('Notes')),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.of(context).push(
-          adaptiveRoute(
-            builder: (_) => NewNoteScreen(client: widget.client),
-          ),
-        ),
+        onPressed: () => NewNoteSheet.show(context, widget.client),
         child: const Icon(Icons.edit_outlined),
       ),
       body: _isLoading

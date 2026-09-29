@@ -105,9 +105,21 @@ class _UserContentScreenState extends State<UserContentScreen> {
       switch (widget.contentType) {
         case UserContentType.gallery:
           _submissions = await widget.client.getGallery(widget.username);
+          // Прогружаем fav-состояния (кэш клиента — дёшево).
+          final favIds = await widget.client.loadFavoriteIds();
+          _submissions = _submissions
+              .map((s) => favIds.contains(s.id)
+                  ? s.copyWith(isFavorite: true)
+                  : s)
+              .toList();
           break;
         case UserContentType.favorites:
-          _submissions = await widget.client.getUserFavorites(widget.username);
+          // Избранное по определению зафавкано.
+          _submissions = await widget.client
+              .getUserFavorites(widget.username)
+              .then((list) => list
+                  .map((s) => s.copyWith(isFavorite: true))
+                  .toList());
           break;
         case UserContentType.journals:
           _journals = await widget.client.getUserJournals(widget.username);
