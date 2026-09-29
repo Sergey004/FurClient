@@ -7,6 +7,7 @@ import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
 import 'note_detail_screen.dart';
+import 'new_note_screen.dart';
 
 /// Инбокс нотесов (PM). Чтение — в NoteDetailScreen; композ для ответа
 /// живёт там же (replyKey из страницы нотеса).
@@ -76,6 +77,14 @@ class _NotesScreenState extends State<NotesScreen> {
     final colors = Theme.of(context).colorScheme;
     return AdaptiveScaffold(
       appBar: AppBar(title: const Text('Notes')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.of(context).push(
+          adaptiveRoute(
+            builder: (_) => NewNoteScreen(client: widget.client),
+          ),
+        ),
+        child: const Icon(Icons.edit_outlined),
+      ),
       body: _isLoading
           ? const LoadingIndicator(message: 'Loading notes...')
           : _error != null
