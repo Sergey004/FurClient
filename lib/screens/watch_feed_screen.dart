@@ -115,6 +115,12 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
               .toList();
           _isInitialLoading = false;
         });
+        // Покрытие favorites: не листать глубже самой старой работы ленты.
+        final oldest = result.submissions
+            .map((s) => int.tryParse(s.id) ?? 0)
+            .where((id) => id > 0)
+            .fold<int>(0, (a, b) => a == 0 || b < a ? b : a);
+        if (oldest > 0) widget.client.favIdsCoverageSid = oldest;
       }
       await favFuture; // ошибки внутри loadFavoriteIds уже проглочены
     } catch (e) {

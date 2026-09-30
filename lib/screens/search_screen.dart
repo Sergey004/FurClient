@@ -182,6 +182,12 @@ class _SearchScreenState extends State<SearchScreen>
           _isLoading = false;
           _hasMore = results.isNotEmpty;
         });
+        // Покрытие favorites: не листать глубже самой старой работы списка.
+        final oldest = results
+            .map((s) => int.tryParse(s.id) ?? 0)
+            .where((id) => id > 0)
+            .fold<int>(0, (a, b) => a == 0 || b < a ? b : a);
+        if (oldest > 0) widget.client.favIdsCoverageSid = oldest;
       }
     } catch (e) {
       if (mounted) {

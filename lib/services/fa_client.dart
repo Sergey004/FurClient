@@ -1476,6 +1476,12 @@ class FAClient {
   DateTime? _favIdsAt;
   Future<Set<String>>? _favIdsInFlight;
 
+  /// Самый старый sid видимого списка. FA сортует favorites по дате
+  /// САБМИШЕНА, поэтому пагинация останавливается, как только волна
+  /// favorites опустилась ниже этого sid — всё старше всё равно не встретится
+  /// в текущем списке. Экран выставляет поле, когда его список пришёл.
+  int? favIdsCoverageSid;
+
   Future<Set<String>> loadFavoriteIds(
       {int maxPages = 5,
       void Function(Set<String> ids)? onPartial,
@@ -1512,10 +1518,12 @@ class FAClient {
       void Function(Set<String> ids)? onPartial}) async {
     final username = _session?.username ?? 'me';
     final ids = <String>{};
+    // Бэкап-потолок: даже без coverage-sid не уходим глубже 20 страниц.
+    final hardCap = maxPages > 20 ? maxPages : 20;
     try {
       // Страницы — ПАРАЛЛЕЛЬНО волнами по две (гейт как в эталоне:
       // больше двух одновременных page-фетчей FA не жалует).
-      for (var start = 1; start <= maxPages; start += 2) {
+      for (var start = 1; start <= hardCap; start += 2) {
         final pageCount = (maxPages - start + 1).clamp(0, 2);
         final pageNumbers = List.generate(pageCount, (i) => start + i);
         final pageResults = await Future.wait(pageNumbers.map((page) async {
@@ -1534,6 +1542,17 @@ class FAClient {
         onPartial?.call(Set.of(ids));
         // Пустая страница или всё уже видели (FA заворачивает по кругу).
         if (pageResults.any((items) => items.isEmpty) || !anyNew) break;
+        // Покрытие: волна опустилась ниже самого старого sid текущего
+        // списка — дальше совпадений не будет.
+        final coverage = favIdsCoverageSid;
+        if (coverage != null && coverage > 0) {
+          final oldestInWave = pageResults
+              .expand((items) => items)
+              .map((s) => int.tryParse(s.id) ?? 0)
+              .where((id) => id > 0)
+              .fold<int>(1 << 62, (a, b) => a < b ? a : b);
+          if (oldestInWave <= coverage) break;
+        }
       }
       _favIdsCache = Set.of(ids);
       _favIdsAt = DateTime.now();

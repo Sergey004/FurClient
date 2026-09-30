@@ -62,7 +62,6 @@ class _NewNoteSheetState extends State<NewNoteSheet> {
     try {
       await widget.client.sendNote(
           to: to, subject: subject, message: message);
-      FHaptics.success();
       if (mounted) {
         FHaptics.success();
         Navigator.pop(context);
@@ -79,7 +78,9 @@ class _NewNoteSheetState extends State<NewNoteSheet> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
       padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
       child: SingleChildScrollView(
         child: Column(
