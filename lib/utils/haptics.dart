@@ -1,12 +1,13 @@
 import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
-import 'package:gaimon/gaimon.dart';
+import 'package:haptic_feedback/haptic_feedback.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Обёртка над Gaimon: на Android/iOS — нативные HD-примитивы
-/// (predefined effects), на Windows — тихий no-op (канала нет, а
-/// channel-методы Gaimon кидают MissingPluginException).
+/// Обёртка над haptic_feedback.
+///
+/// На Android/iOS используются нативные haptic-примитивы.
+/// На остальных платформах — no-op.
 ///
 /// Учитывает пользовательскую настройку [enabled] (ключ
 /// `haptics_enabled`, default ON): некоторым людям вибро не нравится
@@ -27,6 +28,7 @@ class FHaptics {
 
   static Future<void> setEnabled(bool value) async {
     enabled = value;
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefKey, value);
   }
@@ -34,29 +36,32 @@ class FHaptics {
   /// Тап по вкладке — лёгкий клик.
   static void selection() {
     if (!enabled) return;
-    Gaimon.selection();
+    _mobile(() => Haptics.vibrate(HapticsType.selection));
   }
 
   /// Срабатывание pull-to-refresh — едва заметный тик.
   static void light() {
     if (!enabled) return;
-    Gaimon.light();
+    _mobile(() => Haptics.vibrate(HapticsType.light));
   }
 
   /// Успешное действие (fave подтверждён сервером) — заметный «щелчок».
   static void success() {
     if (!enabled) return;
-    _mobile(() => Gaimon.success());
+    _mobile(() => Haptics.vibrate(HapticsType.success));
   }
 
   /// Тяжёлый отклик (зарезервировано: удаление и пр.).
   static void heavy() {
     if (!enabled) return;
-    _mobile(() => Gaimon.heavy());
+    _mobile(() => Haptics.vibrate(HapticsType.heavy));
   }
 
-  static void _mobile(VoidCallback fn) {
+  static void _mobile(Future<void> Function() fn) {
     if (kIsWeb) return;
-    if (io.Platform.isAndroid || io.Platform.isIOS) fn();
+
+    if (io.Platform.isAndroid || io.Platform.isIOS) {
+      fn();
+    }
   }
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../theme/app_theme.dart';
 
 /// Material 3 styled list tile inspired by Google Messages.

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io' as io;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:fa_kit/fa_kit.dart';
 import 'webview_image_fetcher.dart';
 import 'fa_image_cache.dart';

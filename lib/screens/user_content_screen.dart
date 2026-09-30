@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:window_manager/window_manager.dart';
 import '../theme/app_theme.dart';

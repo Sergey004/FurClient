@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:fa_kit/fa_kit.dart' as fa;
 import '../services/fa_client.dart';
 import '../utils/fa_image_loader.dart';

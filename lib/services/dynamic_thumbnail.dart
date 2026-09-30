@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Умная система для выбора оптимального размера thumbnail'а
 /// Аналогично iOS DynamicThumbnail из FAKit

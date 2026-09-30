@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform, HttpClient;
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:system_theme/system_theme.dart';
@@ -535,19 +535,23 @@ class _FurClientAppState extends State<FurClientApp> {
 
         fluent.FluentThemeData theme;
         fluent.FluentThemeData? darkTheme;
+        fluent.ThemeMode fluentThemeMode;
 
         switch (mode) {
           case AppThemeMode.system:
             theme = AppTheme.fluentLightTheme(accent: accent);
             darkTheme = AppTheme.fluentFromSystemAccent(accent);
+            fluentThemeMode = fluent.ThemeMode.system;
             break;
           case AppThemeMode.light:
             theme = AppTheme.fluentLightTheme(accent: accent);
             darkTheme = null;
+            fluentThemeMode = fluent.ThemeMode.light;
             break;
           case AppThemeMode.dark:
             theme = AppTheme.fluentDarkTheme;
             darkTheme = AppTheme.fluentFromSystemAccent(accent);
+            fluentThemeMode = fluent.ThemeMode.dark;
             break;
         }
 
@@ -555,7 +559,7 @@ class _FurClientAppState extends State<FurClientApp> {
           title: 'FurClient',
           debugShowCheckedModeBanner: false,
           navigatorKey: _navigatorKey,
-          themeMode: _themeProvider.themeMode,
+          themeMode: fluentThemeMode,
           theme: theme,
           darkTheme: darkTheme,
           home: FluentRootChrome(

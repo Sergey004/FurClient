@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io' as io;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:extended_image/extended_image.dart';
 import '../utils/webview_image_fetcher.dart';

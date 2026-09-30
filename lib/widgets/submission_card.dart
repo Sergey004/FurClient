@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../utils/haptics.dart';
 import 'package:fa_kit/fa_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
