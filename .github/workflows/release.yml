@@ -6,7 +6,7 @@ on:
       - "v*"
 
 env:
-  FLUTTER_VERSION: "3.44.1"
+  FLUTTER_VERSION: "3.47.0"
   JAVA_VERSION: "17"
   DOTNET_VERSION: "8.0.x"
 
