@@ -219,12 +219,20 @@ class _SearchScreenState extends State<SearchScreen>
       );
       if (mounted) {
         setState(() {
-          _results.addAll(results
-              .map((s) => _favIds.contains(s.id) && !s.isFavorite
-                  ? s.copyWith(isFavorite: true)
-                  : s));
+          final existing = _results.map((s) => s.id).toSet();
+          final fresh = results.where((s) => !existing.contains(s.id)).toList();
+          if (fresh.isEmpty) {
+            // Страница из одних дублей — дальше смысла нет.
+            _currentPage -= 1;
+            _hasMore = false;
+          } else {
+            _results.addAll(fresh.map((s) =>
+                _favIds.contains(s.id) && !s.isFavorite
+                    ? s.copyWith(isFavorite: true)
+                    : s));
+            _hasMore = results.isNotEmpty;
+          }
           _isLoadingMore = false;
-          _hasMore = results.isNotEmpty;
         });
       }
     } catch (_) {
@@ -759,6 +767,7 @@ class _SearchScreenState extends State<SearchScreen>
             }
             final sub = _results[index];
             return SubmissionCard(
+              key: ValueKey(sub.id),
               submission: sub,
               client: widget.client,
               sfwMode: widget.sfwMode,

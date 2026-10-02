@@ -97,6 +97,9 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
     try {
       // Лента показывается СРАЗУ; fav-фетч живёт в отдельном async-потоке и
       // докрашивает сердечки по мере поступления страниц избранного.
+      // Задержка 2.5с: не конкурировать с первым рендером ленты за
+      // создание WebView (бурст из 4 штук = пропущенные кадры клавиатуры).
+      await Future.delayed(const Duration(milliseconds: 2500));
       final feedFuture = widget.client.getWatchSubmissions();
       final favFuture = widget.client.loadFavoriteIds(onPartial: (ids) {
         if (!mounted) return;
@@ -289,6 +292,7 @@ class _WatchFeedScreenState extends State<WatchFeedScreen>
               }
               final sub = _submissions[index];
               return SubmissionCard(
+                key: ValueKey(sub.id),
                 submission: sub,
                 client: widget.client,
                 sfwMode: widget.sfwMode,

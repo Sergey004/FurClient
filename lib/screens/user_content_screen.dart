@@ -361,6 +361,7 @@ class _UserContentScreenState extends State<UserContentScreen> {
               );
             }
             return SubmissionCard(
+              key: ValueKey(_submissions[index].id),
               submission: _submissions[index],
               client: widget.client,
               sfwMode: false,

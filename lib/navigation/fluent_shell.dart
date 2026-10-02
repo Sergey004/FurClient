@@ -99,7 +99,10 @@ class _FluentShellState extends State<FluentShell> {
 
   @override
   Widget build(BuildContext context) {
-    return fluent.NavigationView(
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: fluent.NavigationView(
       pane: fluent.NavigationPane(
         selected: _currentIndex,
         onChanged: (index) {
@@ -222,6 +225,7 @@ class _FluentShellState extends State<FluentShell> {
             onTap: _confirmLogout,
           ),
         ],
+      ),
       ),
     );
   }

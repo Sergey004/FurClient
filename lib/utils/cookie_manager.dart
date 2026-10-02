@@ -24,20 +24,21 @@ class FAICookieManager {
   static final Map<String, CookieEntry> _cookies = {};
   static const List<String> _essentialCookies = ['a', 'b', 'cf_clearance'];
 
+  // Кэш инстанса: без него CookieManager создаётся на КАЖДЫЙ вызов
+  // (в логе старта — 25+ созданий), а это лишний churn на main-потоке.
+  static CookieManager? _cmWindows;
+  static CookieManager? _cmDefault;
+
   static CookieManager get instance {
     if (io.Platform.isWindows) {
       if (webViewEnvironment == null) {
         debugPrint(
             '=== FAICookieManager WARNING: webViewEnvironment is null on Windows!');
       }
-      final cm = CookieManager.instance(webViewEnvironment: webViewEnvironment);
-      debugPrint(
-          '=== FAICookieManager: Created CookieManager for Windows with webViewEnvironment: ${webViewEnvironment != null}');
-      return cm;
+      return _cmWindows ??= CookieManager.instance(
+          webViewEnvironment: webViewEnvironment);
     }
-    debugPrint(
-        '=== FAICookieManager: Created CookieManager for non-Windows platform');
-    return CookieManager.instance();
+    return _cmDefault ??= CookieManager.instance();
   }
 
   // ── CDNLoader compatibility methods ──────────────────────────────

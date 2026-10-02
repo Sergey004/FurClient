@@ -69,10 +69,14 @@ class _GalleryScreenState extends State<GalleryScreen>
       }
     });
     // Сердечки: кэшированный fav-фетч + прогрессивная покраска карточек.
-    widget.client.loadFavoriteIds(onPartial: (ids) {
+    // Небольшая задержка — не конкурировать с первым рендером.
+    Future.delayed(const Duration(milliseconds: 2500), () {
       if (!mounted) return;
-      _favIds = ids;
-      _applyFavs();
+      widget.client.loadFavoriteIds(onPartial: (ids) {
+        if (!mounted) return;
+        _favIds = ids;
+        _applyFavs();
+      });
     });
     _loadSubmissions();
   }
@@ -188,9 +192,20 @@ class _GalleryScreenState extends State<GalleryScreen>
           await widget.client.getSubmissions(_currentPage, _selectedCategory);
       if (mounted) {
         setState(() {
-          _submissions.addAll(results);
+          final existing = _submissions.map((s) => s.id).toSet();
+          final fresh = results.where((s) => !existing.contains(s.id)).toList();
+          if (fresh.isEmpty) {
+            // Страница из одних дублей — дальше смысла нет.
+            _currentPage -= 1;
+            _hasMore = false;
+          } else {
+            _submissions.addAll(fresh.map((s) =>
+                _favIds.contains(s.id) && !s.isFavorite
+                    ? s.copyWith(isFavorite: true)
+                    : s));
+            _hasMore = results.isNotEmpty;
+          }
           _isLoadingMore = false;
-          _hasMore = results.isNotEmpty;
         });
       }
     } catch (_) {
@@ -365,6 +380,7 @@ class _GalleryScreenState extends State<GalleryScreen>
               }
               final sub = _submissions[index];
               return SubmissionCard(
+                key: ValueKey(sub.id),
                 submission: sub,
                 client: widget.client,
                 sfwMode: widget.sfwMode,

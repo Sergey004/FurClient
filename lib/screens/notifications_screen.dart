@@ -191,11 +191,16 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       );
     }
 
-    FHaptics.light();
     return RefreshIndicator(
       color: AppColors.cupertinoPurple,
       backgroundColor: Theme.of(context).cardColor,
-      onRefresh: _loadNotifications,
+      // Хаптик — в обработчике подтяжки, а НЕ в build: экран перестраивается
+      // на каждое изменение insets (клавиатура), и вибро из build превращалось
+      // в «дребезг на открытие/закрытие клавиатуры».
+      onRefresh: () {
+        FHaptics.light();
+        return _loadNotifications();
+      },
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _notifications.length,

@@ -33,6 +33,11 @@ class MaterialShell extends StatefulWidget {
 
 class _MaterialShellState extends State<MaterialShell> {
   int _currentIndex = 0;
+
+  /// Ленивое построение вкладок: экран создаётся при ПЕРВОМ визите.
+  /// Иначе IndexedStack монтирует все 6 экранов сразу и на старте летит
+  /// веер фетчей (gallery+watch+favs+notifications+profile одновременно).
+  final Set<int> _visited = {0};
   // SFW включён по умолчанию, пока не отработает resolveStartupSfwMode.
   bool _sfwMode = true;
 
@@ -78,13 +83,21 @@ class _MaterialShellState extends State<MaterialShell> {
 
   void _onExternalSearch() {
     if (SearchHistory.externalQuery.value != null && mounted) {
+      _visited.add(2);
       setState(() => _currentIndex = 2);
     }
   }
 
+  /// Нерождённые вкладки — пустышки: их initState (и фетчи) не бегут.
+  List<Widget> _lazyChildren(List<Widget> screens) => List.generate(
+        screens.length,
+        (i) => _visited.contains(i) ? screens[i] : const SizedBox.shrink(),
+      );
+
   /// Тап по вкладке: переключение; повторный тап по АКТИВНОЙ вкладке —
   /// скролл текущего списка наверх (стандартное поведение Material).
   void _onNavTap(int index) {
+    _visited.add(index);
     FHaptics.selection();
     if (index == _currentIndex) {
       ScrollToTopBus.fire(index);
@@ -216,7 +229,10 @@ class _MaterialShellState extends State<MaterialShell> {
           Expanded(
             child: Container(
               color: colorScheme.surface,
-              child: screens[_currentIndex],
+              child: IndexedStack(
+                index: _currentIndex,
+                children: _lazyChildren(screens),
+              ),
             ),
           ),
         ],
@@ -229,12 +245,18 @@ class _MaterialShellState extends State<MaterialShell> {
 
     return Scaffold(
       extendBody: true,
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        child: IndexedStack(
-          index: _currentIndex,
-          children: screens,
+      body: GestureDetector(
+        // Тап по пустому месту закрывает клавиатуру; кнопки/поля
+        // перехватывают тап раньше (translucent hit-test).
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: SafeArea(
+          top: true,
+          bottom: false,
+          child: IndexedStack(
+            index: _currentIndex,
+            children: _lazyChildren(screens),
+          ),
         ),
       ),
       bottomNavigationBar: SafeArea(
