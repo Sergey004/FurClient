@@ -235,8 +235,36 @@ class FAClient {
   Future<String> getHtml(String url, {bool waitForAjax = false}) =>
       _getHtml(url, waitForAjax: waitForAjax);
 
+  Completer<void>? _clearanceGate;
+
+  /// Гейт «clearance прогрет» (эталон: FAWebSession.awaitReady): первый
+  /// прогрев homepage в hidden-WebView обновляет доверие Cloudflare —
+  /// ТОТ ЖЕ cf_clearance давал 403 до загрузки и 200 сразу после (10/10
+  /// замеров). Все FA-фетчи после холодного старта ждут гейт (до 20 с),
+  /// дальше идут как есть — не блокируем навсегда.
+  Future<void> _awaitClearanceGate() async {
+    final existing = _clearanceGate;
+    if (existing != null) return existing.future;
+    final gate = Completer<void>();
+    _clearanceGate = gate;
+    unawaited(() async {
+      try {
+        await _ensureFeedWebView(); // первый прогрев home в feed-WebView
+      } catch (e) {
+        debugPrint('=== Clearance gate: warm-up failed, proceeding: $e');
+      }
+      if (!gate.isCompleted) gate.complete();
+    }());
+    return gate.future;
+  }
+
+
   Future<String> _getHtml(String url, {bool waitForAjax = false}) async {
     await _ensureInitialized();
+    // После холодного старта первый прогрев home (feed-WebView) обновляет
+    // доверие Cloudflare — premature-фетчи с тем же cf_clearance давали
+    // 403 (замер эталона: 10/10). Ждём гейт, не блокируя навсегда.
+    await _awaitClearanceGate();
 
     // Use enhanced client for CDN URLs.
     if (url.contains('t.furaffinity.net') ||
@@ -373,19 +401,47 @@ class FAClient {
   /// Build a raw `Cookie:` header value from the session cookies.
   /// Used to inject auth cookies into URLRequest headers when
   /// CookieManager.setCookie() fails to persist them (e.g. the 'a' cookie).
+  /// Последний валидный cf_clearance. Локальная потеря куки (очистка,
+  /// пересоздание менеджера) НЕ инвалидирует её на edge — пока последний
+  /// валидный жив, отдаём его, а не clearance-less header (эталон:
+  /// FAWebSession.refreshedCookieHeader).
+  static String? _lastGoodClearance;
+  static String? _lastSeenClearancePrefix;
+
   String? _buildCookieHeader() {
     if (_session?.cookies == null) return null;
     try {
       final List<dynamic> raw = jsonDecode(_session!.cookies!);
       final parts = <String>[];
+      String? headerClearance;
       for (final item in raw) {
         if (item is Map<String, dynamic>) {
           final name = item['name']?.toString() ?? '';
           final value = item['value']?.toString() ?? '';
           if (name.isNotEmpty && value.isNotEmpty) {
             parts.add('$name=$value');
+            if (name == 'cf_clearance') headerClearance = value;
           }
         }
+      }
+      // CFDIAG: дрейф/ротация токена — сравниваем префиксы при смене.
+      final prefix = headerClearance == null
+          ? null
+          : headerClearance.length > 8
+              ? headerClearance.substring(0, 8)
+              : headerClearance;
+      if (prefix != _lastSeenClearancePrefix) {
+        debugPrint(
+            '=== CFDIAG: clearance drifted: $_lastSeenClearancePrefix -> $prefix');
+        _lastSeenClearancePrefix = prefix;
+      }
+      // Страж: header потерял cf_clearance, а раньше он был — держим
+      // последний валидный (локальная потеря ≠ инвалидация на edge).
+      if (headerClearance == null && _lastGoodClearance != null) {
+        parts.add('cf_clearance=$_lastGoodClearance');
+        debugPrint('=== CFDIAG: header lost clearance, restored last-good');
+      } else if (headerClearance != null) {
+        _lastGoodClearance = headerClearance;
       }
       return parts.isEmpty ? null : parts.join('; ');
     } catch (e) {

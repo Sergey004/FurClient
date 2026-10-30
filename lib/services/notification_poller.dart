@@ -43,6 +43,15 @@ class NotificationPoller {
 
   static const _cfToastNotificationId = 999999;
 
+  /// Возврат в приложение с живой сессией закрывает CF-аутадж (эталон
+  /// 335af254): метка сбрасывается — следующий реальный заслон снова
+  /// уведомит, а устаревший тост снимается из шторки.
+  static Future<void> endCfOutage() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_cf_toast_at', 0);
+    await notificationsPlugin.cancel(id: _cfToastNotificationId);
+  }
+
   Future<void> pollAndNotify() async {
     final prefs = await SharedPreferences.getInstance();
     if (client.session?.isLoggedIn != true) {

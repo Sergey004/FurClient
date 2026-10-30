@@ -452,6 +452,8 @@ class _FurClientAppState extends State<FurClientApp> {
             _isRestoringSession = false;
           });
         }
+        // Возврат в приложение закрывает CF-аутадж (эталон 335af254).
+        unawaited(NotificationPoller.endCfOutage());
         // Верификация в фоне: false = сессия реально мертва (CF-заслон
         // возвращает true) — тихо разлогиниваем.
         unawaited(_client.verifySession().then((valid) async {
