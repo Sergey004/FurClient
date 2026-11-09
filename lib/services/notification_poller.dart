@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
+import '../models/submission_preview.dart';
 import '../utils/notifications.dart';
 import 'fa_client.dart';
 import 'fa_urls.dart';
@@ -50,6 +51,18 @@ class NotificationPoller {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('last_cf_toast_at', 0);
     await notificationsPlugin.cancel(id: _cfToastNotificationId);
+  }
+
+  /// Payload уведомления: конверт {url, preview}. Если конверт не
+  /// закодировался — отдаём просто URL (тап всё равно сработает).
+  String _buildPayload(Map<String, String> record) {
+    final preview = record['preview'];
+    if (preview == null || preview.isEmpty) return record['url']!;
+    try {
+      return jsonEncode({'url': record['url'], 'preview': preview});
+    } catch (_) {
+      return record['url']!;
+    }
   }
 
   Future<void> pollAndNotify() async {
@@ -98,7 +111,8 @@ class NotificationPoller {
                     'submission',
                     s.displayName.isNotEmpty ? s.displayName : s.author,
                     s.title,
-                    'https://www.furaffinity.net/view/${s.id}/'));
+                    'https://www.furaffinity.net/view/${s.id}/',
+                    preview: SubmissionPreview.fromSubmission(s).encode()));
               }
             }
             break;
@@ -144,7 +158,7 @@ class NotificationPoller {
           title: r['title']!,
           body: r['body']!,
           notificationId: r['dedupKey']!.hashCode & 0x7fffffff,
-          payload: r['url'],
+          payload: _buildPayload(r),
         );
       }
 
@@ -184,13 +198,17 @@ class NotificationPoller {
   }
 
   Map<String, String> _record(
-      String dedupKey, String type, String title, String body, String url) {
+      String dedupKey, String type, String title, String body, String url,
+      {String? preview}) {
     return {
       'dedupKey': dedupKey,
       'type': type,
       'title': title,
       'body': body,
       'url': url,
+      // Превью — JSON-строкой: сбой кодирования стоит только превью,
+      // запись уведомления сохраняется (эталон, 28 окт).
+      if (preview != null) 'preview': preview,
     };
   }
 

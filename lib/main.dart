@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform, HttpClient;
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
@@ -25,6 +26,7 @@ import 'screens/login_screen.dart';
 import 'screens/journal_detail_screen.dart';
 import 'screens/note_detail_screen.dart';
 import 'screens/submission_detail_screen.dart';
+import 'models/submission_preview.dart';
 import 'screens/user_content_screen.dart';
 import 'screens/gallery_screen.dart';
 import 'navigation/adaptive_shell.dart';
@@ -205,10 +207,15 @@ class _FurClientAppState extends State<FurClientApp> {
     // Windows: CF-челленджи, которые headless WebView2 пройти не может,
     // показываем пользователю в видимом диалоге (см. _CfChallengeDialog).
     _client.cfChallengeResolver = _resolveCloudflareChallenge;
-    // Тап по уведомлению → deep-link роутер (FATarget).
-    onNotificationTap = (url) {
+    // Тап по уведомлению → deep-link роутер (FATarget). Payload может быть
+    // конвертом {url, preview} (превью едет вместе с уведомлением, чтобы
+    // показывать карточку сразу, не дожидаясь сети) — при битом JSON
+    // разбираем как обычный URL.
+    onNotificationTap = (payload) {
+      final url = _urlFromNotificationPayload(payload);
+      final preview = _previewFromNotificationPayload(payload);
       final target = FATarget.parseString(url);
-      if (target != null) _navigateToTarget(target);
+      if (target != null) _navigateToTarget(target, preview: preview);
     };
     // Foreground-опрос уведомлений: раз после старта + таймер на Windows
     // (на Android в фоне работает workmanager; dedup по watermark'ам
@@ -300,7 +307,29 @@ class _FurClientAppState extends State<FurClientApp> {
     _navigateToTarget(target);
   }
 
-  void _navigateToTarget(FATarget target) {
+  /// URL из payload уведомления: конверт {url, preview} либо голый URL.
+  String _urlFromNotificationPayload(String payload) {
+    try {
+      final map = jsonDecode(payload);
+      if (map is Map && map['url'] is String) return map['url'] as String;
+    } catch (_) {
+      // Не конверт — считаем голым URL.
+    }
+    return payload;
+  }
+
+  /// Превью сабмишена из payload (null, если нет/битый).
+  SubmissionPreview? _previewFromNotificationPayload(String payload) {
+    try {
+      final map = jsonDecode(payload);
+      if (map is Map && map['preview'] is String) {
+        return SubmissionPreview.decode(map['preview'] as String);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  void _navigateToTarget(FATarget target, {SubmissionPreview? preview}) {
     final targetType = target.type;
 
     if (!mounted) return;
@@ -312,30 +341,47 @@ class _FurClientAppState extends State<FurClientApp> {
           final session = _authService.currentSession;
           if (session != null && session.isLoggedIn) {
             _client.setSession(session);
-            _client.verifySession().then((valid) {
-              if (valid && mounted) {
-                setState(() {
-                  _isLoggedIn = true;
-                });
-                // Try to get current context from navigator key if needed
-                final navState = _navigatorKey.currentState;
-                if (navState != null) {
-                  navState.push(
-                    MaterialPageRoute(
-                      builder: (_) => SubmissionDetailScreen(
-                        client: _client,
-                        submissionId: submissionId.toString(),
-                        sfwMode: false,
-                      ),
-                    ),
-                  );
-                } else {
-                  // Navigator not ready yet, will need fallback handling
-                  debugPrint(
-                      'Navigator not ready for submission deep link: $submissionId');
-                }
+            void pushScreen() {
+              final navState = _navigatorKey.currentState;
+              if (navState == null) {
+                debugPrint(
+                    'Navigator not ready for submission deep link: $submissionId');
+                return;
               }
-            });
+              navState.push(
+                MaterialPageRoute(
+                  builder: (_) => SubmissionDetailScreen(
+                    client: _client,
+                    submissionId: submissionId.toString(),
+                    sfwMode: false,
+                    preview: preview,
+                  ),
+                ),
+              );
+            }
+
+            if (preview != null) {
+              // С превью экран открывается СРАЗУ: карточка уже есть,
+              // ждать сетевую проверку сессии незачем (эталон, 28 окт).
+              setState(() {
+                _isLoggedIn = true;
+              });
+              pushScreen();
+              _client.verifySession().then((valid) {
+                if (!valid && mounted) {
+                  debugPrint('=== Session invalid on notification tap');
+                }
+              });
+            } else {
+              _client.verifySession().then((valid) {
+                if (valid && mounted) {
+                  setState(() {
+                    _isLoggedIn = true;
+                  });
+                  pushScreen();
+                }
+              });
+            }
           }
         }
         break;

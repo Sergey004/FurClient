@@ -18,6 +18,7 @@ import '../services/download_service.dart';
 import '../services/search_history.dart';
 import '../widgets/flash_player_widget.dart';
 import '../widgets/fur_html_widget.dart';
+import '../models/submission_preview.dart';
 //import '../utils/notifications.dart';
 
 class SubmissionDetailScreen extends StatefulWidget {
@@ -29,12 +30,17 @@ class SubmissionDetailScreen extends StatefulWidget {
   /// обновляют сердечко карточки, не дожидаясь возврата с экрана.
   final ValueChanged<Submission>? onSubmissionUpdated;
 
+  /// Превью, приехавшее вместе с уведомлением (эталон, 28–29 окт):
+  /// карточка рисуется сразу, не дожидаясь загрузки страницы.
+  final SubmissionPreview? preview;
+
   const SubmissionDetailScreen({
     super.key,
     required this.client,
     required this.submissionId,
     this.sfwMode = false,
     this.onSubmissionUpdated,
+    this.preview,
   });
 
   @override
@@ -559,7 +565,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   }
 
   Widget _buildBody(bool isDesktop) {
-    if (_isLoading) return const Center(child: AdaptiveProgress());
+    if (_isLoading) {
+      final preview = widget.preview;
+      if (preview != null && preview.thumbnailUrl.isNotEmpty) {
+        return _buildPreviewPlaceholder(preview);
+      }
+      return const Center(child: AdaptiveProgress());
+    }
     if (_error != null) return _buildError();
     if (_submission == null) return _buildError();
     return _buildContent(isDesktop);
@@ -583,6 +595,50 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             ),
             const SizedBox(height: 16),
             AdaptiveButton(label: 'Retry', onPressed: _loadSubmission),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Превью-карточка на время загрузки страницы: превью работы, автор и
+  /// заголовок уже известны из уведомления.
+  Widget _buildPreviewPlaceholder(SubmissionPreview preview) {
+    final colors = Theme.of(context).colorScheme;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                preview.thumbnailUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox(
+                  height: 180,
+                  child: Center(child: AdaptiveProgress()),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              preview.title,
+              style: TextStyle(
+                  color: colors.onSurface,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'by ${preview.displayName.isNotEmpty ? preview.displayName : preview.author}',
+              style:
+                  TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            const Center(child: AdaptiveProgress()),
           ],
         ),
       ),

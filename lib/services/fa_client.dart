@@ -21,6 +21,17 @@ import '../main.dart' show webViewEnvironment;
 
 import 'package:fa_kit/fa_kit.dart' as fa;
 
+/// Транспортная ошибка (DNS/VPN/обрыв) — не Cloudflare. На плохой сети
+/// это отдельный случай: ретраим, не показываем «CF challenge».
+class NetworkException implements Exception {
+  final String reason;
+  NetworkException(this.reason);
+
+  @override
+  String toString() =>
+      'No connection to FurAffinity ($reason). Check your network or VPN.';
+}
+
 class CloudflareError implements Exception {
   final String message;
   CloudflareError()
@@ -237,6 +248,15 @@ class FAClient {
 
   Completer<void>? _clearanceGate;
 
+  /// Таймаут HTML-фетча. На нормальной сети FA отдаёт страницу за 1–3 с,
+  /// поэтому 30 с — щедро; при повторных сетевых сбоях ужимаем до 12 с,
+  /// чтобы плохой WiFi не превращал каждый экран в минуту ожидания.
+  static const _fetchTimeoutNormal = Duration(seconds: 30);
+  static const _fetchTimeoutDegraded = Duration(seconds: 12);
+  bool _networkDegraded = false;
+  Duration get _fetchTimeout =>
+      _networkDegraded ? _fetchTimeoutDegraded : _fetchTimeoutNormal;
+
   /// Гейт «clearance прогрет» (эталон: FAWebSession.awaitReady): первый
   /// прогрев homepage в hidden-WebView обновляет доверие Cloudflare —
   /// ТОТ ЖЕ cf_clearance давал 403 до загрузки и 200 сразу после (10/10
@@ -249,7 +269,9 @@ class FAClient {
     _clearanceGate = gate;
     unawaited(() async {
       try {
-        await _ensureFeedWebView(); // первый прогрев home в feed-WebView
+        // Прогрев home ограничен по времени: на плохом WiFi ждать 120 с
+        // бессмысленно — идём дальше и разбираемся с сетью.
+        await _ensureFeedWebView().timeout(const Duration(seconds: 20));
       } catch (e) {
         debugPrint('=== Clearance gate: warm-up failed, proceeding: $e');
       }
@@ -282,6 +304,7 @@ class FAClient {
 
     try {
       var html = await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
+      _networkDegraded = false; // сеть ожила — возвращаем нормальный таймаут
       // Пассивная фаза: чистим счётчики неудач CF и пробуем ещё раз —
       // managed-челлендж часто решается сам, стоит не дёргать пользователя.
       if (_cfLooksBlocked(html)) {
@@ -309,6 +332,20 @@ class FAClient {
         throw CloudflareError();
       }
       return html;
+    } on NetworkException catch (e) {
+      // Транспортный сбой (DNS/VPN/обрыв) — на плохой сети он часто
+      // разовый: жмём короткую паузу и пробуем ещё раз.
+      _networkDegraded = true;
+      debugPrint('=== Network hiccup on $url: $e — retry once');
+      await Future.delayed(const Duration(milliseconds: 1500));
+      try {
+        final html = await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
+        _networkDegraded = false;
+        return html;
+      } catch (e2) {
+        debugPrint('=== WebView HTML fetch failed for $url: $e2');
+        rethrow;
+      }
     } catch (e) {
       debugPrint('=== WebView HTML fetch failed for $url: $e');
       rethrow;
@@ -587,6 +624,11 @@ class FAClient {
       },
       onReceivedError: (controller, request, error) {
         debugPrint('=== FeedWebView error: ${error.description}');
+        // Сеть мертва — гейт прогрева не должен ждать полного таймаута.
+        if (!_feedReady.isCompleted) {
+          _feedReady.completeError(
+              NetworkException(error.description));
+        }
       },
       initialUrlRequest: URLRequest(
         url: WebUri('https://www.furaffinity.net/'),
@@ -771,6 +813,12 @@ class FAClient {
       onReceivedError: (controller, request, error) async {
         if (!(request.isForMainFrame ?? false)) return;
         debugPrint('=== WebView fetch error: ${error.description}');
+        // Транспортный обрыв (DNS/VPN) — падаем СРАЗУ, а не висим до
+        // таймаута: на плохой сети это 60 секунд на каждый запрос.
+        if (!completer.isCompleted) {
+          completer.completeError(
+              NetworkException(error.description));
+        }
       },
       initialUrlRequest: URLRequest(
         url: WebUri(url),
@@ -782,10 +830,10 @@ class FAClient {
 
     try {
       final html = await completer.future.timeout(
-        const Duration(seconds: 60),
+        _fetchTimeout,
         onTimeout: () {
           debugPrint('=== WebView fetch timeout for $url');
-          return ''; // Return empty instead of throwing
+          throw NetworkException('timeout');
         },
       );
       await headless.dispose();

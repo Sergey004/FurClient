@@ -18,6 +18,11 @@ import '../main.dart' show webViewEnvironment;
 /// Параллелизм достигается пулом воркеров: каждый держит свой WebView.
 /// До пула общая очередь была строго последовательной и гриды грузили
 /// картинки по одной.
+/// Последняя транспортная ошибка (DNS/VPN). Пока сеть мертва, не
+/// Queue-им картинки вовсе — иначе 30 карточек ждут по 25 с каждая.
+DateTime? _lastTransportError;
+const _transportErrorPause = Duration(seconds: 15);
+
 class WebViewImageFetcher {
   static WebViewImageFetcher? _instance;
   static WebViewImageFetcher get instance =>
@@ -140,6 +145,12 @@ class _ImageWorker {
   /// хендлер и колбеки замыкаются на него).
   Completer<String?>? _currentImageCompleter;
 
+  /// Таймаут одной картинки. FA отдаёт превью за 1–3 с, поэтому 25 с —
+  /// щедро; на плохом WiFi 60 с на картинку превращали грид в очередь
+  /// висящих запросов.
+  static const _imageTimeout = Duration(seconds: 25);
+
+
   /// Подряд идущие неудачи — >= 3, WebView считается мёртвым, пересоздаём.
   int _consecutiveFailures = 0;
 
@@ -176,7 +187,7 @@ class _ImageWorker {
       // Wait for: onLoadStop → fetch/canvas JS → handler callback.
       // Longer timeout for large files (video can be 100+ MB).
       final dataUrl = await _currentImageCompleter!.future.timeout(
-        const Duration(seconds: 60),
+        _imageTimeout,
         onTimeout: () {
           debugPrint('=== WebViewImageFetcher#$index: Timeout for $url');
           return null;
@@ -198,6 +209,7 @@ class _ImageWorker {
       if (cache.length >= maxCacheSize) cache.remove(cache.keys.first);
       cache[url] = data;
 
+      _lastTransportError = null;
       debugPrint('=== WebViewImageFetcher#$index: ${data.length}B from $url');
       return data;
     } catch (e) {
@@ -352,6 +364,7 @@ class _ImageWorker {
           if (!(request.isForMainFrame ?? false)) return;
           debugPrint(
               '=== WebViewImageFetcher#$index: WebView error: ${error.description}');
+          _lastTransportError = DateTime.now();
           final completer = _currentImageCompleter;
           if (completer != null && !completer.isCompleted) {
             completer.complete(null);
