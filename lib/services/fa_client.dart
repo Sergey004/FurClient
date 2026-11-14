@@ -17,6 +17,7 @@ import '../utils/cookie_manager.dart';
 import '../utils/cookie_store.dart';
 import 'fa_urls.dart';
 import 'fa_enhanced_client.dart';
+import 'page_transport.dart';
 import '../main.dart' show webViewEnvironment;
 
 import 'package:fa_kit/fa_kit.dart' as fa;
@@ -71,6 +72,13 @@ class FAClient {
   // Using a realistic browser User-Agent to avoid Cloudflare blocks
   static const String _userAgent =
       'Mozilla/5.0 (Linux; Android 13; SM-A325F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+
+  /// UA, которым приложение ходит в WebView. На Android подменяем на
+  /// десктопный Chrome — cf_clearance выдаётся именно под него. На Windows
+  /// UA НЕ подменяем: там нужен нативный UA WebView2 (спойленный UA
+  /// ломает clearance — см. _webviewHeaders).
+  static const String webViewUserAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
   // Cloudflare bypass state
   bool _cfPassInProgress = false;
@@ -134,6 +142,7 @@ class FAClient {
   Future<void> init() async {
     await _ensureInitialized();
     await _enhancedClient.initialize();
+    await _loadTransportMode();
   }
 
   UserSession? get session => _session;
@@ -303,6 +312,47 @@ class FAClient {
     }
 
     try {
+      // Новый транспорт: прямой HTTP — втрое быстрее WebView. Пробуем
+      // первым, но только для страниц, которые сервер отдаёт целиком
+      // (waitForAjax=false): комментарии к сабмишену грузятся AJAX-ом и
+      // в сыром HTML их нет — там WebView остаётся обязательным.
+      if (_transportMode != TransportMode.webview && !waitForAjax) {
+        final blocked = _httpBlockedUntil;
+        final coolingDown =
+            blocked != null && DateTime.now().isBefore(blocked);
+        final ua = coolingDown ? null : await _effectiveUserAgent();
+        if (ua != null) {
+          final cookieHeader = await _mergedCookieHeader(url);
+          // Без cf_clearance прямой запрос гарантированно получит 403 и
+          // подкинет счётчик неудач CF — в этом случае сразу идём в WebView.
+          if (cookieHeader == null ||
+              !cookieHeader.contains('cf_clearance=')) {
+            debugPrint('=== Transport: no cf_clearance — WebView path');
+          } else {
+            final res = await _httpTransport.fetch(
+              url,
+              cookieHeader: cookieHeader,
+              userAgent: ua,
+            );
+            if (res.ok) {
+              debugPrint(
+                  '=== HTTP fetch: ${res.html!.length}B from $url (${res.elapsed.inMilliseconds}ms)');
+              await _applySetCookies(url, res.setCookies);
+              _networkDegraded = false;
+              return res.html!;
+            }
+            if (res.challenge) {
+              _httpBlockedUntil = DateTime.now().add(_httpCooldown);
+              debugPrint(
+                  '=== HTTP fetch: CF challenge for $url — WebView fallback, HTTP paused for ${_httpCooldown.inMinutes} min');
+            } else if (res.error != null) {
+              debugPrint(
+                  '=== HTTP fetch failed for $url: ${res.error} — WebView fallback');
+            }
+          }
+        }
+      }
+
       var html = await _fetchHtmlWithWebView(url, waitForAjax: waitForAjax);
       _networkDegraded = false; // сеть ожила — возвращаем нормальный таймаут
       // Пассивная фаза: чистим счётчики неудач CF и пробуем ещё раз —
@@ -496,10 +546,128 @@ class FAClient {
       {
         if (cookieHeader != null) 'Cookie': cookieHeader,
         if (referer != null) 'Referer': referer,
-        if (!io.Platform.isWindows)
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        if (!io.Platform.isWindows) 'User-Agent': webViewUserAgent,
       };
+
+  /// Cookie-заголовок текущей сессии — для прямых HTTP-запросов (проба
+  /// транспорта, будущий HTTP-сессионный слой). null — сессии нет.
+  String? currentCookieHeader() => _buildCookieHeader();
+
+  // ── Транспорт HTML ────────────────────────────────────────────────
+  //
+  // Новый путь: страницы берутся прямым HTTP (втрое быстрее WebView),
+  // а WebView остаётся решателем Cloudflare — он выдаёт cf_clearance,
+  // без которого CF режет прямой запрос (замер CFPROBE: без clearance
+  // 403 + cf-mitigated: challenge, с clearance — 200 и те же 72 сабмишна).
+  //
+  // Режим переключается префом `transport_mode`:
+  //   webview — всё по-старому; http — только HTTP; auto — HTTP, а при
+  //   челлендже WebView (значение по умолчанию).
+  TransportMode _transportMode = TransportMode.auto;
+  final HttpPageTransport _httpTransport = HttpPageTransport();
+
+  /// Пауза после CF-челленджа на HTTP-пути. Каждый челлендж увеличивает
+  /// счётчик пассивных неудач CF (cf_chl_rc_ni) — а он «кричит» Cloudflare,
+  /// что клиент подозрительный. Поэтому после челленджа HTTP выключается
+  /// на 5 минут: работает WebView (он обновит clearance), а HTTP
+  /// возвращается, когда кука снова станет валидной.
+  DateTime? _httpBlockedUntil;
+
+  static const _httpCooldown = Duration(minutes: 5);
+
+  /// UA, которым нужно ходить по HTTP: на Android — тот же, что и в
+  /// WebView; на Windows — нативный UA WebView2 (его узнаём из живого
+  /// WebView, спойлить нельзя: clearance привязан к байт-в-байт UA).
+  String? _webViewUserAgentCache;
+
+  TransportMode get transportMode => _transportMode;
+
+  Future<void> _loadTransportMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _transportMode = TransportMode.fromName(prefs.getString('transport_mode'));
+      debugPrint('=== Transport mode: ${_transportMode.storageName}');
+    } catch (e) {
+      debugPrint('=== Transport mode load failed: $e');
+    }
+  }
+
+  /// UA для прямых HTTP-запросов. null — ходить HTTP нельзя (не знаем UA).
+  Future<String?> _effectiveUserAgent() async {
+    if (!io.Platform.isWindows) return webViewUserAgent;
+    // Windows: UA WebView2 — только из живого WebView.
+    if (_webViewUserAgentCache != null) return _webViewUserAgentCache;
+    final controller = _feedController;
+    if (controller == null) return null;
+    try {
+      final ua = await controller
+          .evaluateJavascript(source: 'navigator.userAgent');
+      final value = (ua as String?)?.trim();
+      if (value == null || value.isEmpty) return null;
+      _webViewUserAgentCache = value;
+      debugPrint('=== Transport: Windows UA captured');
+      return value;
+    } catch (e) {
+      debugPrint('=== Transport: UA capture failed: $e');
+      return null;
+    }
+  }
+
+  /// Cookie-заголовок для HTTP: живой стор ПЕРЕЖИВЕЕТ сохранённой сессии
+  /// (FA ротирует куки, а cf_clearance живёт именно в сторе WebView),
+  /// из сессии добираем только те имена, которых в сторе нет.
+  Future<String?> _mergedCookieHeader(String url) async {
+    final parts = <String>[];
+    final seen = <String>{};
+    try {
+      final uri = Uri.parse(url);
+      final origin = '${uri.scheme}://${uri.host}';
+      final live = await FAICookieManager.getCookies(origin);
+      for (final c in live) {
+        if (c.name.isEmpty || c.value.isEmpty) continue;
+        if (!seen.add(c.name)) continue;
+        parts.add('${c.name}=${c.value}');
+      }
+    } catch (e) {
+      debugPrint('=== Transport: live cookies failed: $e');
+    }
+    final sessionHeader = _buildCookieHeader();
+    if (sessionHeader != null) {
+      for (final pair in sessionHeader.split('; ')) {
+        final name = pair.split('=').first.trim();
+        if (name.isEmpty || !seen.add(name)) continue;
+        parts.add(pair);
+      }
+    }
+    return parts.isEmpty ? null : parts.join('; ');
+  }
+
+  /// Set-Cookie из HTTP-ответа — FA ротирует сессионные куки, их надо
+  /// вернуть в стор, иначе следующий запрос уйдёт со старыми.
+  Future<void> _applySetCookies(String url, List<String> setCookies) async {
+    if (setCookies.isEmpty) return;
+    final uri = Uri.parse(url);
+    final origin = '${uri.scheme}://${uri.host}';
+    try {
+      for (final raw in setCookies) {
+        final first = raw.split(';').first.trim();
+        final eq = first.indexOf('=');
+        if (eq <= 0) continue;
+        final name = first.substring(0, eq).trim();
+        final value = first.substring(eq + 1).trim();
+        if (name.isEmpty) continue;
+        await FAICookieManager.setCookie(
+          url: origin,
+          name: name,
+          value: value,
+        );
+      }
+      debugPrint('=== Transport: applied ${setCookies.length} Set-Cookie');
+      await _syncCookiesFromWebView();
+    } catch (e) {
+      debugPrint('=== Transport: apply Set-Cookie failed: $e');
+    }
+  }
 
   /// CF-куки, чьё устаревание провоцирует эскалацию челленджа: протухший
   /// clearance, __cf_bm и счётчики пассивных неудач cf_chl_rc_* (их рост

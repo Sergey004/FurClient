@@ -47,6 +47,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _autoDownloadOnFave = false;
   bool _autoCloseOnFave = true;
   String _imageQuality = 'high';
+
+  /// Режим транспорта страниц: auto | http | webview.
+  String _transportMode = 'auto';
   String _customDownloadPath = '';
   UpdateService? _updateService;
   String _appVersion = '...';
@@ -97,6 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         _autoDownloadOnFave = prefs.getBool('auto_download_on_fave') ?? false;
         _autoCloseOnFave = prefs.getBool('auto_close_on_fave') ?? true;
         _imageQuality = prefs.getString('image_quality') ?? 'high';
+        _transportMode = prefs.getString('transport_mode') ?? 'auto';
         _customDownloadPath = prefs.getString('custom_download_path') ?? '';
       });
     }
@@ -112,7 +116,25 @@ class _SettingsScreenState extends State<SettingsScreen>
   /// Тумблер категории фоновых уведомлений — poller читает ключ
   /// на каждом цикле, перезапуск не нужен.
   Future<void> _saveNotify(String key, bool value) async {
-    setState(() {});
+    // Тоглы controlled (value: _notify*): поле должно обновиться ДО
+    // rebuild, иначе switch отщёлкивается обратно — преф пишется,
+    // а UI показывает старое состояние.
+    setState(() {
+      switch (key) {
+        case 'notify_submissions':
+          _notifySubmissions = value;
+        case 'notify_notes':
+          _notifyNotes = value;
+        case 'notify_submission_comments':
+          _notifySubmissionComments = value;
+        case 'notify_journal_comments':
+          _notifyJournalComments = value;
+        case 'notify_shouts':
+          _notifyShouts = value;
+        case 'notify_journals':
+          _notifyJournals = value;
+      }
+    });
     await _saveSetting(key, value);
   }
 
@@ -276,6 +298,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
             Divider(height: 1, indent: 16, color: outline),
             _buildImageQualityTile(),
+            Divider(height: 1, indent: 16, color: outline),
+            _buildTransportTile(),
           ]),
           const SizedBox(height: 24),
           _sectionHeader('Feedback'),
@@ -407,9 +431,6 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Widget _buildDesktopBody() {
     final colorScheme = Theme.of(context).colorScheme;
-    final primary = colorScheme.primary;
-    final secondary = colorScheme.primary;
-    final tertiary = colorScheme.tertiary;
     final outline = colorScheme.outlineVariant.withValues(alpha: 0.12);
 
     return SingleChildScrollView(
@@ -425,19 +446,17 @@ class _SettingsScreenState extends State<SettingsScreen>
               const SizedBox(height: 24),
               _desktopSection(
                 title: 'Appearance',
-                icon: Icons.palette_outlined,
-                accent: primary,
+                icon: fluent.FluentIcons.color,
                 children: [_buildThemeTile()],
               ),
               const SizedBox(height: 20),
               _desktopSection(
                 title: 'Content',
-                icon: Icons.tune,
-                accent: tertiary,
+                icon: fluent.FluentIcons.settings,
                 children: [
                   _adaptiveSwitchTile(
-                    icon: Icons.shield_outlined,
-                    iconColor: primary,
+                    icon: fluent.FluentIcons.shield,
+                    iconColor: colorScheme.primary,
                     value: _sfwMode,
                     onChanged: _onSfwToggle,
                     title: 'SFW Mode',
@@ -445,8 +464,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                   Divider(height: 1, indent: 16, color: outline),
                   _adaptiveSwitchTile(
-                    icon: Icons.download_outlined,
-                    iconColor: secondary,
+                    icon: fluent.FluentIcons.download,
+                    iconColor: colorScheme.primary,
                     value: _autoDownloadOnFave,
                     onChanged: (v) {
                       setState(() => _autoDownloadOnFave = v);
@@ -457,8 +476,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                   Divider(height: 1, indent: 16, color: outline),
                   _adaptiveSwitchTile(
-                    icon: Icons.close_fullscreen_outlined,
-                    iconColor: tertiary,
+                    icon: fluent.FluentIcons.leave,
+                    iconColor: colorScheme.primary,
                     value: _autoCloseOnFave,
                     onChanged: (v) {
                       setState(() => _autoCloseOnFave = v);
@@ -469,24 +488,89 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                   Divider(height: 1, indent: 16, color: outline),
                   _buildImageQualityTile(),
+                  Divider(height: 1, indent: 16, color: outline),
+                  _buildTransportTile(),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Раньше секции Feedback/Notifications были только в мобильной
+              // раскладке — на Windows (окно ≥ 840 px) тумблеры уведомлений
+              // были недоступны, хотя поллер их читает.
+              _desktopSection(
+                title: 'Notifications',
+                icon: fluent.FluentIcons.ringer,
+                children: [
+                  _adaptiveSwitchTile(
+                    icon: fluent.FluentIcons.photo2,
+                    iconColor: colorScheme.primary,
+                    value: _notifySubmissions,
+                    onChanged: (v) => _saveNotify('notify_submissions', v),
+                    title: 'New submissions',
+                    subtitle: 'From artists you watch',
+                  ),
+                  Divider(height: 1, indent: 16, color: outline),
+                  _adaptiveSwitchTile(
+                    icon: fluent.FluentIcons.mail,
+                    iconColor: colorScheme.primary,
+                    value: _notifyNotes,
+                    onChanged: (v) => _saveNotify('notify_notes', v),
+                    title: 'Notes',
+                    subtitle: 'Private messages',
+                  ),
+                  Divider(height: 1, indent: 16, color: outline),
+                  _adaptiveSwitchTile(
+                    icon: fluent.FluentIcons.comment,
+                    iconColor: colorScheme.primary,
+                    value: _notifySubmissionComments,
+                    onChanged: (v) =>
+                        _saveNotify('notify_submission_comments', v),
+                    title: 'Submission comments',
+                    subtitle: 'Comments on your submissions',
+                  ),
+                  Divider(height: 1, indent: 16, color: outline),
+                  _adaptiveSwitchTile(
+                    icon: fluent.FluentIcons.news,
+                    iconColor: colorScheme.primary,
+                    value: _notifyJournalComments,
+                    onChanged: (v) =>
+                        _saveNotify('notify_journal_comments', v),
+                    title: 'Journal comments',
+                    subtitle: 'Comments on your journals',
+                  ),
+                  Divider(height: 1, indent: 16, color: outline),
+                  _adaptiveSwitchTile(
+                    icon: fluent.FluentIcons.megaphone,
+                    iconColor: colorScheme.primary,
+                    value: _notifyShouts,
+                    onChanged: (v) => _saveNotify('notify_shouts', v),
+                    title: 'Shouts',
+                    subtitle: 'Messages on your page',
+                  ),
+                  Divider(height: 1, indent: 16, color: outline),
+                  _adaptiveSwitchTile(
+                    icon: fluent.FluentIcons.list,
+                    iconColor: colorScheme.primary,
+                    value: _notifyJournals,
+                    onChanged: (v) => _saveNotify('notify_journals', v),
+                    title: 'Journals',
+                    subtitle: 'From watched users',
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
               _desktopSection(
                 title: 'Downloads',
-                icon: Icons.folder_outlined,
-                accent: secondary,
+                icon: fluent.FluentIcons.folder,
                 children: [_buildDownloadFolderTile()],
               ),
               const SizedBox(height: 20),
               _desktopSection(
                 title: 'Account',
-                icon: Icons.person,
-                accent: secondary,
+                icon: fluent.FluentIcons.contact,
                 children: [
                   _actionTile(
-                    icon: Icons.logout,
-                    color: Theme.of(context).colorScheme.error,
+                    icon: fluent.FluentIcons.leave,
+                    color: colorScheme.error,
                     title: 'Logout',
                     subtitle: 'Sign out and clear session',
                     onTap: _confirmLogout,
@@ -496,42 +580,29 @@ class _SettingsScreenState extends State<SettingsScreen>
               const SizedBox(height: 20),
               _desktopSection(
                 title: 'About',
-                icon: Icons.info_outline,
-                accent: tertiary,
+                icon: fluent.FluentIcons.info,
                 children: [
                   _infoTile(
-                    icon: Icons.pets,
-                    iconColor: primary,
+                    icon: fluent.FluentIcons.heart,
+                    iconColor: colorScheme.primary,
                     title: 'FurClient',
                     subtitle: 'A FurAffinity client',
                   ),
                   Divider(height: 1, indent: 56, color: outline),
                   _infoTile(
-                    icon: Icons.info_outline,
-                    iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                    icon: fluent.FluentIcons.info,
+                    iconColor: colorScheme.onSurfaceVariant,
                     title: 'Version',
                     trailing: _appVersion,
                   ),
                   if (Platform.isWindows) ...[
-                    Divider(
-                        height: 1,
-                        indent: 56,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outlineVariant
-                            .withValues(alpha: 0.12)),
+                    Divider(height: 1, indent: 56, color: outline),
                     _buildUpdateTile(),
                   ],
-                  Divider(
-                      height: 1,
-                      indent: 56,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .outlineVariant
-                          .withValues(alpha: 0.12)),
+                  Divider(height: 1, indent: 56, color: outline),
                   _infoTile(
-                    icon: Icons.code,
-                    iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                    icon: fluent.FluentIcons.code,
+                    iconColor: colorScheme.onSurfaceVariant,
                     title: 'Built with Flutter',
                     trailing: 'Flutter',
                   ),
@@ -712,6 +783,97 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  /// Тайл выбора транспорта страниц.
+  ///
+  /// auto — прямой HTTP, при CF-челлендже WebView (быстрее втрое);
+  /// http — только прямой HTTP; webview — всё через WebView (прежнее
+  /// поведение, запасной вариант при проблемах с Cloudflare).
+  Widget _buildTransportTile() {
+    const labels = {'auto': 'Auto', 'http': 'HTTP', 'webview': 'WebView'};
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(Icons.swap_horiz_outlined,
+              color: Theme.of(context).colorScheme.tertiary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Page Transport',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 15)),
+                const SizedBox(height: 2),
+                Text('How FurAffinity pages are loaded',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 13)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (isWindows)
+            SizedBox(
+              width: 120,
+              child: fluent.ComboBox<String>(
+                value: _transportMode,
+                isExpanded: true,
+                items: labels.entries
+                    .map((e) => fluent.ComboBoxItem<String>(
+                          value: e.key,
+                          child: Text(e.value),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() => _transportMode = v);
+                    _saveSetting('transport_mode', v);
+                  }
+                },
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .outlineVariant
+                        .withValues(alpha: 0.12)),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _transportMode,
+                  isDense: true,
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 13),
+                  dropdownColor: Theme.of(context).cardColor,
+                  items: labels.entries
+                      .map((e) => DropdownMenuItem(
+                            value: e.key,
+                            child: Text(e.value),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() => _transportMode = v);
+                      _saveSetting('transport_mode', v);
+                    }
+                  },
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDownloadFolderTile() {
     final displayPath =
         _customDownloadPath.isEmpty ? 'Default' : _customDownloadPath;
@@ -823,28 +985,38 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget _desktopSection({
     required String title,
     required IconData icon,
-    required Color accent,
     required List<Widget> children,
   }) {
+    // Fluent-стиль Windows-настроек: нейтральный заголовок секции (не
+    // акцентный, как в Material) и fluent.Card-контейнер. На прочих
+    // платформах — прежние Material-карточки.
+    final headerColor = Theme.of(context).colorScheme.onSurfaceVariant;
+    final Widget card = isWindows
+        ? fluent.Card(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            borderRadius: BorderRadius.circular(8),
+            child: Column(children: children),
+          )
+        : _card(children);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, color: accent, size: 20),
+            Icon(icon, color: headerColor, size: 18),
             const SizedBox(width: 10),
             Text(
               title,
               style: TextStyle(
-                color: accent,
+                color: headerColor,
                 fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
         const SizedBox(height: 8),
-        _card(children),
+        card,
       ],
     );
   }

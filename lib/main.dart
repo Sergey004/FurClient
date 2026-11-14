@@ -18,6 +18,7 @@ import 'services/auth_service.dart';
 import 'utils/haptics.dart';
 import 'services/fa_client.dart';
 import 'services/notification_poller.dart';
+import 'services/transport_probe.dart';
 import 'services/update_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
@@ -509,6 +510,7 @@ class _FurClientAppState extends State<FurClientApp> {
             if (mounted) setState(() => _isLoggedIn = false);
           }
         }));
+        _maybeRunTransportProbe();
         return;
       } else {
         debugPrint('=== _initApp: No valid session to restore');
@@ -522,6 +524,31 @@ class _FurClientAppState extends State<FurClientApp> {
         _isLoggedIn = false;
         _isRestoringSession = false;
       });
+    }
+    _maybeRunTransportProbe();
+  }
+
+  /// Проба транспорта (миграция на HTTP-сессионный слой) — только по
+  /// явному флагу сборки `--dart-define=FA_PROBE=1`. Ничего не меняет,
+  /// только меряет, отдаёт ли прямой HTTP настоящую страницу.
+  void _maybeRunTransportProbe() {
+    // bool.fromEnvironment понимает только строку "true", а --dart-define
+    // обычно ставят как "1" — принимаем оба варианта.
+    const flag = String.fromEnvironment('FA_PROBE');
+    if (flag != 'true' && flag != '1') return;
+    unawaited(_runTransportProbe());
+  }
+
+  Future<void> _runTransportProbe() async {
+    try {
+      // Даём CF-кукам устояться после стартовых запросов.
+      await Future<void>.delayed(const Duration(seconds: 5));
+      debugPrint('=== CFPROBE: start');
+      final results = await TransportProbe.run(_client);
+      logProbeResults(results);
+      debugPrint('=== CFPROBE: done');
+    } catch (e) {
+      debugPrint('=== CFPROBE: failed: $e');
     }
   }
 
@@ -610,6 +637,36 @@ class _FurClientAppState extends State<FurClientApp> {
           themeMode: fluentThemeMode,
           theme: theme,
           darkTheme: darkTheme,
+          // Экраны используют Material-виджеты (RefreshIndicator, Scaffold
+          // parts), а FluentApp даёт только SDK-локализации. После выноса
+          // Material в отдельный пакет material_ui его MaterialLocalizations —
+          // ДРУГОЙ тип, и Material-виджеты падали с «No MaterialLocalizations
+          // found» (красный экран на Gallery/Watch/Notifications/Profile).
+          // Поэтому отдаём delegate именно из material_ui.
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+          ],
+          // material_ui — ОТДЕЛЬНЫЙ пакет: SDK-Theme, который fluent_ui
+          // подсовывает через AnimatedTheme, для его виджетов чужой тип.
+          // Без своей темы Theme.of() отдавал fallback (акцент всегда
+          // дефолтный, мимо системного), без Material-предка InkWell-ы
+          // падали с «No Material widget found» и тёмная тема не
+          // отрисовывалась. Синхронизируем material_ui-тему с Fluent-ой.
+          builder: (context, child) {
+            final fluentTheme = fluent.FluentTheme.of(context);
+            final accent = AppTheme.systemAccent;
+            final materialTheme =
+                fluentTheme.brightness == fluent.Brightness.dark
+                    ? AppTheme.buildFromSystemAccent(accent)
+                    : AppTheme.buildLightTheme(accent: accent);
+            return Theme(
+              data: materialTheme,
+              child: Material(
+                type: MaterialType.transparency,
+                child: child!,
+              ),
+            );
+          },
           home: FluentRootChrome(
             child: UpgradeAlert(child: _buildHome()),
           ),

@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import '../utils/haptics.dart';
+import '../utils/touch_mode.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
@@ -262,6 +263,15 @@ class _GalleryScreenState extends State<GalleryScreen>
     return AdaptiveScaffold(
       appBar: AppBar(
         title: const Text('Gallery'),
+        // Pull-жест показывается только на таче; мышью — кнопкой.
+        actions: [
+          if (!isTouchInput)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh',
+              onPressed: _onRefresh,
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -352,9 +362,7 @@ class _GalleryScreenState extends State<GalleryScreen>
       );
     }
 
-    return RefreshIndicator(
-      color: AppColors.fluentCyan,
-      backgroundColor: AppColors.bgCard,
+    return AdaptiveRefresh(
       onRefresh: _onRefresh,
       child: LayoutBuilder(
         builder: (context, constraints) {

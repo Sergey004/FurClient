@@ -1,7 +1,9 @@
 import 'dart:ui';
 import 'dart:async';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:material_ui/material_ui.dart';
 import '../utils/haptics.dart';
+import '../utils/platform_utils.dart';
 import 'package:fa_kit/fa_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
@@ -210,40 +212,63 @@ class _SubmissionCardState extends State<SubmissionCard> {
         Positioned(
           top: 6,
           right: 6,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: _onFav,
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHighest.withValues(alpha: 0.72),
-                  shape: BoxShape.circle,
-                ),
-                child: _isFaving
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: AdaptiveProgress(
-                          strokeWidth: 2,
-                          color: colors.primary,
-                        ),
-                      )
-                    : Icon(
-                        _current.isFavorite
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        color: _current.isFavorite
-                            ? colors.primary
-                            : colors.onSurfaceVariant,
-                        size: 18,
+          // Windows — Fluent-кнопка с hover-подсветкой вместо Material-ripple.
+          child: isWindows
+              ? fluent.HoverButton(
+                  onPressed: _onFav,
+                  builder: (context, states) {
+                    final theme = fluent.FluentTheme.of(context);
+                    final overlay = states.isPressed
+                        ? theme.resources.subtleFillColorTertiary
+                        : states.isHovered
+                            ? theme.resources.subtleFillColorSecondary
+                            : theme.resources.subtleFillColorTransparent;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 80),
+                      decoration: BoxDecoration(
+                        color: overlay,
+                        shape: BoxShape.circle,
                       ),
-              ),
-            ),
-          ),
+                      child: _favIcon(colors),
+                    );
+                  },
+                )
+              : Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: _onFav,
+                    child: _favIcon(colors),
+                  ),
+                ),
         ),
       ],
+    );
+  }
+
+  Widget _favIcon(ColorScheme colors) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.72),
+        shape: BoxShape.circle,
+      ),
+      child: _isFaving
+          ? SizedBox(
+              width: 18,
+              height: 18,
+              child: AdaptiveProgress(
+                strokeWidth: 2,
+                color: colors.primary,
+              ),
+            )
+          : Icon(
+              _current.isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _current.isFavorite
+                  ? colors.primary
+                  : colors.onSurfaceVariant,
+              size: 18,
+            ),
     );
   }
 

@@ -220,13 +220,15 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
         ? _findCommentById(_comments, parentCid.toString())
         : null;
 
-    await showModalBottomSheet(
+    await showAdaptiveSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      scrollable: false,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      title: 'Comment',
       builder: (ctx) {
         return SafeArea(
           bottom: false,
@@ -353,8 +355,11 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   ),
                 ],
                 const SizedBox(height: 8),
-                Expanded(
-                  child: TextField(
+                // В шите (Android) поле растягивается на свободную высоту;
+                // в Fluent-диалоге Expanded раздувал бы диалог до максимума
+                // и валил лейаут — там поле берёт натуральную высоту.
+                if (isWindows)
+                  TextField(
                     controller: _commentCtrl,
                     maxLines: null,
                     minLines: 3,
@@ -376,8 +381,34 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 14),
                     ),
+                  )
+                else
+                  Expanded(
+                    child: TextField(
+                      controller: _commentCtrl,
+                      maxLines: null,
+                      minLines: 3,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        hintText: 'Write a comment...',
+                        filled: true,
+                        fillColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(28),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(28),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
+                      ),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -493,7 +524,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
   Future<void> _showActionMenu(Submission sub) async {
     final colorScheme = Theme.of(context).colorScheme;
-    await showModalBottomSheet<void>(
+    await showAdaptiveSheet<void>(
       context: context,
       useSafeArea: true,
       backgroundColor: colorScheme.surfaceContainerHigh,

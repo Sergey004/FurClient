@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import '../services/fa_client.dart';
 import '../utils/haptics.dart';
+import '../widgets/adaptive/adaptive_sheet.dart';
 
 /// Композ нового нотеса — модальный bottom sheet в стиле панели
 /// параметров поиска: to + subject + message → sendNote (ключ формы
@@ -14,7 +15,7 @@ class NewNoteSheet extends StatefulWidget {
   /// Открыть композ шитом (клавиатура учитывается через viewInsets).
   static Future<void> show(BuildContext context, FAClient client,
       {String? initialTo}) {
-    return showModalBottomSheet(
+    return showAdaptiveSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -22,6 +23,7 @@ class NewNoteSheet extends StatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      title: 'New note',
       builder: (_) => NewNoteSheet(client: client, initialTo: initialTo),
     );
   }

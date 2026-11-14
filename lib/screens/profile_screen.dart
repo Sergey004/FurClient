@@ -149,9 +149,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppBreakpoints.desktop;
 
-    return RefreshIndicator(
-      color: AppColors.materialLavender,
-      backgroundColor: AppColors.bgCard,
+    return AdaptiveRefresh(
       onRefresh: _loadProfile,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),

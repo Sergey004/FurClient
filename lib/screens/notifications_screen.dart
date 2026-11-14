@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import '../utils/haptics.dart';
+import '../utils/touch_mode.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -147,6 +148,12 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       appBar: AppBar(
         title: const Text('Notifications'),
         actions: [
+          if (!isTouchInput)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh',
+              onPressed: () => _loadNotifications(),
+            ),
           IconButton(
             icon: const Icon(Icons.mail_outline),
             tooltip: 'Notes',
@@ -191,9 +198,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       );
     }
 
-    return RefreshIndicator(
-      color: AppColors.cupertinoPurple,
-      backgroundColor: Theme.of(context).cardColor,
+    return AdaptiveRefresh(
       // Хаптик — в обработчике подтяжки, а НЕ в build: экран перестраивается
       // на каждое изменение insets (клавиатура), и вибро из build превращалось
       // в «дребезг на открытие/закрытие клавиатуры».

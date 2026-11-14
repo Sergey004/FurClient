@@ -3,6 +3,7 @@ import 'package:fa_kit/fa_kit.dart' as fa;
 import '../services/fa_client.dart';
 import '../utils/fa_image_loader.dart';
 import '../utils/haptics.dart';
+import '../utils/touch_mode.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/error_view.dart';
 import '../widgets/adaptive/adaptive.dart';
@@ -76,7 +77,17 @@ class _NotesScreenState extends State<NotesScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return AdaptiveScaffold(
-      appBar: AppBar(title: const Text('Notes')),
+      appBar: AppBar(
+        title: const Text('Notes'),
+        actions: [
+          if (!isTouchInput)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh',
+              onPressed: () => _loadNotes(isRefresh: true),
+            ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => NewNoteSheet.show(context, widget.client),
         child: const Icon(Icons.edit_outlined),
@@ -85,8 +96,7 @@ class _NotesScreenState extends State<NotesScreen> {
           ? const LoadingIndicator(message: 'Loading notes...')
           : _error != null
               ? ErrorView(message: _error!, onRetry: () => _loadNotes())
-              : RefreshIndicator(
-                  color: colors.primary,
+              : AdaptiveRefresh(
                   onRefresh: () => _loadNotes(isRefresh: true),
                   child: _notes.isEmpty
                       ? ListView(

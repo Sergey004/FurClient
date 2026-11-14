@@ -36,6 +36,10 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      - name: Run parser tests (fa_kit)
+        run: dart test
+        working-directory: packages/fa_kit
+
   # ─── Build Android APK ──────────────────────────────────────────
   build-android:
     name: Android APK
@@ -59,6 +63,9 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      - name: Clean workspace
+        run: flutter clean
 
       - name: Get dependencies
         run: flutter pub get

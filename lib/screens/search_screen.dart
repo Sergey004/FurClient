@@ -293,7 +293,7 @@ class _SearchScreenState extends State<SearchScreen>
     _authorController.text = _author;
     _tagsController.text = _tags.join(', ');
 
-    final result = await showModalBottomSheet<bool>(
+    final result = await showAdaptiveSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -301,6 +301,7 @@ class _SearchScreenState extends State<SearchScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      title: 'Search filters',
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
@@ -311,18 +312,23 @@ class _SearchScreenState extends State<SearchScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text('Search filters',
-                              style: Theme.of(context).textTheme.titleLarge),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(sheetContext),
-                        ),
-                      ],
-                    ),
+                    // В Fluent-диалоге заголовок и закрытие даёт сам
+                    // ContentDialog — внутренний хедер шита только для
+                    // Material bottom sheet.
+                    if (!isWindows)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text('Search filters',
+                                style:
+                                    Theme.of(context).textTheme.titleLarge),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(sheetContext),
+                          ),
+                        ],
+                      ),
                     TextField(
                       controller: _authorController,
                       textInputAction: TextInputAction.done,
@@ -555,6 +561,17 @@ class _SearchScreenState extends State<SearchScreen>
                       : null,
                   onSubmitted: _search,
                 ),
+              ),
+              const SizedBox(width: 8),
+              // В Fluent-раскладке фильтры были недостижимы: кнопка жила
+              // только в Material AppBar.
+              fluent.IconButton(
+                icon: Badge(
+                  isLabelVisible: _hasActiveFilters,
+                  smallSize: 8,
+                  child: const Icon(fluent.FluentIcons.filter, size: 16),
+                ),
+                onPressed: _showSearchFilters,
               ),
             ],
           ),
