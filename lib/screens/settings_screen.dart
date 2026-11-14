@@ -1,3 +1,5 @@
+import 'dart:io' show Directory, File;
+
 import 'package:material_ui/material_ui.dart';
 import '../utils/haptics.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
@@ -1027,11 +1029,43 @@ class _SettingsScreenState extends State<SettingsScreen>
         confirmButtonText: 'Select Folder',
       );
       if (result != null && result.isNotEmpty) {
+        // Проверяем, что в выбранную папку реально можно писать: на
+        // Android запись в произвольную папку требует «All files access»,
+        // а SD-карты file_selector вообше не умеет возвращать путём.
+        try {
+          final dir = Directory(result);
+          if (!dir.existsSync()) dir.createSync(recursive: true);
+          final probe = File('${dir.path}/.furclient_write_test');
+          probe.writeAsStringSync('ok');
+          probe.deleteSync();
+        } catch (e) {
+          debugPrint('=== Settings: custom folder not writable: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    'Folder is not writable: $e\nGrant "All files access" '
+                    'or pick a folder in phone storage.'),
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+          return;
+        }
         setState(() => _customDownloadPath = result);
         await _saveSetting('custom_download_path', result);
       }
     } catch (e) {
       debugPrint('=== Settings: Folder picker error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Folder picker failed: $e\n'
+                'Only folders in phone storage are supported.'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 

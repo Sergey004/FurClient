@@ -104,6 +104,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             client: widget.client,
             session: widget.client.session!,
             targetUsername: userMatch.group(1)!,
+            targetShoutId: int.tryParse(
+              RegExp(r'#shout-(\d+)').firstMatch(notification.url)?.group(1) ??
+                  '',
+            ),
           ),
         ),
       );
@@ -116,8 +120,12 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       case 'fave':
         return AppColors.notifFave;
       case 'comment':
+      case 'submission_comment':
+      case 'journal_comment':
         return AppColors.notifComment;
       case 'watch':
+        return AppColors.notifWatch;
+      case 'shout':
         return AppColors.notifWatch;
       case 'journal':
         return AppColors.notifJournal;
@@ -131,15 +139,28 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       case 'fave':
         return Icons.favorite;
       case 'comment':
+      case 'submission_comment':
+      case 'journal_comment':
         return Icons.comment;
       case 'watch':
         return Icons.visibility;
+      case 'shout':
+        return Icons.campaign_outlined;
       case 'journal':
         return Icons.book;
       default:
         return Icons.notifications;
     }
   }
+
+  String _typeLabel(String type) => switch (type) {
+        'submission_comment' || 'journal_comment' || 'comment' => 'COMMENT',
+        'shout' => 'SHOUT',
+        'journal' => 'JOURNAL',
+        'fave' => 'FAVE',
+        'watch' => 'WATCH',
+        _ => type.toUpperCase(),
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +279,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           Icon(_typeIcon(notif.type), color: color, size: 12),
           const SizedBox(width: 6),
           Text(
-            notif.type.toUpperCase(),
+            _typeLabel(notif.type),
             style: TextStyle(
                 color: color, fontSize: 11, fontWeight: FontWeight.w700),
           ),

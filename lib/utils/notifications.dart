@@ -75,6 +75,30 @@ const _channels = {
 /// роутер (FATarget) сюда при старте.
 void Function(String url)? onNotificationTap;
 
+final List<String> _pendingNotificationTaps = <String>[];
+
+void dispatchNotificationTap(String payload) {
+  final handler = onNotificationTap;
+  if (handler == null) {
+    // initialize() выполняется до runApp: callback холодного запуска может
+    // прийти раньше, чем главный экран успеет назначить deep-link роутер.
+    _pendingNotificationTaps.add(payload);
+    return;
+  }
+  handler(payload);
+}
+
+/// Отдаёт нажатия, пришедшие до подписки главного экрана.
+void flushPendingNotificationTaps() {
+  final handler = onNotificationTap;
+  if (handler == null || _pendingNotificationTaps.isEmpty) return;
+  final pending = List<String>.of(_pendingNotificationTaps);
+  _pendingNotificationTaps.clear();
+  for (final payload in pending) {
+    handler(payload);
+  }
+}
+
 // ignore: unused_element
 AndroidNotificationDetails _androidDetails(String channelId) {
   return _channels[channelId] ?? _channels['download']!;
@@ -100,10 +124,27 @@ Future<void> initNotifications() async {
     onDidReceiveNotificationResponse: (NotificationResponse response) {
       final payload = response.payload;
       if (payload != null && payload.isNotEmpty) {
-        onNotificationTap?.call(payload);
+        dispatchNotificationTap(payload);
       }
     },
   );
+
+  // Создаём весь набор сразу: иначе Android показывает в настройках только
+  // каналы, которые уже успели показать первое уведомление.
+  final androidPlugin =
+      notificationsPlugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+  if (androidPlugin != null) {
+    for (final entry in _channels.entries) {
+      final details = entry.value;
+      await androidPlugin.createNotificationChannel(AndroidNotificationChannel(
+        '${entry.key}_channel',
+        details.channelName,
+        description: details.channelDescription,
+        importance: details.importance,
+      ));
+    }
+  }
 }
 
 Future<void> requestNotificationPermissions() async {
@@ -113,6 +154,30 @@ Future<void> requestNotificationPermissions() async {
   if (androidPlugin != null) {
     await androidPlugin.requestNotificationsPermission();
   }
+}
+
+/// Стабильный системный ID для логически одного события. Повторный показ с
+/// тем же ключом обновляет уведомление, а разные события не перезаписываются.
+int notificationIdFor(String key) => key.hashCode & 0x7fffffff;
+
+AndroidNotificationDetails androidNotificationDetailsForType(
+  String type, {
+  bool showProgress = false,
+  int progress = 0,
+  int maxProgress = 100,
+}) {
+  final channel = _channels[type] ?? _channels['download']!;
+  return AndroidNotificationDetails(
+    '${type}_channel',
+    channel.channelName,
+    channelDescription: channel.channelDescription,
+    importance: channel.importance,
+    priority: channel.priority,
+    onlyAlertOnce: true,
+    showProgress: showProgress,
+    progress: progress,
+    maxProgress: maxProgress,
+  );
 }
 
 /// Show a notification for a specific FA notification type.
@@ -126,15 +191,8 @@ Future<void> showNotification({
   int maxProgress = 100,
   String? payload,
 }) async {
-  final android = AndroidNotificationDetails(
-    '${type}_channel',
-    type.toUpperCase(),
-    channelDescription: 'FA $type notifications',
-    importance: _channels['${type}_channel']?.importance ??
-        Importance.defaultImportance,
-    priority:
-        _channels['${type}_channel']?.priority ?? Priority.defaultPriority,
-    onlyAlertOnce: true,
+  final android = androidNotificationDetailsForType(
+    type,
     showProgress: showProgress,
     progress: progress,
     maxProgress: maxProgress,
@@ -165,6 +223,7 @@ Future<void> showFavoriteNotification({required String title}) async {
 Future<void> showDownloadNotification({
   required String title,
   required String body,
+  int? notificationId,
   bool showProgress = false,
   int progress = 0,
   int maxProgress = 100,
@@ -173,7 +232,7 @@ Future<void> showDownloadNotification({
     type: 'download',
     title: title,
     body: body,
-    notificationId: 0,
+    notificationId: notificationId ?? 0,
     showProgress: showProgress,
     progress: progress,
     maxProgress: maxProgress,

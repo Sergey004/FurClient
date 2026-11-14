@@ -18,6 +18,7 @@ class ProfileScreen extends StatefulWidget {
   final FAClient client;
   final UserSession session;
   final String? targetUsername;
+  final int? targetShoutId;
   final VoidCallback? onLogout;
 
   const ProfileScreen({
@@ -25,6 +26,7 @@ class ProfileScreen extends StatefulWidget {
     required this.client,
     required this.session,
     this.targetUsername,
+    this.targetShoutId,
     this.onLogout,
   });
 
@@ -37,6 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   FAUser? _profile;
   bool _isLoading = true;
   String? _error;
+  final GlobalKey _targetShoutKey = GlobalKey();
 
   @override
   bool get wantKeepAlive => true;
@@ -62,6 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           _profile = profile;
           _isLoading = false;
         });
+        _scrollToTargetShout(profile);
       }
     } catch (e) {
       if (mounted) {
@@ -71,6 +75,27 @@ class _ProfileScreenState extends State<ProfileScreen>
         });
       }
     }
+  }
+
+  void _scrollToTargetShout(FAUser? profile) {
+    final targetId = widget.targetShoutId;
+    if (targetId == null ||
+        profile == null ||
+        !profile.shouts.any((shout) => shout.cid == targetId)) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final targetContext = _targetShoutKey.currentContext;
+      if (targetContext != null) {
+        Scrollable.ensureVisible(
+          targetContext,
+          alignment: 0.15,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
   }
 
   @override
@@ -201,12 +226,16 @@ class _ProfileScreenState extends State<ProfileScreen>
           const SizedBox(height: 8),
           for (final shout in p.shouts)
             Container(
+              key: shout.cid == widget.targetShoutId ? _targetShoutKey : null,
               width: double.infinity,
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: colors.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(16),
+                border: shout.cid == widget.targetShoutId
+                    ? Border.all(color: colors.primary, width: 2)
+                    : null,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -650,7 +679,8 @@ class _ProfileScreenState extends State<ProfileScreen>
             title: 'Watchlist',
             trailing: const Icon(Icons.chevron_right,
                 size: 20, color: AppColors.textMuted),
-            onTap: () => _openUserContent(p.username, UserContentType.watchlist),
+            onTap: () =>
+                _openUserContent(p.username, UserContentType.watchlist),
           ),
         ],
       ),

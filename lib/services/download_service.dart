@@ -25,14 +25,28 @@ class DownloadService {
     if (Platform.isAndroid) {
       // Android 11+ (API 30+): MANAGE_EXTERNAL_STORAGE
       final status = await Permission.manageExternalStorage.status;
+      debugPrint('=== DownloadService: manageExternalStorage status=$status');
       if (status.isGranted) return true;
+
+      // MANAGE_EXTERNAL_STORAGE — special permission: после первого отказа
+      // статус становится permanentlyDenied, и request() МОЛЧА возвращает
+      // отказ — юзер не видит никакого запроса. Единственный путь —
+      // настройки приложения, где тумблер «All files access» доступен
+      // всегда. При следующей попытке статус перечитается и скачает.
+      if (status.isPermanentlyDenied) {
+        debugPrint(
+            '=== DownloadService: permanently denied — opening app settings');
+        await openAppSettings();
+        return false;
+      }
 
       if (status.isDenied) {
         final result = await Permission.manageExternalStorage.request();
         if (result.isGranted) return true;
       }
 
-      // Fallback: basic storage permission
+      // Fallback: basic storage permission (актуален для Android ≤ 12;
+      // на 13+ WRITE_EXTERNAL_STORAGE системой не выдаётся).
       final basicStatus = await Permission.storage.status;
       if (basicStatus.isGranted) return true;
 
@@ -67,6 +81,19 @@ class DownloadService {
       return null;
     }
 
+    // У каждого файла свой ID: параллельные загрузки больше не перезаписывают
+    // статусы друг друга, а этапы одной загрузки обновляют одно уведомление.
+    final downloadNotificationId = notificationIdFor('download-$imageUrl');
+    Future<void> notifyDownload({
+      required String title,
+      required String body,
+    }) =>
+        showDownloadNotification(
+          title: title,
+          body: body,
+          notificationId: downloadNotificationId,
+        );
+
     try {
       // Request permissions if needed
       if (Platform.isAndroid || Platform.isIOS) {
@@ -77,7 +104,7 @@ class DownloadService {
       }
 
       // Show background notification for download start
-      await showDownloadNotification(
+      await notifyDownload(
         title: 'Download started',
         body: 'Fetching: $imageUrl',
       );
@@ -98,22 +125,35 @@ class DownloadService {
       if (bytes == null || bytes.isEmpty) {
         debugPrint(
             '=== DownloadService: Failed to fetch image bytes after retry');
-        await showDownloadNotification(
+        await notifyDownload(
           title: 'Download failed',
           body: 'Image fetch failed after retry.',
         );
         return null;
       }
       debugPrint('=== DownloadService: Fetched ${bytes.length} bytes');
-      await showDownloadNotification(
+      await notifyDownload(
         title: 'Image loaded',
         body: '${bytes.length} bytes fetched',
       );
 
-      // Step 2: Build path — /Download/furaffinity/{rating}/{author}/
+      // Step 2: Build path — {baseDir}/{rating}/{author}/. Если выбрана
+      // своя папка, но она недоступна — сообщаем уведомлением и падаем в
+      // общий Downloads (раньше фолбэк был молчаливым, и казалось, что
+      // «сохраняет не туда»).
       final safeAuthor = author.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_').trim();
       final safeRating = rating.toLowerCase(); // general, mature, adult
-      final baseDir = await _getBaseDir();
+      final base = await _getBaseDir();
+      if (base.customError != null) {
+        debugPrint(
+            '=== DownloadService: custom folder unavailable (${base.customError}) — fallback to Downloads');
+        await notifyDownload(
+          title: 'Selected folder unavailable',
+          body: 'Saved to Downloads instead. '
+              'Grant "All files access" or pick another folder.',
+        );
+      }
+      final baseDir = base.path;
       final dirPath = '$baseDir/$safeRating/$safeAuthor';
       final dir = Directory(dirPath);
       if (!dir.existsSync()) {
@@ -130,7 +170,7 @@ class DownloadService {
       final file = File(filePath);
       if (await file.exists()) {
         debugPrint('=== DownloadService: SKIP (already exists): $filePath');
-        await showDownloadNotification(
+        await notifyDownload(
           title: 'Already saved',
           body: 'Image already exists.',
         );
@@ -144,7 +184,7 @@ class DownloadService {
       if (await file.exists()) {
         final size = await file.length();
         debugPrint('=== DownloadService: Saved OK: $filePath ($size bytes)');
-        await showDownloadNotification(
+        await notifyDownload(
           title: 'Download complete',
           body: 'Saved: ${filePath.split('/').last} (${size} bytes)',
         );
@@ -156,7 +196,7 @@ class DownloadService {
       return filePath;
     } catch (e, stack) {
       debugPrint('=== DownloadService: Download error: $e');
-      await showDownloadNotification(
+      await notifyDownload(
         title: 'Download failed',
         body: 'Could not save image.',
       );
@@ -165,10 +205,9 @@ class DownloadService {
     }
   }
 
-  /// Get base download directory.
-  /// If user chose a custom folder in Settings, use that.
-  /// Otherwise falls back to platform defaults.
-  Future<String> _getBaseDir() async {
+  /// Результат выбора базовой папки: путь + причина отказа от выбранной
+  /// юзером папки (null — папка юзера работает или она не задана).
+  Future<({String path, String? customError})> _getBaseDir() async {
     // Check for custom download path set in Settings
     final prefs = await SharedPreferences.getInstance();
     final customPath = prefs.getString('custom_download_path');
@@ -187,12 +226,22 @@ class DownloadService {
           furDir.createSync(recursive: true);
         }
         debugPrint('=== DownloadService: Using custom path: ${furDir.path}');
-        return furDir.path;
+        return (path: furDir.path, customError: null);
       } catch (e) {
+        // Чаще всего это отсутствие «All files access» (scoped storage
+        // режет прямую запись на Android 11+) — сообщим наверх.
         debugPrint('=== DownloadService: Custom path not writable: $e');
+        final fallback = await _publicDownloadsDir();
+        return (path: fallback, customError: e.toString());
       }
     }
 
+    final fallback = await _publicDownloadsDir();
+    return (path: fallback, customError: null);
+  }
+
+  /// Публичный Downloads/furaffinity; если недоступен — app-specific dir.
+  Future<String> _publicDownloadsDir() async {
     if (Platform.isAndroid) {
       // Try public Downloads/furaffinity
       const publicBase = '/storage/emulated/0/Download/furaffinity';

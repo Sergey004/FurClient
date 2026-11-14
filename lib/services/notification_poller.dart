@@ -11,6 +11,19 @@ import '../utils/notifications.dart';
 import 'fa_client.dart';
 import 'fa_urls.dart';
 
+typedef NotificationPoster = Future<void> Function({
+  required String type,
+  required String title,
+  String body,
+  int notificationId,
+  bool showProgress,
+  int progress,
+  int maxProgress,
+  String? payload,
+});
+typedef NotesSource = Future<List<fa.FANotePreview>> Function();
+typedef OthersSource = Future<fa.FANotificationPreviews> Function();
+
 /// Цикл: 3 GET (лента → инбокс → /msg/others/) → diff по 6 int-watermark'ам
 /// (строго >) → фильтр по тумблерам → постинг старых-раньше. Watermarks
 /// двигаются из ПОЛНЫХ списков даже для выключенных категорий (помечаем
@@ -19,8 +32,18 @@ import 'fa_urls.dart';
 /// без изменения watermarks (очередь не теряется).
 class NotificationPoller {
   final FAClient client;
+  final NotificationPoster _poster;
+  final NotesSource? _notesSource;
+  final OthersSource? _othersSource;
 
-  NotificationPoller(this.client);
+  NotificationPoller(
+    this.client, {
+    NotificationPoster? poster,
+    NotesSource? notesSource,
+    OthersSource? othersSource,
+  })  : _poster = poster ?? showNotification,
+        _notesSource = notesSource,
+        _othersSource = othersSource;
 
   // Watermark-ключи — зеркала UserDefaultKeys эталона.
   static const _wmKeys = <String, String>{
@@ -78,8 +101,8 @@ class NotificationPoller {
       // запроса, а не сумму трёх.
       final results = await Future.wait<Object?>([
         client.getWatchSubmissions(),
-        _fetchNotes(),
-        _fetchOthers(),
+        _notesSource?.call() ?? _fetchNotes(),
+        _othersSource?.call() ?? _fetchOthers(),
       ]);
       final feed = results[0] as ({List<Submission> submissions, int? nextSid});
       final notes = results[1] as List<fa.FANotePreview>;
@@ -112,7 +135,9 @@ class NotificationPoller {
                     s.displayName.isNotEmpty ? s.displayName : s.author,
                     s.title,
                     'https://www.furaffinity.net/view/${s.id}/',
-                    preview: SubmissionPreview.fromSubmission(s).encode()));
+                    preview: SubmissionPreview.fromSubmission(s).encode(),
+                    createdAt: s.sortDate,
+                    numericId: int.tryParse(s.id) ?? 0));
               }
             }
             break;
@@ -125,7 +150,9 @@ class NotificationPoller {
                     'note',
                     n.displayAuthor.isNotEmpty ? n.displayAuthor : n.author,
                     '✉️ ${n.title}',
-                    n.noteUrl.toString()));
+                    n.noteUrl.toString(),
+                    createdAt: n.datetime,
+                    numericId: n.id));
               }
             }
             break;
@@ -144,20 +171,32 @@ class NotificationPoller {
                     category,
                     n.displayAuthor.isNotEmpty ? n.displayAuthor : n.author,
                     _emojiFor(category) + n.title,
-                    n.url.toString()));
+                    n.url.toString(),
+                    createdAt: n.datetime,
+                    numericId: n.id));
               }
             }
             break;
         }
       }
 
-      // 3. Постинг старые-раньше (новые в конце, как в эталоне).
+      // 3. Постинг старые-раньше. Даты сравниваются между категориями;
+      // у превью ленты даты нет, поэтому такие записи (sortAt=0) идут первыми
+      // в порядке числового sid. При равном времени — тип, затем числовой ID.
+      records.sort((a, b) {
+        final byDate =
+            int.parse(a['sortAt']!).compareTo(int.parse(b['sortAt']!));
+        if (byDate != 0) return byDate;
+        final byType = a['type']!.compareTo(b['type']!);
+        if (byType != 0) return byType;
+        return int.parse(a['numericId']!).compareTo(int.parse(b['numericId']!));
+      });
       for (final r in records) {
-        await showNotification(
+        await _poster(
           type: r['type']!,
           title: r['title']!,
           body: r['body']!,
-          notificationId: r['dedupKey']!.hashCode & 0x7fffffff,
+          notificationId: notificationIdFor(r['dedupKey']!),
           payload: _buildPayload(r),
         );
       }
@@ -188,7 +227,7 @@ class NotificationPoller {
       return;
     }
     await prefs.setInt('last_cf_toast_at', now);
-    await showNotification(
+    await _poster(
       type: 'system',
       title: 'Cloudflare check required',
       body:
@@ -199,13 +238,15 @@ class NotificationPoller {
 
   Map<String, String> _record(
       String dedupKey, String type, String title, String body, String url,
-      {String? preview}) {
+      {String? preview, DateTime? createdAt, required int numericId}) {
     return {
       'dedupKey': dedupKey,
       'type': type,
       'title': title,
       'body': body,
       'url': url,
+      'sortAt': '${createdAt?.millisecondsSinceEpoch ?? 0}',
+      'numericId': '$numericId',
       // Превью — JSON-строкой: сбой кодирования стоит только превью,
       // запись уведомления сохраняется (эталон, 28 окт).
       if (preview != null) 'preview': preview,
@@ -303,12 +344,11 @@ class NotificationPoller {
 /// постинга и доотправка прерванных запусков).
 String encodeQueue(List<Map<String, String>> records) => jsonEncode(records);
 
-
 // Топ-левел парсеры: замыкания без `this` (unsendable-ловушка изолятов).
 
 Future<fa.FANotificationPreviews> parseOthersInBackground(String html) =>
     Isolate.run(() {
-      final page = fa.FANotificationsPage.parse(
-          html, Uri.parse(FAUrls.notifications));
+      final page =
+          fa.FANotificationsPage.parse(html, Uri.parse(FAUrls.notifications));
       return fa.FANotificationPreviews.fromPage(page);
     });

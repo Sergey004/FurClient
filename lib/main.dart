@@ -26,6 +26,7 @@ import 'utils/cookie_manager.dart';
 import 'screens/login_screen.dart';
 import 'screens/journal_detail_screen.dart';
 import 'screens/note_detail_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/submission_detail_screen.dart';
 import 'models/submission_preview.dart';
 import 'screens/user_content_screen.dart';
@@ -196,6 +197,9 @@ class _FurClientAppState extends State<FurClientApp> {
   StreamSubscription<SystemAccentColor>? _systemThemeSubscription;
   bool _isLoggedIn = false;
   bool _isRestoringSession = true;
+  final Completer<void> _sessionRestored = Completer<void>();
+  String? _lastNotificationPayload;
+  DateTime? _lastNotificationTapAt;
 
   static final GlobalKey<NavigatorState> _navigatorKey =
       GlobalKey<NavigatorState>();
@@ -212,12 +216,7 @@ class _FurClientAppState extends State<FurClientApp> {
     // конвертом {url, preview} (превью едет вместе с уведомлением, чтобы
     // показывать карточку сразу, не дожидаясь сети) — при битом JSON
     // разбираем как обычный URL.
-    onNotificationTap = (payload) {
-      final url = _urlFromNotificationPayload(payload);
-      final preview = _previewFromNotificationPayload(payload);
-      final target = FATarget.parseString(url);
-      if (target != null) _navigateToTarget(target, preview: preview);
-    };
+    onNotificationTap = _handleNotificationTap;
     // Foreground-опрос уведомлений: раз после старта + таймер на Windows
     // (на Android в фоне работает workmanager; dedup по watermark'ам
     // исключает дубли между foreground- и background-прогонами).
@@ -231,6 +230,59 @@ class _FurClientAppState extends State<FurClientApp> {
     }
     _initApp();
     _setupDeepLinks();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      flushPendingNotificationTaps();
+      unawaited(_openColdStartNotification());
+    });
+  }
+
+  void _handleNotificationTap(String payload) {
+    final now = DateTime.now();
+    if (_lastNotificationPayload == payload &&
+        _lastNotificationTapAt != null &&
+        now.difference(_lastNotificationTapAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastNotificationPayload = payload;
+    _lastNotificationTapAt = now;
+    unawaited(_routeNotificationWhenReady(payload));
+  }
+
+  Future<void> _routeNotificationWhenReady(String payload) async {
+    // На холодном старте ждём и восстановление сессии, и первый кадр с
+    // Navigator. Иначе тап по submission/shout терялся до авторизации.
+    await _sessionRestored.future;
+    if (!mounted) return;
+    try {
+      final url = _urlFromNotificationPayload(payload);
+      final preview = _previewFromNotificationPayload(payload);
+      final target = FATarget.parseString(url);
+      if (target != null) _navigateToTarget(target, preview: preview);
+    } catch (e) {
+      debugPrint('Notification payload parse error: $e');
+    }
+  }
+
+  Future<void> _openColdStartNotification() async {
+    try {
+      final details =
+          await notificationsPlugin.getNotificationAppLaunchDetails();
+      final response = details?.notificationResponse;
+      final payload = response?.payload;
+      if (details?.didNotificationLaunchApp == true &&
+          payload != null &&
+          payload.isNotEmpty &&
+          mounted) {
+        _handleNotificationTap(payload);
+      }
+    } catch (e) {
+      debugPrint('Initial notification lookup error: $e');
+    }
+  }
+
+  void _finishSessionRestore() {
+    if (!_sessionRestored.isCompleted) _sessionRestored.complete();
   }
 
   bool _cfDialogOpen = false;
@@ -402,6 +454,26 @@ class _FurClientAppState extends State<FurClientApp> {
       case FATargetType.user:
         final username = target.username;
         if (username != null && mounted) {
+          final shoutId = int.tryParse(RegExp(r'^shout-(\d+)$')
+                  .firstMatch(target.url.fragment)
+                  ?.group(1) ??
+              '');
+          if (shoutId != null) {
+            final session = _authService.currentSession;
+            if (session != null && session.isLoggedIn) {
+              _navigatorKey.currentState?.push(
+                MaterialPageRoute(
+                  builder: (_) => ProfileScreen(
+                    client: _client,
+                    session: session,
+                    targetUsername: username,
+                    targetShoutId: shoutId,
+                  ),
+                ),
+              );
+            }
+            break;
+          }
           _navigatorKey.currentState?.push(
             MaterialPageRoute(
               builder: (_) => UserContentScreen(
@@ -499,6 +571,7 @@ class _FurClientAppState extends State<FurClientApp> {
             _isRestoringSession = false;
           });
         }
+        _finishSessionRestore();
         // Возврат в приложение закрывает CF-аутадж (эталон 335af254).
         unawaited(NotificationPoller.endCfOutage());
         // Верификация в фоне: false = сессия реально мертва (CF-заслон
@@ -525,6 +598,7 @@ class _FurClientAppState extends State<FurClientApp> {
         _isRestoringSession = false;
       });
     }
+    _finishSessionRestore();
     _maybeRunTransportProbe();
   }
 
@@ -564,6 +638,7 @@ class _FurClientAppState extends State<FurClientApp> {
     if (mounted) {
       setState(() => _isLoggedIn = true);
     }
+    _finishSessionRestore();
     debugPrint('=== _onLogin() completed successfully');
   }
 
