@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:furclient/models/fa_comment.dart';
 import 'package:furclient/models/submission.dart';
 import 'package:furclient/models/submission_preview.dart';
 import 'package:furclient/screens/submission_detail_screen.dart';
 import 'package:furclient/services/fa_client.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// FAClient с вечно висящим ответом — экран остаётся в состоянии загрузки,
 /// где и рисуется превью из уведомления.

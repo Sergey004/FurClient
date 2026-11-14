@@ -21,7 +21,12 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          # Пин к той же версии, что и в сборках: без flutter-version
+          # ставился свежий stable (3.50.0), где SDK-material объявлен
+          # deprecated — analyze падал на info-замечании.
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
