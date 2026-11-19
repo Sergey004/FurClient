@@ -1,172 +1,263 @@
 > [!NOTE]
-> Privacy
+> **Privacy**
 >
-> This app does not use telemetry, analytics, trackers, Firebase, or other third-party data collection services.
->
-> Your Fur Affinity credentials and account data are not collected or sold.
+> FurClient does not use telemetry, analytics, trackers, Firebase, or other
+> third-party data collection services. Your Fur Affinity credentials and
+> account data are not collected or sold.
 
-# FurClient — unofficial Fur Affinity client for Android and Windows
+# FurClient
 
-A cross-platform Fur Affinity client built with Flutter & Dart.
+An unofficial cross-platform [Fur Affinity](https://www.furaffinity.net/)
+client built with Flutter and Dart.
 
-## Platforms
+[![CI](https://github.com/Sergey004/FurClient/actions/workflows/ci.yml/badge.svg)](https://github.com/Sergey004/FurClient/actions/workflows/ci.yml)
 
-| Platform | Tech | Build Command |
-|---|---|---|
-| Windows | Flutter (WinUI 3 style) | `flutter build windows` |
-| Android | Flutter (Material 3) | `flutter build apk` |
+## Platforms and downloads
 
-## Design System
+| Platform | UI | Background notifications | Build |
+|---|---|---|---|
+| **Android** | Material 3 / Material You | `workmanager`, without Google Play Services | `flutter build apk --release` |
+| **Windows** | Fluent UI | In-process timer while the app is running | `flutter build windows --release` |
 
-FurClient adapts its UI to match the host OS design language (see [DESIGN.md](DESIGN.md)):
+Release packages are available from
+[GitHub Releases](https://github.com/Sergey004/FurClient/releases):
 
-- **Desktop** (Windows) — Fluent WinUI 3 layout: sidebar navigation, custom window chrome, cyan `#60cdff` accents, rectangular inputs
-- **Mobile** (Android) — Material 3 / Material You layout: bottom navigation bar, pill indicators, lavender `#e8def8` accents, capsule inputs, rounded-2xl cards
-- **Color-coded navigation** — each tab has a distinct accent color (Gallery=cyan, Watch=teal, Search=green, Notifications=purple, Profile=lavender)
-- **Dynamic color** — Material You wallpaper-derived colors on Android 12+, OS accent color on desktop
-- **High refresh rate** — pins the display's max refresh mode on Android (no 60↔120 Hz jumping on LTPO panels)
-
-## Commands
-
-```bash
-# Setup
-flutter pub get
-
-# Development
-flutter run -d windows
-flutter run -d <device_id>
-
-# Build
-flutter build windows
-flutter build apk --release
-
-# Analysis & tests
-dart analyze
-flutter test
-cd packages/fa_kit && dart test   # HTML parser tests (real-page fixtures)
-```
-
-## Project Structure
-
-```
-furclient/
-  lib/
-    main.dart              — App entry, session restore, CF challenge dialog,
-                             background task dispatcher, deep links
-    theme/
-      app_theme.dart       — Color system, breakpoints, adaptive theme
-    navigation/
-      adaptive_shell.dart  — FluentShell (Windows) / MaterialShell (mobile)
-      fluent_shell.dart    — Fluent navigation pane, SFW sync, sign out
-      material_shell.dart  — Bottom bar / NavigationRail, SFW sync
-    screens/
-      login_screen.dart    — WebView-based FA login with cookie capture
-      gallery_screen.dart  — Browse submissions with adaptive grid
-      watch_feed_screen.dart — Watched-users feed (new@72 cursors)
-      search_screen.dart   — Search with filters, sort and history
-      notifications_screen.dart — Color-coded notification types
-      profile_screen.dart  — Profile stats, bio, quick links, shouts wall
-      settings_screen.dart — Theme, SFW, downloads, updates (Fluent/M3)
-      submission_detail_screen.dart — Side-by-side desktop / scroll mobile
-      user_content_screen.dart        — User gallery / favorites / journals
-      journal_detail_screen.dart      — Journal content and comments
-    services/
-      auth_service.dart    — Session storage, WebView login flow
-      fa_client.dart       — WebView-based HTML fetching, cookies,
-                             Cloudflare escalation, background parsing
-      notification_poller.dart — Background notification polling
-      update_service.dart  — GitHub Releases updater (Velopack on Windows)
-      download_service.dart — Asset downloading logic
-      fa_urls.dart         — FA URL builders
-    packages/fa_kit        — Pure HTML parsers & models (no I/O), mirrors
-                             the Swift FAKit reference implementation
-    models/
-      submission.dart      — Submission model
-      fa_notification.dart — Notification model with type detection
-      fa_user.dart         — User profile, stats and shouts
-      user_session.dart    — Session/cookie persistence model
-    utils/
-      cookie_manager.dart  — CookieManager wrapper (per-platform quirks)
-      fa_image_loader.dart — FAImage/FAAvatar widgets
-      webview_image_fetcher.dart — Headless WebView image pool (2 workers)
-      fa_image_proxy.dart  — Local image proxy for HTML content (Windows)
-      notifications.dart   — Local notification channels and posting
-```
+- Android: APK and AAB.
+- Windows: Velopack packages with update support.
 
 ## Features
 
-### Implemented
+### Account and networking
 
-- **Authentication**: WebView-based login with cookie persistence and validation
-- **Session Management**: Automatic restore; Cloudflare interstitials no longer
-  log you out — they are resolved lazily where they appear
-- **Cloudflare handling**: locale-independent challenge detection, passive
-  retries, visible Turnstile resolver dialog (Windows), `cf-mitigated` header
-  checks, CF cookie hygiene (see [AGENTS.md](AGENTS.md) for the gritty details)
-- **Navigation**: Adaptive shell — Fluent pane on Windows, bottom bar/rail on mobile
-- **Submission Browsing**: Gallery/Browse with category chips and pagination
-- **Watch Feed**: watched-users feed with favorite-state restore and
-  progressive heart updates
-- **Search**: full filters (author, tags, ratings, types, date range, sort) and history
-- **Notifications tab**: color-coded by type (shouts, journals, comments, faves)
-- **Background Notifications**: periodic polling via `workmanager` (no Google
-  Play Services — falls back to AlarmManager), per-category channels, tap →
-  deep link, "Cloudflare check required" service notification
-- **User Profiles**: stats (fixed for the beta theme's responsive labels),
-  bio, quick links, **shouts wall**
-- **Settings**: theme, SFW mode (synced with the site's `sfw_toggle` cookie),
-  image quality, download folder, per-app updates
-- **Downloads**: structured save paths `{rating}/{author}/{file}` with
-  progress notifications
-- **Updates**: in-app updater — Velopack on Windows, `upgrader` on Android
-- **Image Pipeline**: shared WebView image pool (2 workers), 3-layer cache,
-  local image proxy for HTML content on Windows, thumbnail size negotiation
-- **Smoothness**: HTML parsing runs in background isolates (`Isolate.run`),
-  parallel image/feed/favorites fetching, pinned high refresh rate
+- WebView-based Fur Affinity login with persistent cookie storage.
+- Automatic session restoration and validation.
+- Locale-independent Cloudflare challenge detection and cookie synchronization.
+- Visible Cloudflare resolver on Windows when a headless WebView cannot pass
+  the challenge automatically.
+- Configurable HTML transport in Settings:
+  - **Auto** — use direct HTTP when the session and Cloudflare clearance allow
+    it, with a safe WebView fallback.
+  - **HTTP** — prefer direct HTTP for eligible page reads.
+  - **WebView** — use the WebView path.
+- Cronet on Android and Dart HTTP on Windows for supported requests.
+- WebView remains available for login, Cloudflare, AJAX pages, and requests
+  that cannot use direct HTTP.
 
-### Not implemented yet
+### Content
 
-- **Notes (PMs)**: parsers exist in `packages/fa_kit`; no UI yet
-- **Watchlist browsing**: parser exists; no UI yet
-- **Posting journals/shouts/notes**: only comments, favorites and watch
-  toggles are wired
-- **Submission upload**
+- Gallery/Browse with adaptive grids, categories, and pagination.
+- Watch Feed with favorite-state restoration and progressive updates.
+- Search with author, tags, ratings, content types, date range, sorting, and
+  search history.
+- Submission and journal details with comments.
+- Favorite, watch, and comment actions.
+- User profiles with stats, biography, quick links, and a shouts wall.
+- User galleries, favorites, journals, and watchlists through profile links.
+- Notes inbox, note reading, replies, and new-note composition.
 
-## Supported Deep Link URLs
+### Notifications
 
-| URL Pattern | Target Type | Status |
+Six independently configurable background categories:
+
+- New submissions from watched artists.
+- Notes.
+- Submission comments.
+- Journal comments.
+- Shouts.
+- Journals from watched artists.
+
+Behavior:
+
+- Android polls periodically with `workmanager` when a network connection is
+  available. Exact timing still depends on Android power management.
+- Windows polls every 30 minutes **only while the application is running**.
+- The first successful poll seeds watermarks without posting the existing
+  backlog. Subsequent polls compare numeric IDs to avoid duplicates.
+- Disabled categories advance their watermarks, so enabling a category later
+  does not replay old events.
+- Android registers all nine notification channels at startup, including
+  Downloads, System, and Favorites alongside the six polling categories.
+- Notification taps restore the session before routing when necessary.
+- Submission notifications carry a preview for immediate rendering.
+- Shout notifications open the profile and scroll to the highlighted shout.
+- Cloudflare service notifications are throttled to avoid repeated alerts.
+- Parallel downloads use separate notification IDs and do not overwrite each
+  other's progress.
+
+### Downloads
+
+- Automatic download on favorite can be enabled independently.
+- Default Android destination:
+
+  ```text
+  Download/furaffinity/{rating}/{author}/{original_filename}
+  ```
+
+- A user-selected folder uses:
+
+  ```text
+  {selected_folder}/furaffinity/{rating}/{author}/{original_filename}
+  ```
+
+- Original filenames are preserved when available.
+- Existing files are skipped instead of duplicated.
+- Folder write tests and explicit notifications make permission/fallback
+  problems visible.
+- If the selected or public folder is unavailable, the app falls back to an
+  app-specific storage directory.
+
+### Interface and accessibility
+
+- **Android:** Material 3, Material You dynamic colors on supported devices,
+  bottom navigation/navigation rail, and a high-refresh-rate mode.
+- **Windows:** Fluent navigation, dialogs, controls, system accent color,
+  light/dark/system themes, and custom window chrome.
+- Touch-aware refresh controls: pull-to-refresh on touch devices and refresh
+  buttons for pointer/desktop use.
+- Adaptive sheets, dialogs, lists, and favorite controls for each platform.
+- Optional haptic feedback.
+- SFW mode synchronized with Fur Affinity's `sfw_toggle` cookie.
+
+## Requirements
+
+- **Flutter 3.50.0** on the stable channel (the version pinned in CI).
+- **Java 17** for Android builds.
+- **Microsoft WebView2 Runtime** on Windows.
+- **.NET 8** only if you want to create Velopack release packages locally.
+
+## Getting started
+
+```bash
+flutter pub get
+
+# Install the local parser package's dependencies as well
+cd packages/fa_kit
+flutter pub get
+cd ../..
+
+# Run on Windows
+flutter run -d windows --debug
+
+# Run on a connected Android device or emulator
+flutter devices
+flutter run -d <device_id> --debug
+```
+
+## Build
+
+```bash
+# Android APK
+flutter build apk --release
+
+# Android App Bundle
+flutter build appbundle --release
+
+# Windows
+flutter build windows --release
+```
+
+Outputs:
+
+```text
+build/app/outputs/flutter-apk/app-release.apk
+build/app/outputs/bundle/release/app-release.aab
+build/windows/x64/runner/Release/
+```
+
+## Analysis and tests
+
+```bash
+dart analyze
+flutter test
+
+cd packages/fa_kit
+dart test
+cd ../..
+```
+
+The `fa_kit` parser tests use real-page HTML fixtures. The application tests
+also cover notification watermarks, category filtering, ordering, Cloudflare
+throttling, channel configuration, and notification payload handling.
+
+## Project structure
+
+```text
+furclient/
+├── lib/
+│   ├── main.dart                       # Startup, session restore, scheduling,
+│   │                                   # notification taps, deep links
+│   ├── navigation/                    # Fluent and Material application shells
+│   ├── screens/                       # Gallery, Watch, Search, Notifications,
+│   │                                   # Profile, Notes, Settings, details
+│   ├── models/                        # Application models and UserSession
+│   ├── services/
+│   │   ├── fa_client.dart             # Session, cookies, Cloudflare, HTML/API
+│   │   ├── page_transport.dart        # Direct HTTP transport and fallback
+│   │   ├── notification_poller.dart   # Six-category diff and watermark logic
+│   │   ├── download_service.dart      # Storage paths and downloads
+│   │   └── update_service.dart        # Platform update handling
+│   ├── utils/
+│   │   ├── notifications.dart         # Channels, posting, tap dispatch
+│   │   ├── touch_mode.dart            # Windows touch-input detection
+│   │   └── cookie_manager.dart        # Platform cookie normalization
+│   ├── widgets/adaptive/               # Adaptive switches, sheets, refresh, etc.
+│   └── theme/                         # Material and Fluent theme builders
+├── packages/fa_kit/                   # Pure HTML parsers and models, no I/O
+├── test/                              # Application and widget tests
+├── android/                           # Android host project and permissions
+├── windows/                           # Windows host project
+└── .github/workflows/                 # CI and tagged release builds
+```
+
+## Supported deep links
+
+| URL pattern | Result | Status |
 |---|---|---|
-| `https://www.furaffinity.net/view/{id}/` | submission | ✅ |
-| `https://www.furaffinity.net/journal/{id}/` | journal | ✅ |
-| `https://www.furaffinity.net/user/{username}/` | user | ✅ |
-| `https://www.furaffinity.net/gallery/{username}/` | gallery | ✅ |
-| `https://www.furaffinity.net/msg/pms/{id}/` | note | ⚠️ stub (no notes UI) |
-| `furaffinity://view/{id}/` | submission | ✅ |
+| `https://www.furaffinity.net/view/{id}/` | Submission detail | Supported |
+| `https://www.furaffinity.net/journal/{id}/` | Journal detail | Supported |
+| `https://www.furaffinity.net/msg/pms/{id}/` | Note detail | Supported |
+| `https://www.furaffinity.net/user/{username}/#shout-{id}` | Profile with the target shout highlighted | Supported |
+| `https://www.furaffinity.net/user/{username}/` | User content | Supported |
+| `furaffinity://view/{id}/` | Submission detail | Supported |
+| Gallery/favorites/journals/watchlist URL variants | Shell-level routing | Partial |
 
-## Platform-Specific Notes
+## CI and releases
 
-- **Windows**: WebView2 (shared environment for login/headless/dialogs —
-  mixing environments breaks cookies), local image proxy on `127.0.0.1`,
-  Velopack-based updates, Fluent window chrome
-- **Android**: Material You dynamic colors, local notifications +
-  `workmanager` background polling (GMS-free), App Links
-  (`https://*.furaffinity.net`), MANAGE_EXTERNAL_STORAGE for downloads
+GitHub Actions runs on pushes and pull requests to `master` and `dev`:
 
-## Authentication
+1. Static analysis and both test suites.
+2. Android debug APK build.
+3. Windows release build.
 
-FurClient uses a WebView-based login (the password never touches app code):
+Tags matching `v*` trigger the release workflow and publish Android APK/AAB
+artifacts plus Windows Velopack packages.
 
-1. **WebView Login**: the FurAffinity login page is opened via `flutter_inappwebview`.
-2. **Cookie Capture**: after successful authentication the app captures
-   cookies (CookieManager + `document.cookie` strategies) and validates the
-   essential ones.
-3. **Persistence & Sync**: cookies are stored in `SharedPreferences`
-   (`UserSession`) and mirrored into the WebView cookie store, Dio's cookie
-   jar and the in-memory `CookieStore` for image loaders.
-4. **Validation**: on startup the session is verified against the FA homepage;
-   a Cloudflare interstitial is treated as "session alive" — it resolves
-   lazily via the challenge resolver instead of forcing a re-login.
+## Current limitations
 
-## Note for FA Stuff
+- There are no background notifications on Windows after the application is
+  closed.
+- Incoming favorite and watch events are not polled as notification categories.
+- Journal/shout publishing and submission upload are not implemented.
+- Some gallery, favorites, journals, and watchlist deep links still need
+  shell-level navigation.
+- The image-quality preference is present in Settings but is not yet applied
+  consistently to image loading.
 
-If this app is causing any interference with the servers, I'll stop "developing" it right away.
+## Authentication details
+
+1. Fur Affinity's login page is opened in a WebView; the password is not passed
+   to application code.
+2. After login, cookies are captured and essential session cookies are checked.
+3. Cookies are persisted in `SharedPreferences` and synchronized with the
+   WebView store, HTTP cookie jar, and image-loading layer.
+4. Startup verification treats a Cloudflare interstitial as a solvable network
+   state rather than immediately deleting the saved session.
+
+## License
+
+See [LICENSE](LICENSE).
+
+## Note for FA staff
+
+If this app causes any interference with the servers, development will be
+stopped immediately.
