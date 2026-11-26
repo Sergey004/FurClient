@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/window_manager.dart' as wm;
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/fa_client.dart';
@@ -110,13 +110,15 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
       height: 48,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onPanStart: (_) => windowManager.startDragging(),
+        onPanStart: (_) =>
+            wm.WindowManager.instance.getCurrent()!.startDragging(),
         onDoubleTap: () async {
-          final isMax = await windowManager.isMaximized();
+          final window = wm.WindowManager.instance.getCurrent()!;
+          final isMax = window.isMaximized;
           if (isMax) {
-            windowManager.unmaximize();
+            window.unmaximize();
           } else {
-            windowManager.maximize();
+            window.maximize();
           }
         },
         child: Row(

@@ -4,11 +4,11 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tray_manager/tray_manager.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/window_manager.dart' as wm;
 
 /// Tray-backed background mode for Windows. Closing the window hides it while
-/// the existing notification timer keeps running; Exit destroys the process.
-class WindowsTrayService with WindowListener {
+/// the existing notification timer keeps running; Exit closes the app window.
+class WindowsTrayService {
   WindowsTrayService._();
   static final WindowsTrayService instance = WindowsTrayService._();
 
@@ -21,6 +21,8 @@ class WindowsTrayService with WindowListener {
   ListenerId? _trayListener;
   ListenerId? _openListener;
   ListenerId? _exitListener;
+  wm.Window? _window;
+  wm.ListenerId? _windowListener;
   bool _enabled = false;
   bool _exiting = false;
 
@@ -37,14 +39,22 @@ class WindowsTrayService with WindowListener {
     if (value) {
       await _createTray();
     } else {
-      await windowManager.setPreventClose(false);
-      windowManager.removeListener(this);
+      final window = _window;
+      final listener = _windowListener;
+      if (window != null && listener != null) {
+        window.removeListener(listener);
+      }
+      _windowListener = null;
       await _destroyTray();
     }
   }
 
   Future<void> _createTray() async {
     if (_trayIcon != null || !TrayManager.instance.isSupported()) return;
+    final window = wm.WindowManager.instance.getCurrent();
+    if (window == null) {
+      throw StateError('Windows app window is unavailable.');
+    }
     final tray = TrayIcon.createWithIdentifier('furclient');
     if (tray == null) {
       debugPrint('=== Tray: could not create tray icon');
@@ -97,38 +107,56 @@ class WindowsTrayService with WindowListener {
       return;
     }
 
-    windowManager.addListener(this);
-    await windowManager.setPreventClose(true);
+    _window = window;
+    _windowListener = window.addListener((event) {
+      if (event is wm.WindowCloseRequestedEvent && _enabled && !_exiting) {
+        event.request.cancel();
+        window.hide();
+      }
+    });
     debugPrint('=== Tray: background mode enabled');
   }
 
   Future<void> showWindow() async {
     if (!Platform.isWindows) return;
-    await windowManager.show();
-    await windowManager.focus();
+    final window = _window ?? wm.WindowManager.instance.getCurrent();
+    if (window == null) {
+      throw StateError('Windows app window is unavailable.');
+    }
+    window.show();
+    window.focus();
   }
 
   Future<void> closeWindow() async {
-    if (_enabled) {
-      await windowManager.hide();
-    } else {
-      await windowManager.close();
+    final window = _window ?? wm.WindowManager.instance.getCurrent();
+    if (window == null) {
+      throw StateError('Windows app window is unavailable.');
     }
-  }
-
-  @override
-  void onWindowClose() {
-    if (!_enabled || _exiting) return;
-    unawaited(windowManager.hide());
+    if (_enabled) {
+      window.hide();
+    } else {
+      if (!window.close()) {
+        debugPrint('=== Tray: could not close the app window');
+      }
+    }
   }
 
   Future<void> exitApp() async {
     if (_exiting) return;
+    final window = _window ?? wm.WindowManager.instance.getCurrent();
+    if (window == null) {
+      throw StateError('Windows app window is unavailable.');
+    }
     _exiting = true;
-    await windowManager.setPreventClose(false);
-    windowManager.removeListener(this);
+    final listener = _windowListener;
+    if (listener != null) {
+      window.removeListener(listener);
+    }
+    _windowListener = null;
     await _destroyTray();
-    await windowManager.destroy();
+    if (!window.close()) {
+      debugPrint('=== Tray: could not close the app window on exit');
+    }
   }
 
   Future<void> _destroyTray() async {

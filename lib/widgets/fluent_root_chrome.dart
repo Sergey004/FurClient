@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/window_manager.dart' as wm;
 import 'caption_buttons.dart';
 import '../theme/app_theme.dart';
 
@@ -111,13 +111,15 @@ class _ChromeBar extends StatelessWidget {
       color: theme.micaBackgroundColor,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onPanStart: (_) => windowManager.startDragging(),
+        onPanStart: (_) =>
+            wm.WindowManager.instance.getCurrent()!.startDragging(),
         onDoubleTap: () async {
-          final isMax = await windowManager.isMaximized();
+          final window = wm.WindowManager.instance.getCurrent()!;
+          final isMax = window.isMaximized;
           if (isMax) {
-            await windowManager.unmaximize();
+            window.unmaximize();
           } else {
-            await windowManager.maximize();
+            window.maximize();
           }
         },
         child: Padding(

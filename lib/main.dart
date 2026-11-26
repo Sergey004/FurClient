@@ -143,16 +143,15 @@ void main() {
 
         // Hide the OS title bar so the single FluentRootChrome caption bar is
         // the only one in the window (prevents duplicate min/max/close buttons).
-        await windowManager.ensureInitialized();
-        const windowOptions = WindowOptions(
-          titleBarStyle: TitleBarStyle.hidden,
-          size: Size(1280, 800),
-          minimumSize: Size(720, 540),
-          center: true,
-        );
-        await windowManager.waitUntilReadyToShow(windowOptions, () async {
-          await windowManager.show();
-        });
+        final window = WindowManager.instance.getCurrent();
+        if (window == null) {
+          throw StateError('Windows app window is unavailable.');
+        }
+        window.titleBarStyle = TitleBarStyle.hidden;
+        window.setSize(const Size(1280, 800).toNative(), false);
+        window.minimumSize = const Size(720, 540).toNative();
+        window.center();
+        window.show();
         await WindowsTrayService.instance.load();
       }
 

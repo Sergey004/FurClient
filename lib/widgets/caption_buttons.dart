@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/window_manager.dart' as wm;
 import '../services/windows_tray_service.dart';
 
 /// Custom caption buttons (minimize / maximize / close) replacing the
@@ -32,18 +32,19 @@ class CaptionButtons extends StatelessWidget {
         children: [
           _btn(
             fluent.FluentIcons.chrome_minimize,
-            () => windowManager.minimize(),
+            () => wm.WindowManager.instance.getCurrent()!.minimize(),
             inactive,
             hoverBg: hoverBg,
           ),
           _btn(
             fluent.FluentIcons.stop,
             () async {
-              final isMax = await windowManager.isMaximized();
+              final window = wm.WindowManager.instance.getCurrent()!;
+              final isMax = window.isMaximized;
               if (isMax) {
-                windowManager.unmaximize();
+                window.unmaximize();
               } else {
-                windowManager.maximize();
+                window.maximize();
               }
             },
             inactive,
