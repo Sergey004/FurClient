@@ -189,8 +189,7 @@ class _MaterialShellState extends State<MaterialShell> {
             ),
             child: NavigationRail(
               selectedIndex: _currentIndex,
-              onDestinationSelected: (index) =>
-                  setState(() => _currentIndex = index),
+              onDestinationSelected: _onNavTap,
               extended: isExtended,
               minExtendedWidth: 220,
               backgroundColor: colorScheme.surfaceContainerLow,

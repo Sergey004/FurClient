@@ -72,11 +72,33 @@ void main() {
       expect(j2.datetime, DateTime(2025, 1, 14, 19, 36));
     });
 
+    test('parses watches from the current real notification layout', () {
+      final html = fixture('www.furaffinity.net-msg-others-watches.html');
+      final page = FANotificationsPage.parse(
+          html, Uri.parse('https://www.furaffinity.net/msg/others/'));
+
+      expect(page.watchHeaders, hasLength(2));
+      expect(page.favoriteHeaders, isEmpty);
+      final first = page.watchHeaders[0];
+      expect(first.id, 188036768);
+      expect(first.author, 'watcherone');
+      expect(first.displayAuthor, 'WatcherOne');
+      expect(first.title, 'Started watching you');
+      expect(first.url.toString(),
+          'https://www.furaffinity.net/user/watcherone/');
+      expect(first.datetime, DateTime(2026, 10, 12, 13, 14, 38));
+      expect(first.naturalDatetime, 'a month ago');
+      expect(page.watchHeaders[1].id, 187191268);
+      expect(page.watchHeaders[1].displayAuthor, 'WatcherTwo');
+    });
+
     test('empty fixture returns all empty lists', () {
       final html = fixture('www.furaffinity.net-msg-others-empty.html');
       final page = FANotificationsPage.parse(
           html, Uri.parse('https://www.furaffinity.net/msg/others/'));
 
+      expect(page.favoriteHeaders, isEmpty);
+      expect(page.watchHeaders, isEmpty);
       expect(page.submissionCommentHeaders, isEmpty);
       expect(page.journalCommentHeaders, isEmpty);
       expect(page.shoutHeaders, isEmpty);

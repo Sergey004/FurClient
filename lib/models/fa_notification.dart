@@ -55,7 +55,7 @@ class FANotification {
       displayName: header.displayAuthor,
       avatarUrl: fa.FAURLs.avatarUrl(header.author) ?? '',
       title: header.title,
-      // type: 'submission_comment' | 'journal_comment' | 'shout' | 'journal'
+      // fave | watch | submission_comment | journal_comment | shout | journal
       type: type,
       datetime: header.naturalDatetime,
       naturalDatetime: header.naturalDatetime,
@@ -69,6 +69,12 @@ class FANotification {
     final page = fa.FANotificationsPage.parse(
         htmlString, Uri.parse('https://www.furaffinity.net/msg/others/'));
     final result = <FANotification>[];
+    for (final h in page.favoriteHeaders) {
+      result.add(FANotification.fromFAHeader(h, 'fave'));
+    }
+    for (final h in page.watchHeaders) {
+      result.add(FANotification.fromFAHeader(h, 'watch'));
+    }
     for (final h in page.submissionCommentHeaders) {
       result.add(FANotification.fromFAHeader(h, 'submission_comment'));
     }

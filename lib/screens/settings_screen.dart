@@ -2,6 +2,7 @@ import 'dart:io' show Directory, File;
 
 import 'package:material_ui/material_ui.dart';
 import '../utils/haptics.dart';
+import '../utils/image_quality.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_selector/file_selector.dart';
@@ -9,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../services/fa_client.dart';
 import '../services/update_service.dart';
+import '../services/windows_tray_service.dart';
 import '../utils/platform_utils.dart';
 import '../theme/theme_provider.dart';
 import '../utils/app_version.dart';
@@ -42,10 +44,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   // Категории фоновых уведомлений (poller читает те же ключи).
   bool _notifySubmissions = true;
   bool _notifyNotes = true;
+  bool _notifyFavorites = true;
+  bool _notifyWatches = true;
   bool _notifySubmissionComments = true;
   bool _notifyJournalComments = true;
   bool _notifyShouts = true;
   bool _notifyJournals = true;
+  bool _windowsBackground = true;
   bool _autoDownloadOnFave = false;
   bool _autoCloseOnFave = true;
   String _imageQuality = 'high';
@@ -93,12 +98,16 @@ class _SettingsScreenState extends State<SettingsScreen>
         _hapticsEnabled = prefs.getBool('haptics_enabled') ?? true;
         _notifySubmissions = prefs.getBool('notify_submissions') ?? true;
         _notifyNotes = prefs.getBool('notify_notes') ?? true;
+        _notifyFavorites = prefs.getBool('notify_favorites') ?? true;
+        _notifyWatches = prefs.getBool('notify_watches') ?? true;
         _notifySubmissionComments =
             prefs.getBool('notify_submission_comments') ?? true;
         _notifyJournalComments =
             prefs.getBool('notify_journal_comments') ?? true;
         _notifyShouts = prefs.getBool('notify_shouts') ?? true;
         _notifyJournals = prefs.getBool('notify_journals') ?? true;
+        _windowsBackground =
+            prefs.getBool(WindowsTrayService.preferenceKey) ?? true;
         _autoDownloadOnFave = prefs.getBool('auto_download_on_fave') ?? false;
         _autoCloseOnFave = prefs.getBool('auto_close_on_fave') ?? true;
         _imageQuality = prefs.getString('image_quality') ?? 'high';
@@ -127,6 +136,10 @@ class _SettingsScreenState extends State<SettingsScreen>
           _notifySubmissions = value;
         case 'notify_notes':
           _notifyNotes = value;
+        case 'notify_favorites':
+          _notifyFavorites = value;
+        case 'notify_watches':
+          _notifyWatches = value;
         case 'notify_submission_comments':
           _notifySubmissionComments = value;
         case 'notify_journal_comments':
@@ -138,6 +151,12 @@ class _SettingsScreenState extends State<SettingsScreen>
       }
     });
     await _saveSetting(key, value);
+  }
+
+  Future<void> _onWindowsBackgroundToggle(bool value) async {
+    setState(() => _windowsBackground = value);
+    await _saveSetting(WindowsTrayService.preferenceKey, value);
+    await WindowsTrayService.instance.setEnabled(value);
   }
 
   Future<void> _saveSetting(String key, dynamic value) async {
@@ -337,6 +356,24 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
             Divider(height: 1, indent: 16, color: outline),
             _adaptiveSwitchTile(
+              icon: Icons.favorite_outline,
+              iconColor: primary,
+              value: _notifyFavorites,
+              onChanged: (v) => _saveNotify('notify_favorites', v),
+              title: 'Favorites',
+              subtitle: 'When someone favorites your submissions',
+            ),
+            Divider(height: 1, indent: 16, color: outline),
+            _adaptiveSwitchTile(
+              icon: Icons.visibility_outlined,
+              iconColor: secondary,
+              value: _notifyWatches,
+              onChanged: (v) => _saveNotify('notify_watches', v),
+              title: 'New watchers',
+              subtitle: 'When someone starts watching you',
+            ),
+            Divider(height: 1, indent: 16, color: outline),
+            _adaptiveSwitchTile(
               icon: Icons.comment_outlined,
               iconColor: tertiary,
               value: _notifySubmissionComments,
@@ -371,6 +408,17 @@ class _SettingsScreenState extends State<SettingsScreen>
               title: 'Journals',
               subtitle: 'From watched users',
             ),
+            if (isWindows) ...[
+              Divider(height: 1, indent: 16, color: outline),
+              _adaptiveSwitchTile(
+                icon: Icons.picture_in_picture_alt_outlined,
+                iconColor: primary,
+                value: _windowsBackground,
+                onChanged: _onWindowsBackgroundToggle,
+                title: 'Run in background',
+                subtitle: 'Keep notifications active in tray when closed',
+              ),
+            ],
           ]),
           const SizedBox(height: 24),
           _sectionHeader('Downloads'),
@@ -521,6 +569,24 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                   Divider(height: 1, indent: 16, color: outline),
                   _adaptiveSwitchTile(
+                    icon: fluent.FluentIcons.heart,
+                    iconColor: colorScheme.primary,
+                    value: _notifyFavorites,
+                    onChanged: (v) => _saveNotify('notify_favorites', v),
+                    title: 'Favorites',
+                    subtitle: 'When someone favorites your submissions',
+                  ),
+                  Divider(height: 1, indent: 16, color: outline),
+                  _adaptiveSwitchTile(
+                    icon: fluent.FluentIcons.view,
+                    iconColor: colorScheme.primary,
+                    value: _notifyWatches,
+                    onChanged: (v) => _saveNotify('notify_watches', v),
+                    title: 'New watchers',
+                    subtitle: 'When someone starts watching you',
+                  ),
+                  Divider(height: 1, indent: 16, color: outline),
+                  _adaptiveSwitchTile(
                     icon: fluent.FluentIcons.comment,
                     iconColor: colorScheme.primary,
                     value: _notifySubmissionComments,
@@ -556,6 +622,15 @@ class _SettingsScreenState extends State<SettingsScreen>
                     onChanged: (v) => _saveNotify('notify_journals', v),
                     title: 'Journals',
                     subtitle: 'From watched users',
+                  ),
+                  Divider(height: 1, indent: 16, color: outline),
+                  _adaptiveSwitchTile(
+                    icon: fluent.FluentIcons.desktop_flow,
+                    iconColor: colorScheme.primary,
+                    value: _windowsBackground,
+                    onChanged: _onWindowsBackgroundToggle,
+                    title: 'Run in background',
+                    subtitle: 'Keep notifications active in tray when closed',
                   ),
                 ],
               ),
@@ -714,7 +789,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                         color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 15)),
                 const SizedBox(height: 2),
-                Text('Quality for full-size images',
+                Text('Display quality; downloads keep originals',
                     style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 13)),
@@ -741,7 +816,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 onChanged: (v) {
                   if (v != null) {
                     setState(() => _imageQuality = v);
-                    _saveSetting('image_quality', v);
+                    FAImageQuality.setQuality(v);
                   }
                 },
               ),
@@ -774,7 +849,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   onChanged: (v) {
                     if (v != null) {
                       setState(() => _imageQuality = v);
-                      _saveSetting('image_quality', v);
+                      FAImageQuality.setQuality(v);
                     }
                   },
                 ),

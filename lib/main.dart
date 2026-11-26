@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform, HttpClient;
+import 'dart:developer' as developer;
+import 'dart:io' show Platform, HttpClient, File;
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:material_ui/material_ui.dart';
@@ -16,10 +17,12 @@ import 'package:workmanager/workmanager.dart';
 
 import 'services/auth_service.dart';
 import 'utils/haptics.dart';
+import 'utils/image_quality.dart';
 import 'services/fa_client.dart';
 import 'services/notification_poller.dart';
 import 'services/transport_probe.dart';
 import 'services/update_service.dart';
+import 'services/windows_tray_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
 import 'utils/cookie_manager.dart';
@@ -30,7 +33,6 @@ import 'screens/profile_screen.dart';
 import 'screens/submission_detail_screen.dart';
 import 'models/submission_preview.dart';
 import 'screens/user_content_screen.dart';
-import 'screens/gallery_screen.dart';
 import 'navigation/adaptive_shell.dart';
 
 import 'widgets/fluent_root_chrome.dart';
@@ -87,6 +89,7 @@ void main() {
 
       // Настройка хаптик (haptics_enabled) — до любых UI-взаимодействий.
       await FHaptics.load();
+      await FAImageQuality.load();
 
       if (Platform.isAndroid) {
         await InAppWebViewController.setWebContentsDebuggingEnabled(true);
@@ -150,6 +153,7 @@ void main() {
         await windowManager.waitUntilReadyToShow(windowOptions, () async {
           await windowManager.show();
         });
+        await WindowsTrayService.instance.load();
       }
 
       if (isDesktop) {
@@ -212,6 +216,46 @@ class _FurClientAppState extends State<FurClientApp> {
     // Windows: CF-челленджи, которые headless WebView2 пройти не может,
     // показываем пользователю в видимом диалоге (см. _CfChallengeDialog).
     _client.cfChallengeResolver = _resolveCloudflareChallenge;
+    if (kDebugMode) {
+      // Временная выгрузка настоящих страниц для parser fixtures. Только debug;
+      // удаляется после завершения работы с текущими формами/уведомлениями.
+      developer.registerExtension('ext.flutter.furclient.fetchFixture',
+          (method, parameters) async {
+        try {
+          final uri = Uri.parse(parameters['url'] ?? '');
+          if (uri.host != 'www.furaffinity.net') {
+            return developer.ServiceExtensionResponse.result(jsonEncode({
+              'error': 'Only www.furaffinity.net is allowed',
+            }));
+          }
+          var html = '';
+          try {
+            html = await _client.getHtml(uri.toString());
+          } catch (_) {
+            final solved = await _resolveCloudflareChallenge(uri.toString());
+            if (solved) html = await _client.getHtml(uri.toString());
+          }
+          if (html.isEmpty) {
+            return developer.ServiceExtensionResponse.result(jsonEncode({
+              'error': 'Could not fetch the page',
+            }));
+          }
+          final name = uri.path
+              .replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_')
+              .replaceAll(RegExp(r'^_+|_+$'), '');
+          final file = File('C:/temp/fa_fixtures_current_20261119/$name.html');
+          await file.writeAsString(html);
+          return developer.ServiceExtensionResponse.result(jsonEncode({
+            'path': file.path,
+            'bytes': html.length,
+          }));
+        } catch (e) {
+          return developer.ServiceExtensionResponse.result(jsonEncode({
+            'error': e.toString(),
+          }));
+        }
+      });
+    }
     // Тап по уведомлению → deep-link роутер (FATarget). Payload может быть
     // конвертом {url, preview} (превью едет вместе с уведомлением, чтобы
     // показывать карточку сразу, не дожидаясь сети) — при битом JSON
@@ -258,7 +302,10 @@ class _FurClientAppState extends State<FurClientApp> {
       final url = _urlFromNotificationPayload(payload);
       final preview = _previewFromNotificationPayload(payload);
       final target = FATarget.parseString(url);
-      if (target != null) _navigateToTarget(target, preview: preview);
+      if (target != null) {
+        if (isWindows) await WindowsTrayService.instance.showWindow();
+        _navigateToTarget(target, preview: preview);
+      }
     } catch (e) {
       debugPrint('Notification payload parse error: $e');
     }
@@ -340,7 +387,7 @@ class _FurClientAppState extends State<FurClientApp> {
     });
   }
 
-  void _handleDeepLink(Uri uri) {
+  Future<void> _handleDeepLink(Uri uri) async {
     debugPrint('Deep link received: $uri');
     final now = DateTime.now();
     if (_lastDeepLink == uri.toString() &&
@@ -356,6 +403,10 @@ class _FurClientAppState extends State<FurClientApp> {
       return;
     }
 
+    // Как и при тапе по уведомлению, холодный deep link ждёт восстановления
+    // сессии: ProfileScreen и user-content не должны открываться до неё.
+    await _sessionRestored.future;
+    if (!mounted) return;
     debugPrint('Parsed target: $target');
     _navigateToTarget(target);
   }
@@ -453,55 +504,32 @@ class _FurClientAppState extends State<FurClientApp> {
         break;
       case FATargetType.user:
         final username = target.username;
-        if (username != null && mounted) {
+        final session = _authService.currentSession;
+        if (username != null &&
+            session != null &&
+            session.isLoggedIn &&
+            mounted) {
           final shoutId = int.tryParse(RegExp(r'^shout-(\d+)$')
                   .firstMatch(target.url.fragment)
                   ?.group(1) ??
               '');
-          if (shoutId != null) {
-            final session = _authService.currentSession;
-            if (session != null && session.isLoggedIn) {
-              _navigatorKey.currentState?.push(
-                MaterialPageRoute(
-                  builder: (_) => ProfileScreen(
-                    client: _client,
-                    session: session,
-                    targetUsername: username,
-                    targetShoutId: shoutId,
-                  ),
-                ),
-              );
-            }
-            break;
-          }
           _navigatorKey.currentState?.push(
             MaterialPageRoute(
-              builder: (_) => UserContentScreen(
+              builder: (_) => ProfileScreen(
                 client: _client,
-                username: username,
-                contentType: UserContentType.journals,
+                session: session,
+                targetUsername: username,
+                targetShoutId: shoutId,
               ),
             ),
           );
         }
         break;
       case FATargetType.gallery:
-        final username = target.username;
-        if (username != null && mounted) {
-          _navigatorKey.currentState?.push(
-            MaterialPageRoute(
-              builder: (_) => GalleryScreen(
-                client: _client,
-                sfwMode: false,
-              ),
-            ),
-          );
-        }
+        _pushUserContent(target, UserContentType.gallery);
         break;
       case FATargetType.favorites:
-        // Navigate to gallery tab by default
-        // Note: This requires app-level coordination with AdaptiveShell
-        debugPrint('Favorites deep link - needs shell-level navigation');
+        _pushUserContent(target, UserContentType.favorites);
         break;
       case FATargetType.note:
         final navState = _navigatorKey.currentState;
@@ -517,14 +545,28 @@ class _FurClientAppState extends State<FurClientApp> {
         }
         break;
       case FATargetType.journals:
-        _navToTabByUrl(target);
+        _pushUserContent(target, UserContentType.journals);
         break;
       case FATargetType.watchlist:
-        _navToTabByUrl(target);
+        _pushUserContent(target, UserContentType.watchlist);
         break;
       default:
         debugPrint('Unhandled target type: $targetType');
     }
+  }
+
+  void _pushUserContent(FATarget target, UserContentType contentType) {
+    final username = target.username;
+    if (username == null || !mounted) return;
+    _navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (_) => UserContentScreen(
+          client: _client,
+          username: username,
+          contentType: contentType,
+        ),
+      ),
+    );
   }
 
   Future<void> _navToTabByUrl(FATarget target) async {
@@ -936,6 +978,8 @@ class _CfChallengeDialog extends StatefulWidget {
 
 class _CfChallengeDialogState extends State<_CfChallengeDialog> {
   bool _completed = false;
+  Timer? _clearanceTimer;
+  bool _checkingClearance = false;
 
   Future<void> _onLoadStop(InAppWebViewController controller, Uri? url) async {
     if (_completed) return;
@@ -944,8 +988,48 @@ class _CfChallengeDialogState extends State<_CfChallengeDialog> {
     // настоящая страница FA всегда крупнее и размечена по-другому.
     if (!FAClient.isCloudflarePageHtml(html) && html.length > 5000) {
       _completed = true;
+      _clearanceTimer?.cancel();
       if (mounted) Navigator.of(context).pop(true);
+      return;
     }
+    _watchForClearance(controller);
+  }
+
+  void _watchForClearance(InAppWebViewController controller) {
+    if (_clearanceTimer != null) return;
+    var checks = 0;
+    _clearanceTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (_checkingClearance || _completed || !mounted) return;
+      if (++checks > 60) {
+        timer.cancel();
+        return;
+      }
+      _checkingClearance = true;
+      try {
+        final cookies = await FAICookieManager.instance
+            .getCookies(url: WebUri('https://www.furaffinity.net'));
+        final solved = cookies.any((cookie) =>
+            cookie.name == 'cf_clearance' &&
+            (cookie.value?.isNotEmpty ?? false));
+        if (!solved) return;
+        timer.cancel();
+        // Turnstile ставит галочку, но не обязан сам перезагружать целевую
+        // страницу. Без этого reload onLoadStop никогда не наступит.
+        await controller.loadUrl(
+          urlRequest: URLRequest(url: WebUri(widget.url)),
+        );
+      } catch (e) {
+        debugPrint('CF clearance watch error: $e');
+      } finally {
+        _checkingClearance = false;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _clearanceTimer?.cancel();
+    super.dispose();
   }
 
   @override

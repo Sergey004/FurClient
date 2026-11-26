@@ -39,12 +39,16 @@ class FANotificationHeader {
 ///
 /// Mirrors `FANotificationsPage` in FANotificationsPage.swift:11-65.
 class FANotificationsPage {
+  final List<FANotificationHeader> favoriteHeaders;
+  final List<FANotificationHeader> watchHeaders;
   final List<FANotificationHeader> submissionCommentHeaders;
   final List<FANotificationHeader> journalCommentHeaders;
   final List<FANotificationHeader> shoutHeaders;
   final List<FANotificationHeader> journalHeaders;
 
   FANotificationsPage({
+    required this.favoriteHeaders,
+    required this.watchHeaders,
     required this.submissionCommentHeaders,
     required this.journalCommentHeaders,
     required this.shoutHeaders,
@@ -63,6 +67,12 @@ class FANotificationsPage {
     final formNode = document.querySelector(
         'body div#main-window div#site-content div#messagecenter-other div#columnpage div.submission-content form#messages-form');
 
+    final favoriteNodes = formNode?.querySelectorAll(
+            'section#messages-favorites div.section-body ul.message-stream li') ??
+        [];
+    final watchNodes = formNode?.querySelectorAll(
+            'section#messages-watches div.section-body ul.message-stream li') ??
+        [];
     final submissionCommentNodes = formNode?.querySelectorAll(
             'section#messages-comments-submission div.section-body ul.message-stream li') ??
         [];
@@ -77,6 +87,12 @@ class FANotificationsPage {
         [];
 
     return FANotificationsPage(
+      favoriteHeaders: favoriteNodes
+          .map((li) => _parseActivityNotification(li, favorite: true))
+          .toList(),
+      watchHeaders: watchNodes
+          .map((li) => _parseActivityNotification(li, favorite: false))
+          .toList(),
       submissionCommentHeaders: submissionCommentNodes
           .map((li) => _parseCommentNotification(li,
               urlNodeSelector: 'strong i a',
@@ -90,6 +106,61 @@ class FANotificationsPage {
           .map((li) => _parseShoutNotification(li, document))
           .toList(),
       journalHeaders: journalNodes.map(_parseJournalNotification).toList(),
+    );
+  }
+
+  /// Parse a favorite/watch row. Both carry their own notification ID in the
+  /// checkbox; watches put the display name in div.info rather than in the
+  /// avatar link, so they cannot reuse the comment parser.
+  static FANotificationHeader _parseActivityNotification(
+    dom.Element li, {
+    required bool favorite,
+  }) {
+    final inputName = favorite ? 'favorites[]' : 'watches[]';
+    final input = li.querySelector('input[name="$inputName"]') ??
+        li.querySelector('input[type="checkbox"]');
+    final id = int.tryParse(input?.attributes['value'] ?? '') ?? 0;
+
+    final authorNode = li.querySelector('a[href*="/user/"]');
+    final authorHref = authorNode?.attributes['href'] ?? '';
+    final author = RegExp(r'/user/([^/]+)/')
+            .firstMatch(authorHref)
+            ?.group(1) ??
+        '';
+    final linkedDisplayName = authorNode
+            ?.querySelector('span.c-usernameBlockSimple__displayName')
+            ?.text
+            .trim() ??
+        '';
+    final displayAuthor = linkedDisplayName.isNotEmpty
+        ? linkedDisplayName
+        : li.querySelector('div.info > span')?.text.trim() ??
+            authorNode?.text.trim() ??
+            author;
+
+    final dateResult = parseFADateNode(li.querySelector('span.popup_date'));
+    final targetNode = favorite ? li.querySelector('a[href*="/view/"]') : null;
+    final targetHref = targetNode?.attributes['href'] ?? '';
+    final urlHref = favorite && targetHref.isNotEmpty ? targetHref : authorHref;
+    final url = Uri.parse(
+      urlHref.startsWith('http')
+          ? urlHref
+          : '${FAURLs.baseUrl}${urlHref.startsWith('/') ? urlHref : '/$urlHref'}',
+    );
+    final title = favorite
+        ? targetNode?.text.trim().isNotEmpty == true
+            ? targetNode!.text.trim()
+            : 'Favorited your submission'
+        : 'Started watching you';
+
+    return FANotificationHeader(
+      id: id,
+      author: author,
+      displayAuthor: displayAuthor,
+      title: title,
+      datetime: dateResult.datetime,
+      naturalDatetime: dateResult.naturalDatetime,
+      url: url,
     );
   }
 

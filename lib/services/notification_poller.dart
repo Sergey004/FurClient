@@ -24,7 +24,7 @@ typedef NotificationPoster = Future<void> Function({
 typedef NotesSource = Future<List<fa.FANotePreview>> Function();
 typedef OthersSource = Future<fa.FANotificationPreviews> Function();
 
-/// Цикл: 3 GET (лента → инбокс → /msg/others/) → diff по 6 int-watermark'ам
+/// Цикл: 3 GET (лента → инбокс → /msg/others/) → diff по 8 int-watermark'ам
 /// (строго >) → фильтр по тумблерам → постинг старых-раньше. Watermarks
 /// двигаются из ПОЛНЫХ списков даже для выключенных категорий (помечаем
 /// прочитанным). Первый запуск только засеивает watermarks — без постинга.
@@ -49,6 +49,8 @@ class NotificationPoller {
   static const _wmKeys = <String, String>{
     'submission': 'latestSubmissionNotificationID',
     'note': 'latestNoteNotificationID',
+    'favorite': 'latestFavoriteNotificationID',
+    'watch': 'latestWatchNotificationID',
     'submission_comment': 'latestSubmissionCommentNotificationID',
     'journal_comment': 'latestJournalCommentNotificationID',
     'shout': 'latestShoutNotificationID',
@@ -59,6 +61,8 @@ class NotificationPoller {
   static const _prefKeys = <String, String>{
     'submission': 'notify_submissions',
     'note': 'notify_notes',
+    'favorite': 'notify_favorites',
+    'watch': 'notify_watches',
     'submission_comment': 'notify_submission_comments',
     'journal_comment': 'notify_journal_comments',
     'shout': 'notify_shouts',
@@ -121,13 +125,16 @@ class NotificationPoller {
       for (final entry in _wmKeys.entries) {
         final category = entry.key;
         final enabled = prefs.getBool(_prefKeys[category]!) ?? true;
+        // Новая категория на существующей установке сначала засевается, а не
+        // высыпает текущую очередь. На следующем цикле diff работает как обычно.
+        final initialized = prefs.containsKey(entry.value);
         final watermark = prefs.getInt(entry.value) ?? 0;
 
         switch (category) {
           case 'submission':
             final fresh = feed.submissions
                 .where((s) => (int.tryParse(s.id) ?? 0) > watermark);
-            if (enabled) {
+            if (enabled && initialized) {
               for (final s in fresh) {
                 records.add(_record(
                     'submission-${s.id}',
@@ -143,7 +150,7 @@ class NotificationPoller {
             break;
           case 'note':
             final fresh = notes.where((n) => n.id > watermark && n.unread);
-            if (enabled) {
+            if (enabled && initialized) {
               for (final n in fresh) {
                 records.add(_record(
                     'note-${n.id}',
@@ -158,13 +165,15 @@ class NotificationPoller {
             break;
           default:
             final List<fa.FANotificationPreview> list = switch (category) {
+              'favorite' => others.favorites,
+              'watch' => others.watches,
               'submission_comment' => others.submissionComments,
               'journal_comment' => others.journalComments,
               'shout' => others.shouts,
               _ => others.journals,
             };
             final fresh = list.where((n) => n.id > watermark);
-            if (enabled) {
+            if (enabled && initialized) {
               for (final n in fresh) {
                 records.add(_record(
                     '$category-${n.id}',
@@ -254,6 +263,8 @@ class NotificationPoller {
   }
 
   String _emojiFor(String category) => switch (category) {
+        'favorite' => '❤️ ',
+        'watch' => '👀 ',
         'submission_comment' => '💬 ',
         'journal_comment' => '💬 ',
         'shout' => '📣 ',
@@ -274,6 +285,10 @@ class NotificationPoller {
     await prefs.setInt(_wmKeys['submission']!,
         maxOf(feed.submissions.map((s) => int.tryParse(s.id) ?? 0)));
     await prefs.setInt(_wmKeys['note']!, maxOf(notes.map((n) => n.id)));
+    await prefs.setInt(_wmKeys['favorite']!,
+        maxOf(others.favorites.map((n) => n.id)));
+    await prefs.setInt(
+        _wmKeys['watch']!, maxOf(others.watches.map((n) => n.id)));
     await prefs.setInt(_wmKeys['submission_comment']!,
         maxOf(others.submissionComments.map((n) => n.id)));
     await prefs.setInt(_wmKeys['journal_comment']!,
@@ -301,6 +316,14 @@ class NotificationPoller {
             prefs.getInt(wm['submission']!) ?? 0));
     await prefs.setInt(wm['note']!,
         maxOf(notes.map((n) => n.id), prefs.getInt(wm['note']!) ?? 0));
+    await prefs.setInt(
+        wm['favorite']!,
+        maxOf(others.favorites.map((n) => n.id),
+            prefs.getInt(wm['favorite']!) ?? 0));
+    await prefs.setInt(
+        wm['watch']!,
+        maxOf(others.watches.map((n) => n.id),
+            prefs.getInt(wm['watch']!) ?? 0));
     await prefs.setInt(
         wm['submission_comment']!,
         maxOf(others.submissionComments.map((n) => n.id),

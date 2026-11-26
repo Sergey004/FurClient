@@ -9,6 +9,7 @@ class Submission {
   final String displayName;
   final String category;
   final String imageUrl;
+  final String previewImageUrl;
   final int views;
   final int faves;
   final int commentsCount;
@@ -25,7 +26,8 @@ class Submission {
   final bool isFavorite;
   final String favoriteUrl;
 
-  String get thumbnailUrl => imageUrl;
+  String get thumbnailUrl =>
+      previewImageUrl.isNotEmpty ? previewImageUrl : imageUrl;
   String get fullImageUrl => flashUrl.isNotEmpty ? flashUrl : imageUrl;
   String get authorAvatar => FAUrls.avatar(author);
 
@@ -36,6 +38,7 @@ class Submission {
     this.displayName = '',
     required this.category,
     required this.imageUrl,
+    this.previewImageUrl = '',
     required this.views,
     required this.faves,
     required this.commentsCount,
@@ -65,6 +68,7 @@ class Submission {
         displayName: displayName,
         category: category,
         imageUrl: imageUrl,
+        previewImageUrl: previewImageUrl,
         views: views,
         faves: faves ?? this.faves,
         commentsCount: commentsCount,
@@ -89,6 +93,7 @@ class Submission {
         'displayName': displayName,
         'category': category,
         'imageUrl': imageUrl,
+        'previewImageUrl': previewImageUrl,
         'views': views,
         'faves': faves,
         'commentsCount': commentsCount,
@@ -113,6 +118,7 @@ class Submission {
         displayName: json['displayName'] as String? ?? '',
         category: json['category'] as String? ?? 'Digital',
         imageUrl: json['imageUrl'] as String? ?? '',
+        previewImageUrl: json['previewImageUrl'] as String? ?? '',
         views: json['views'] as int? ?? 0,
         faves: json['faves'] as int? ?? 0,
         commentsCount: json['commentsCount'] as int? ?? 0,
@@ -144,6 +150,7 @@ class Submission {
       category: m.category.isNotEmpty ? m.category : 'Digital',
       imageUrl: page.fullResolutionMediaUrl?.toString() ??
           page.previewImageUrl.toString(),
+      previewImageUrl: page.previewImageUrl.toString(),
       views: m.viewCount,
       faves: m.favoriteCount,
       commentsCount: m.commentCount,
@@ -178,6 +185,7 @@ class Submission {
       displayName: item.displayAuthor,
       category: 'Digital',
       imageUrl: item.thumbnailUrl.toString(),
+      previewImageUrl: item.thumbnailUrl.toString(),
       views: 0,
       faves: 0,
       commentsCount: 0,

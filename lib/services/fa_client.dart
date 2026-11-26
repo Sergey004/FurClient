@@ -1879,6 +1879,47 @@ class FAClient {
     debugPrint('=== sendNote: delivered to $to');
   }
 
+  /// Опубликовать shout на странице пользователя. CSRF-key и action каждый
+  /// раз берутся из живой формы профиля, а не переиспользуются между заходами.
+  Future<void> postShout({
+    required String username,
+    required String message,
+  }) async {
+    final text = message.trim();
+    if (text.isEmpty) throw ArgumentError.value(message, 'message', 'Empty');
+    if (text.length > 255) {
+      throw ArgumentError.value(message, 'message', 'Maximum 255 characters');
+    }
+
+    await _ensureInitialized();
+    final profileUrl = FAUrls.user(username);
+    final html = await _getHtml(profileUrl);
+    final form = fa.FAShoutForm.parse(html, Uri.parse(profileUrl));
+    if (form == null) {
+      throw StateError('Shout form is unavailable on this profile');
+    }
+
+    final cookieHeader = _buildCookieHeader();
+    final response = await _dio.post<String>(
+      form.action.toString(),
+      data: form.fields(text),
+      options: Options(
+        headers: {
+          if (cookieHeader != null) 'Cookie': cookieHeader,
+          'Referer': profileUrl,
+        },
+        contentType: 'application/x-www-form-urlencoded',
+      ),
+    );
+    final status = response.statusCode ?? 0;
+    if (status >= 400) {
+      throw StateError('Shout post failed with HTTP $status');
+    }
+    final responseHtml = response.data ?? '';
+    if (_cfLooksBlocked(responseHtml)) throw CloudflareError();
+    debugPrint('=== postShout: delivered to $username');
+  }
+
   /// Fetch a user's watchlist. direction: 'by' = кто кого СМОТРИТ
   /// (watching), 'to' = кто смотрит НА НЕГО (watchers).
   Future<List<fa.FAWatchlistUser>> getWatchlist(String username,

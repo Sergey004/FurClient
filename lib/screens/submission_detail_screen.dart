@@ -13,6 +13,7 @@ import '../screens/profile_screen.dart';
 import '../widgets/adaptive/adaptive.dart';
 import '../utils/platform_utils.dart';
 import '../utils/fa_image_loader.dart';
+import '../utils/image_quality.dart';
 import '../widgets/fullscreen_image_viewer.dart';
 import '../services/download_service.dart';
 import '../services/search_history.dart';
@@ -53,7 +54,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   bool _isLoading = true;
   bool _isFaving = false;
   bool _isDownloading = false;
-  bool _isSendingComment = false;
+  final ValueNotifier<bool> _isSendingComment = ValueNotifier<bool>(false);
   final TextEditingController _commentCtrl = TextEditingController();
 
   String? _error;
@@ -62,6 +63,13 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   void initState() {
     super.initState();
     _loadSubmission();
+  }
+
+  @override
+  void dispose() {
+    _isSendingComment.dispose();
+    _commentCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSubmission() async {
@@ -126,7 +134,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       final updated =
           await widget.client.toggleFavorite(sub.favoriteUrl, sub.id);
       if (mounted && updated != null) {
-        success = true;
+        success = updated.isFavorite && !sub.isFavorite;
         FHaptics.success();
         final updatedSubmission = Submission(
           id: sub.id,
@@ -134,6 +142,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           author: sub.author,
           category: sub.category,
           imageUrl: sub.imageUrl,
+          previewImageUrl: sub.previewImageUrl,
           views: sub.views,
           faves: updated.faves,
           commentsCount: sub.commentsCount,
@@ -260,23 +269,30 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                         overflow: TextOverflow.clip,
                       ),
                     ),
-                    IconButton(
-                      icon: _isSendingComment
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            )
-                          : Icon(Icons.send,
-                              size: 20,
-                              color: Theme.of(context).colorScheme.onSurface),
-                      onPressed:
-                          _isSendingComment || _commentCtrl.text.trim().isEmpty
-                              ? null
-                              : () => _submitComment(ctx, parentCid),
+                    AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _commentCtrl,
+                        _isSendingComment,
+                      ]),
+                      builder: (context, _) => IconButton(
+                        icon: _isSendingComment.value
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color:
+                                      Theme.of(context).colorScheme.primary,
+                                ),
+                              )
+                            : Icon(Icons.send,
+                                size: 20,
+                                color: Theme.of(context).colorScheme.onSurface),
+                        onPressed: _isSendingComment.value ||
+                                _commentCtrl.text.trim().isEmpty
+                            ? null
+                            : () => _submitComment(ctx, parentCid),
+                      ),
                     ),
                   ],
                 ),
@@ -355,60 +371,31 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
                   ),
                 ],
                 const SizedBox(height: 8),
-                // В шите (Android) поле растягивается на свободную высоту;
-                // в Fluent-диалоге Expanded раздувал бы диалог до максимума
-                // и валил лейаут — там поле берёт натуральную высоту.
-                if (isWindows)
-                  TextField(
-                    controller: _commentCtrl,
-                    maxLines: null,
-                    minLines: 3,
-                    keyboardType: TextInputType.multiline,
-                    textInputAction: TextInputAction.newline,
-                    decoration: InputDecoration(
-                      hintText: 'Write a comment...',
-                      filled: true,
-                      fillColor:
-                          Theme.of(context).colorScheme.surfaceContainerHighest,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(28),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(28),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 14),
+                // Поле имеет натуральную ограниченную высоту на обеих
+                // платформах: Expanded внутри min-height композа недопустим.
+                TextField(
+                  controller: _commentCtrl,
+                  maxLines: null,
+                  minLines: 3,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  decoration: InputDecoration(
+                    hintText: 'Write a comment...',
+                    filled: true,
+                    fillColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(28),
+                      borderSide: BorderSide.none,
                     ),
-                  )
-                else
-                  Expanded(
-                    child: TextField(
-                      controller: _commentCtrl,
-                      maxLines: null,
-                      minLines: 3,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      decoration: InputDecoration(
-                        hintText: 'Write a comment...',
-                        filled: true,
-                        fillColor: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(28),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(28),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 14),
-                      ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(28),
+                      borderSide: BorderSide.none,
                     ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
                   ),
+                ),
               ],
             ),
           ),
@@ -420,7 +407,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   Future<void> _submitComment(BuildContext ctx, int? parentCid) async {
     final text = _commentCtrl.text.trim();
     if (text.isEmpty || _submission == null) return;
-    setState(() => _isSendingComment = true);
+    _isSendingComment.value = true;
     try {
       final success = await widget.client.postComment(
         _submission!.url,
@@ -439,7 +426,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       debugPrint('=== postComment error: $e');
       _showMessage('Error: $e', AppColors.danger);
     } finally {
-      if (mounted) setState(() => _isSendingComment = false);
+      if (mounted) _isSendingComment.value = false;
     }
   }
 
@@ -790,52 +777,63 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       );
     }
 
-    return GestureDetector(
-      onTap: sub.imageUrl.isNotEmpty
-          ? () => FullscreenImageViewer.open(
-                context,
-                imageUrl: sub.imageUrl,
-                title: sub.title,
-                author: sub.author,
-              )
-          : null,
-      child: MouseRegion(
-        cursor: sub.imageUrl.isNotEmpty
-            ? SystemMouseCursors.zoomIn
-            : SystemMouseCursors.basic,
-        child: Container(
-          color: colorScheme.surfaceContainerLowest,
-          child: sub.imageUrl.isNotEmpty
-              ? FAImage(
-                  url: sub.imageUrl,
-                  fit: BoxFit.contain,
-                  placeholder: Container(
-                    height: 300,
-                    color: colorScheme.surfaceContainerHighest,
-                    child: const Center(
-                      child: AdaptiveProgress(strokeWidth: 2),
+    return ValueListenableBuilder<String>(
+      valueListenable: FAImageQuality.current,
+      builder: (context, quality, _) {
+        final imageUrl = FAImageQuality.resolveUrl(
+          fullUrl: sub.imageUrl,
+          previewUrl: sub.previewImageUrl,
+          quality: quality,
+        );
+        return GestureDetector(
+          onTap: imageUrl.isNotEmpty
+              ? () => FullscreenImageViewer.open(
+                    context,
+                    imageUrl: imageUrl,
+                    title: sub.title,
+                    author: sub.author,
+                  )
+              : null,
+          child: MouseRegion(
+            cursor: imageUrl.isNotEmpty
+                ? SystemMouseCursors.zoomIn
+                : SystemMouseCursors.basic,
+            child: Container(
+              color: colorScheme.surfaceContainerLowest,
+              child: imageUrl.isNotEmpty
+                  ? FAImage(
+                      key: ValueKey(imageUrl),
+                      url: imageUrl,
+                      fit: BoxFit.contain,
+                      placeholder: Container(
+                        height: 300,
+                        color: colorScheme.surfaceContainerHighest,
+                        child: const Center(
+                          child: AdaptiveProgress(strokeWidth: 2),
+                        ),
+                      ),
+                      errorWidget: Container(
+                        height: 200,
+                        color: colorScheme.surfaceContainerHighest,
+                        child: Icon(
+                          Icons.broken_image,
+                          color: colorScheme.onSurfaceVariant,
+                          size: 48,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      height: 200,
+                      color: colorScheme.surfaceContainerHighest,
+                      child: Center(
+                        child: Icon(Icons.image,
+                            color: colorScheme.onSurfaceVariant, size: 48),
+                      ),
                     ),
-                  ),
-                  errorWidget: Container(
-                    height: 200,
-                    color: colorScheme.surfaceContainerHighest,
-                    child: Icon(
-                      Icons.broken_image,
-                      color: colorScheme.onSurfaceVariant,
-                      size: 48,
-                    ),
-                  ),
-                )
-              : Container(
-                  height: 200,
-                  color: colorScheme.surfaceContainerHighest,
-                  child: Center(
-                    child: Icon(Icons.image,
-                        color: colorScheme.onSurfaceVariant, size: 48),
-                  ),
-                ),
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -844,9 +842,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
         MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(isDesktop ? 24 : 16),
-      child: Column(
+    final content = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -1114,7 +1110,17 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             ..._comments.map((c) => _buildComment(c)),
           const SizedBox(height: 32),
         ],
-      ),
+      );
+
+    if (isDesktop) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: content,
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: content,
     );
   }
 

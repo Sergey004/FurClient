@@ -44,12 +44,16 @@ class FANotificationPreview {
 
 /// Container for all notification types.
 class FANotificationPreviews {
+  final List<FANotificationPreview> favorites;
+  final List<FANotificationPreview> watches;
   final List<FANotificationPreview> submissionComments;
   final List<FANotificationPreview> journalComments;
   final List<FANotificationPreview> shouts;
   final List<FANotificationPreview> journals;
 
   FANotificationPreviews({
+    this.favorites = const [],
+    this.watches = const [],
     required this.submissionComments,
     required this.journalComments,
     required this.shouts,
@@ -59,6 +63,9 @@ class FANotificationPreviews {
   /// Create from a parsed notifications page.
   factory FANotificationPreviews.fromPage(FANotificationsPage page) {
     return FANotificationPreviews(
+      favorites:
+          page.favoriteHeaders.map(FANotificationPreview.fromHeader).toList(),
+      watches: page.watchHeaders.map(FANotificationPreview.fromHeader).toList(),
       submissionComments: page.submissionCommentHeaders
           .map(FANotificationPreview.fromHeader)
           .toList(),

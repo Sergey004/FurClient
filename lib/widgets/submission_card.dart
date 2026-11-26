@@ -74,7 +74,9 @@ class _SubmissionCardState extends State<SubmissionCard> {
         widget.onFavoriteChanged?.call(updated);
         // Saving a favorite is complete once the server confirms it. An
         // optional image download must not hold the card's interaction open.
-        unawaited(_maybeAutoDownload());
+        if (updated.isFavorite && !wasFav) {
+          unawaited(_maybeAutoDownload());
+        }
       } else {
         // Site toggle failed — revert the optimistic change.
         setState(() {
@@ -97,7 +99,7 @@ class _SubmissionCardState extends State<SubmissionCard> {
       final autoDownload = prefs.getBool('auto_download_on_fave') ?? false;
       if (!autoDownload) return;
       final sub = _current;
-      if (sub.imageUrl.isEmpty) return;
+      if (!sub.isFavorite || sub.imageUrl.isEmpty) return;
       final path = await DownloadService.instance.downloadImage(
         imageUrl: sub.imageUrl,
         title: sub.title,

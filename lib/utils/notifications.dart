@@ -13,6 +13,13 @@ const _channels = {
     importance: Importance.defaultImportance,
     priority: Priority.defaultPriority,
   ),
+  'watch': AndroidNotificationDetails(
+    'watch_channel',
+    'Watches',
+    channelDescription: 'When someone starts watching you',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+  ),
   'submission_comment': AndroidNotificationDetails(
     'submission_comment_channel',
     'Submission Comments',

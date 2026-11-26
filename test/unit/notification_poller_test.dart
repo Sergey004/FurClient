@@ -118,12 +118,16 @@ fa.FANotificationPreview _other(int id, {DateTime? date}) =>
     );
 
 fa.FANotificationPreviews _others({
+  List<fa.FANotificationPreview> favorites = const [],
+  List<fa.FANotificationPreview> watches = const [],
   List<fa.FANotificationPreview> submissionComments = const [],
   List<fa.FANotificationPreview> journalComments = const [],
   List<fa.FANotificationPreview> shouts = const [],
   List<fa.FANotificationPreview> journals = const [],
 }) =>
     fa.FANotificationPreviews(
+      favorites: favorites,
+      watches: watches,
       submissionComments: submissionComments,
       journalComments: journalComments,
       shouts: shouts,
@@ -147,6 +151,8 @@ NotificationPoller _poller(
 Map<String, Object> _initializedPrefs() => {
       'latestSubmissionNotificationID': 0,
       'latestNoteNotificationID': 0,
+      'latestFavoriteNotificationID': 0,
+      'latestWatchNotificationID': 0,
       'latestSubmissionCommentNotificationID': 0,
       'latestJournalCommentNotificationID': 0,
       'latestShoutNotificationID': 0,
@@ -165,7 +171,12 @@ void main() {
       client,
       posted,
       notes: [_note(5)],
-      others: _others(shouts: [_other(12)], journals: [_other(11)]),
+      others: _others(
+        favorites: [_other(14)],
+        watches: [_other(13)],
+        shouts: [_other(12)],
+        journals: [_other(11)],
+      ),
     );
 
     await poller.pollAndNotify();
@@ -174,6 +185,8 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getInt('latestSubmissionNotificationID'), 102);
     expect(prefs.getInt('latestNoteNotificationID'), 5);
+    expect(prefs.getInt('latestFavoriteNotificationID'), 14);
+    expect(prefs.getInt('latestWatchNotificationID'), 13);
     expect(prefs.getInt('latestShoutNotificationID'), 12);
     expect(prefs.getInt('latestJournalNotificationID'), 11);
     expect(prefs.getInt('latestSubmissionCommentNotificationID'), 0);
@@ -183,7 +196,7 @@ void main() {
     expect(posted, isEmpty);
   });
 
-  test('all six categories post once and advance their own watermark',
+  test('all eight categories post once and advance their own watermark',
       () async {
     SharedPreferences.setMockInitialValues(_initializedPrefs());
     final posted = <_PostedNotification>[];
@@ -192,6 +205,8 @@ void main() {
       posted,
       notes: [_note(10)],
       others: _others(
+        favorites: [_other(60)],
+        watches: [_other(70)],
         submissionComments: [_other(20)],
         journalComments: [_other(30)],
         shouts: [_other(40)],
@@ -205,24 +220,54 @@ void main() {
       containsAll(<String>[
         'submission',
         'note',
+        'favorite',
+        'watch',
         'submission_comment',
         'journal_comment',
         'shout',
         'journal',
       ]),
     );
-    expect(posted, hasLength(6));
+    expect(posted, hasLength(8));
 
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getInt('latestSubmissionNotificationID'), 100);
     expect(prefs.getInt('latestNoteNotificationID'), 10);
+    expect(prefs.getInt('latestFavoriteNotificationID'), 60);
+    expect(prefs.getInt('latestWatchNotificationID'), 70);
     expect(prefs.getInt('latestSubmissionCommentNotificationID'), 20);
     expect(prefs.getInt('latestJournalCommentNotificationID'), 30);
     expect(prefs.getInt('latestShoutNotificationID'), 40);
     expect(prefs.getInt('latestJournalNotificationID'), 50);
 
     await poller.pollAndNotify();
-    expect(posted, hasLength(6));
+    expect(posted, hasLength(8));
+  });
+
+  test('new favorite/watch watermarks seed without an upgrade backlog',
+      () async {
+    final legacyPrefs = _initializedPrefs()
+      ..remove('latestFavoriteNotificationID')
+      ..remove('latestWatchNotificationID');
+    SharedPreferences.setMockInitialValues(legacyPrefs);
+    final posted = <_PostedNotification>[];
+
+    await _poller(
+      _FakeClient(),
+      posted,
+      others: _others(favorites: [_other(60)], watches: [_other(70)]),
+    ).pollAndNotify();
+    expect(posted, isEmpty);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt('latestFavoriteNotificationID'), 60);
+    expect(prefs.getInt('latestWatchNotificationID'), 70);
+
+    await _poller(
+      _FakeClient(),
+      posted,
+      others: _others(favorites: [_other(61)], watches: [_other(71)]),
+    ).pollAndNotify();
+    expect(posted.map((n) => n.type), ['favorite', 'watch']);
   });
 
   test('disabled and already read notes advance without a later backlog',

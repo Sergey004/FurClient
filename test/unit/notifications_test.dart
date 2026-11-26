@@ -20,6 +20,10 @@ void main() {
     expect(comment.channelName, 'Submission Comments');
     expect(comment.importance, Importance.high);
 
+    final watch = androidNotificationDetailsForType('watch');
+    expect(watch.channelId, 'watch_channel');
+    expect(watch.channelName, 'Watches');
+
     final submission = androidNotificationDetailsForType('submission');
     expect(submission.channelName, 'New Submissions');
     expect(submission.importance, Importance.defaultImportance);

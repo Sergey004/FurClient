@@ -111,6 +111,7 @@ export 'src/pages/fa_note_page.dart';
 export 'src/pages/fa_notes_page.dart';
 export 'src/pages/fa_new_note_page.dart';
 export 'src/pages/fa_user_page.dart';
+export 'src/pages/fa_shout_form.dart';
 export 'src/pages/fa_user_gallery_like_page.dart';
 export 'src/pages/fa_user_journals_page.dart';
 export 'src/pages/fa_watchlist_page.dart';

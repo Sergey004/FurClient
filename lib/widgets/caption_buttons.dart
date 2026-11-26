@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:window_manager/window_manager.dart';
+import '../services/windows_tray_service.dart';
 
 /// Custom caption buttons (minimize / maximize / close) replacing the
 /// non-existent `WindowCaption` from fluent_ui 4.15.1.
@@ -50,7 +51,7 @@ class CaptionButtons extends StatelessWidget {
           ),
           _btn(
             fluent.FluentIcons.chrome_close,
-            () => windowManager.close(),
+            () => WindowsTrayService.instance.closeWindow(),
             inactive,
             hoverBg: hoverBg,
             isClose: true,

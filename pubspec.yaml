@@ -56,6 +56,7 @@ dependencies:
   workmanager: ^0.10.10
   haptic_feedback: ^0.8.0
   cupertino_ui: any
+  tray_manager: ^0.9.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -63,3 +64,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/tray_icon.png

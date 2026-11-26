@@ -40,6 +40,10 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isLoading = true;
   String? _error;
   final GlobalKey _targetShoutKey = GlobalKey();
+  final TextEditingController _shoutCtrl = TextEditingController();
+  bool _isPostingShout = false;
+  String? _shoutFeedback;
+  bool _shoutSucceeded = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -48,6 +52,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   void initState() {
     super.initState();
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _shoutCtrl.dispose();
+    super.dispose();
   }
 
   String get _username => widget.targetUsername ?? widget.session.username;
@@ -74,6 +84,39 @@ class _ProfileScreenState extends State<ProfileScreen>
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _postShout() async {
+    if (_isPostingShout) return;
+    final message = _shoutCtrl.text.trim();
+    if (message.isEmpty) {
+      setState(() {
+        _shoutSucceeded = false;
+        _shoutFeedback = 'Write a shout first';
+      });
+      return;
+    }
+    setState(() {
+      _isPostingShout = true;
+      _shoutFeedback = null;
+    });
+    try {
+      await widget.client.postShout(username: _username, message: message);
+      if (!mounted) return;
+      _shoutCtrl.clear();
+      _shoutSucceeded = true;
+      _shoutFeedback = 'Shout posted';
+      await _loadProfile();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _shoutSucceeded = false;
+          _shoutFeedback = 'Post failed: $e';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isPostingShout = false);
     }
   }
 
@@ -201,7 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ],
         const SizedBox(height: 20),
         _buildLinks(p),
-        if (p.shouts.isNotEmpty) ...[
+        ...[
           const SizedBox(height: 20),
           _buildShouts(p),
         ],
@@ -223,7 +266,47 @@ class _ProfileScreenState extends State<ProfileScreen>
                   color: colors.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _shoutCtrl,
+            enabled: !_isPostingShout,
+            minLines: 1,
+            maxLines: 3,
+            maxLength: 255,
+            style: TextStyle(color: colors.onSurface, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Write a shout…',
+              hintStyle: TextStyle(color: colors.onSurfaceVariant),
+              filled: true,
+              fillColor: colors.surfaceContainerLow,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
+          Row(
+            children: [
+              AdaptiveButton(
+                label: _isPostingShout ? 'Posting…' : 'Post shout',
+                onPressed: _isPostingShout ? null : _postShout,
+              ),
+              if (_shoutFeedback != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _shoutFeedback!,
+                    style: TextStyle(
+                      color: _shoutSucceeded ? colors.primary : colors.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
           for (final shout in p.shouts)
             Container(
               key: shout.cid == widget.targetShoutId ? _targetShoutKey : null,
@@ -370,7 +453,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             const SizedBox(height: 20),
           ],
           _buildLinks(p),
-          if (p.shouts.isNotEmpty) ...[
+          ...[
             const SizedBox(height: 20),
             _buildShouts(p),
           ],
